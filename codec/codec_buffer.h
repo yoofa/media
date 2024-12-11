@@ -14,7 +14,7 @@
 namespace ave {
 namespace media {
 
-class CodecBuffer : public Buffer {
+class CodecBuffer {
  public:
   enum class BufferType {
     kTypeNormal,
@@ -24,7 +24,17 @@ class CodecBuffer : public Buffer {
 
   CodecBuffer();
   CodecBuffer(size_t capacity);
-  ~CodecBuffer() override;
+  ~CodecBuffer();
+
+  // buffer operation
+  uint8_t* base();
+  uint8_t* data();
+  size_t capacity();
+  size_t size();
+  size_t offset();
+  void SetRange(size_t offset, size_t size);
+  void EnsureCapacity(size_t capacity, bool copy = false);
+  void ResetBuffer(std::shared_ptr<Buffer>& buffer);
 
   void SetIndex(int32_t index) {
     buffer_index_ = index;
@@ -49,6 +59,7 @@ class CodecBuffer : public Buffer {
   std::shared_ptr<MediaFormat>& format() { return format_; }
 
  private:
+  std::shared_ptr<Buffer> buffer_;
   int32_t buffer_index_;
   int32_t texture_id_;
   void* native_handle_;
