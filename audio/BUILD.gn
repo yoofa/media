@@ -31,7 +31,7 @@ ave_library("audio_channel_layout") {
 # audio device
 ave_library("audio_device") {
   sources = [
-    "audio_device_factory.h",
+    "audio_device_module.h",
     "audio_record.h",
     "audio_track.h",
   ]
@@ -40,8 +40,8 @@ ave_library("audio_device") {
 
 ave_library("alsa_audio_device") {
   sources = [
-    "alsa/alsa_audio_device_factory.cc",
-    "alsa/alsa_audio_device_factory.h",
+    "alsa/alsa_audio_device_module.cc",
+    "alsa/alsa_audio_device_module.h",
     "alsa/alsa_audio_record.cc",
     "alsa/alsa_audio_record.h",
     "alsa/alsa_audio_track.cc",
@@ -53,10 +53,10 @@ ave_library("alsa_audio_device") {
   ]
 }
 
-ave_library("default_audio_device_factory") {
+ave_library("default_audio_device_module") {
   sources = [
-    "default_audio_device_factory.cc",
-    "default_audio_device_factory.h",
+    "default_audio_device_module.cc",
+    "default_audio_device_module.h",
   ]
   deps = [
     ":alsa_audio_device",

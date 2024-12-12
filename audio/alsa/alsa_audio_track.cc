@@ -8,9 +8,5 @@
 #include "alsa_audio_track.h"
 
 namespace ave {
-namespace media {
-
-//
-
-}  // namespace media
+namespace media {}  // namespace media
 }  // namespace ave
