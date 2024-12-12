@@ -25,6 +25,7 @@ MediaPacket::MediaPacket(size_t size, protect_parameter)
       native_handle_(nullptr),
       buffer_type_(PacketBufferType::kTypeNormal),
       media_type_(MediaType::UNKNOWN),
+      is_eos_(false),
       sample_info_(0) {}
 
 MediaPacket::MediaPacket(void* handle, protect_parameter)
@@ -33,6 +34,7 @@ MediaPacket::MediaPacket(void* handle, protect_parameter)
       native_handle_(handle),
       buffer_type_(PacketBufferType::kTypeNativeHandle),
       media_type_(MediaType::UNKNOWN),
+      is_eos_(false),
       sample_info_(0) {}
 
 MediaPacket::~MediaPacket() = default;
@@ -50,6 +52,7 @@ MediaPacket::MediaPacket(const MediaPacket& other) {
 
   size_ = other.size_;
   media_type_ = other.media_type_;
+  is_eos_ = other.is_eos_;
   sample_info_ = other.sample_info_;
 }
 

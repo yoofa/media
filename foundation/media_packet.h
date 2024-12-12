@@ -62,6 +62,9 @@ class MediaPacket : MessageObject {
   PacketBufferType buffer_type() const { return buffer_type_; }
   void* native_handle() const { return native_handle_; }
 
+  void SetEOS(bool eos) { is_eos_ = eos; }
+  bool is_eos() const { return is_eos_; }
+
  private:
   using SampleInfo = std::variant<int, AudioSampleInfo, VideoSampleInfo>;
 
@@ -70,6 +73,8 @@ class MediaPacket : MessageObject {
   void* native_handle_;
   PacketBufferType buffer_type_;
   MediaType media_type_;
+
+  bool is_eos_;
 
   // audio or video or data sample info
   SampleInfo sample_info_;
