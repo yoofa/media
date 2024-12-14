@@ -66,8 +66,6 @@ class MediaPacket : MessageObject {
   bool is_eos() const { return is_eos_; }
 
  private:
-  using SampleInfo = std::variant<int, AudioSampleInfo, VideoSampleInfo>;
-
   size_t size_;
   std::shared_ptr<Buffer> data_;
   void* native_handle_;

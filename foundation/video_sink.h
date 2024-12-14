@@ -15,11 +15,12 @@
 namespace ave {
 namespace media {
 
+template <typename VideoFrameT>
 class VideoSink : public MessageObject {
  public:
   VideoSink() = default;
   ~VideoSink() override = default;
-  virtual void onFrame() = 0;
+  virtual void OnFrame(const VideoFrameT& frame) = 0;
   virtual int64_t render_latency() { return 0; }
 };
 

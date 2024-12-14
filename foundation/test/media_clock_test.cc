@@ -13,7 +13,7 @@ namespace ave {
 namespace media {
 
 class MediaClockTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override { media_clock_ = std::make_shared<MediaClock>(); }
 
   std::shared_ptr<MediaClock> media_clock_;
@@ -61,5 +61,5 @@ TEST_F(MediaClockTest, SetStartingTimeMedia) {
 
 // Add more tests here for other methods and edge cases
 
-} // namespace media
-} // namespace ave
+}  // namespace media
+}  // namespace ave

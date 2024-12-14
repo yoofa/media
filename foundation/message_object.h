@@ -12,12 +12,12 @@ namespace ave {
 namespace media {
 
 class MessageObject {
-public:
+ public:
   MessageObject() = default;
   virtual ~MessageObject() = default;
 };
 
-} // namespace media
-} // namespace ave
+}  // namespace media
+}  // namespace ave
 
 #endif /* !MESSAGE_OBJECT_H */

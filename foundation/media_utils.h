@@ -58,6 +58,8 @@ struct AudioSampleInfo {
   base::Timestamp pts = base::Timestamp::Zero();
   base::Timestamp dts = base::Timestamp::Zero();
   base::TimeDelta duration = base::TimeDelta::Zero();
+
+  bool eos = false;
 };
 
 struct VideoSampleInfo {
@@ -72,6 +74,8 @@ struct VideoSampleInfo {
   base::Timestamp dts = base::Timestamp::Zero();
   base::TimeDelta duration = base::TimeDelta::Zero();
 
+  bool eos = false;
+
   // raw
   PixelFormat pixel_format = PixelFormat::AVE_PIX_FMT_NONE;
 
@@ -79,6 +83,8 @@ struct VideoSampleInfo {
   PictureType picture_type = PictureType::NONE;
   int16_t qp = -1;
 };
+
+using SampleInfo = std::variant<int, AudioSampleInfo, VideoSampleInfo>;
 
 struct AudioTrackInfo {
   CodecId codec_id = CodecId::AVE_CODEC_ID_NONE;

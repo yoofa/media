@@ -17,9 +17,10 @@ namespace media {
 class CodecBuffer {
  public:
   enum class BufferType {
-    kTypeNormal,
-    kTypeTexture,
-    kTypeNativeHandle,
+    kTypeNormal,        // a normal memory buffer
+    kTypeTexture,       // frame is rendered in texture_id
+    kTypeNativeHandle,  // a buffer with specified native handle that only some
+                        // special sink can resolve real data
   };
 
   CodecBuffer();
