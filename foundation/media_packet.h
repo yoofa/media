@@ -9,10 +9,10 @@
 #define MEDIA_PACKET_H
 
 #include <memory>
-#include <variant>
 
 #include "buffer.h"
 #include "media_utils.h"
+#include "media_format.h"
 #include "message_object.h"
 
 namespace ave {
@@ -75,7 +75,8 @@ class MediaPacket : MessageObject {
   bool is_eos_;
 
   // audio or video or data sample info
-  SampleInfo sample_info_;
+  //MediaSampleInfo sample_info_;
+  MediaFormat media_format_;
 };
 
 }  // namespace media

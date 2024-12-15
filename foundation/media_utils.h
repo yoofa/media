@@ -12,6 +12,7 @@
 
 #include <variant>
 
+#include "base/buffer.h"
 #include "base/units/time_delta.h"
 #include "base/units/timestamp.h"
 
@@ -46,8 +47,13 @@ enum class PictureType {
   D,
 };
 
+// max csd data size 4k
+static constexpr size_t kMaxCsdSize =
+    4096;  // or whatever maximum size is appropriate
+
 const char* get_media_type_string(enum MediaType media_type);
 
+/*******************************************************/
 struct AudioSampleInfo {
   CodecId codec_id = CodecId::AVE_CODEC_ID_NONE;
   int64_t sample_rate_hz = -1;
@@ -60,6 +66,8 @@ struct AudioSampleInfo {
   base::TimeDelta duration = base::TimeDelta::Zero();
 
   bool eos = false;
+
+  std::shared_ptr<base::Buffer> private_data;
 };
 
 struct VideoSampleInfo {
@@ -82,10 +90,37 @@ struct VideoSampleInfo {
   // encoded
   PictureType picture_type = PictureType::NONE;
   int16_t qp = -1;
+
+  std::shared_ptr<base::Buffer> private_data;
 };
 
-using SampleInfo = std::variant<int, AudioSampleInfo, VideoSampleInfo>;
+struct OtherSampleInfo {};
 
+struct MediaSampleInfo {
+  explicit MediaSampleInfo(MediaType type) : sample_type(type) {
+    if (sample_type == MediaType::AUDIO) {
+      sample_info = AudioSampleInfo();
+    } else if (sample_type == MediaType::VIDEO) {
+      sample_info = VideoSampleInfo();
+    } else {
+      sample_info = OtherSampleInfo();
+    }
+  }
+  AudioSampleInfo& audio() { return std::get<AudioSampleInfo>(sample_info); }
+  VideoSampleInfo& video() { return std::get<VideoSampleInfo>(sample_info); }
+
+  const AudioSampleInfo& audio() const {
+    return std::get<AudioSampleInfo>(sample_info);
+  }
+  const VideoSampleInfo& video() const {
+    return std::get<VideoSampleInfo>(sample_info);
+  }
+
+  MediaType sample_type = MediaType::UNKNOWN;
+  std::variant<OtherSampleInfo, AudioSampleInfo, VideoSampleInfo> sample_info;
+};
+
+/*******************************************************/
 struct AudioTrackInfo {
   CodecId codec_id = CodecId::AVE_CODEC_ID_NONE;
   base::TimeDelta duration = base::TimeDelta::Zero();
@@ -94,6 +129,8 @@ struct AudioTrackInfo {
   ChannelLayout channel_layout = CHANNEL_LAYOUT_NONE;
   int64_t samples_per_channel = -1;
   int16_t bits_per_sample = -1;
+
+  std::shared_ptr<base::Buffer> private_data;
 };
 
 struct VideoTrackInfo {
@@ -105,6 +142,9 @@ struct VideoTrackInfo {
   int16_t height = -1;
   int16_t rotation = -1;
   PixelFormat pixel_format = PixelFormat::AVE_PIX_FMT_NONE;
+  int16_t fps = -1;
+
+  std::shared_ptr<base::Buffer> private_data;
 };
 
 struct OtherTrackInfo {};
@@ -133,6 +173,7 @@ struct MediaTrackInfo {
   std::variant<OtherTrackInfo, AudioTrackInfo, VideoTrackInfo> track_info;
 };
 
+/*******************************************************/
 MediaType CodecMediaType(CodecId codec_id);
 
 }  // namespace media

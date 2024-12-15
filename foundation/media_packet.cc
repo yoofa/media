@@ -26,7 +26,7 @@ MediaPacket::MediaPacket(size_t size, protect_parameter)
       buffer_type_(PacketBufferType::kTypeNormal),
       media_type_(MediaType::UNKNOWN),
       is_eos_(false),
-      sample_info_(0) {}
+      media_format_(MediaFormat::Create(MediaType::UNKNOWN)) {}
 
 MediaPacket::MediaPacket(void* handle, protect_parameter)
     : size_(0),
@@ -35,11 +35,15 @@ MediaPacket::MediaPacket(void* handle, protect_parameter)
       buffer_type_(PacketBufferType::kTypeNativeHandle),
       media_type_(MediaType::UNKNOWN),
       is_eos_(false),
-      sample_info_(0) {}
+      media_format_(MediaFormat::Create(MediaType::UNKNOWN)) {}
 
 MediaPacket::~MediaPacket() = default;
 
-MediaPacket::MediaPacket(const MediaPacket& other) {
+MediaPacket::MediaPacket(const MediaPacket& other)
+    : size_(other.size_),
+      media_type_(other.media_type_),
+      is_eos_(other.is_eos_),
+      media_format_(other.media_format_) {
   if (other.buffer_type_ == PacketBufferType::kTypeNormal) {
     data_ = other.data_;
     native_handle_ = nullptr;
@@ -49,11 +53,6 @@ MediaPacket::MediaPacket(const MediaPacket& other) {
     native_handle_ = other.native_handle_;
     buffer_type_ = PacketBufferType::kTypeNativeHandle;
   }
-
-  size_ = other.size_;
-  media_type_ = other.media_type_;
-  is_eos_ = other.is_eos_;
-  sample_info_ = other.sample_info_;
 }
 
 void MediaPacket::SetMediaType(MediaType type) {
@@ -61,10 +60,10 @@ void MediaPacket::SetMediaType(MediaType type) {
     media_type_ = type;
     switch (media_type_) {
       case MediaType::AUDIO:
-        sample_info_ = AudioSampleInfo();
+        media_format_ = MediaFormat::Create(MediaType::AUDIO);
         break;
       case MediaType::VIDEO:
-        sample_info_ = VideoSampleInfo();
+        media_format_ = MediaFormat::Create(MediaType::VIDEO);
         break;
       default:
         break;
@@ -86,11 +85,19 @@ void MediaPacket::SetData(uint8_t* data, size_t size) {
 }
 
 AudioSampleInfo* MediaPacket::audio_info() {
-  return std::get_if<AudioSampleInfo>(&sample_info_);
+  if (media_type_ != MediaType::AUDIO) {
+    return nullptr;
+  }
+  auto& sample_info = media_format_.sample_info();
+  return &sample_info.audio();
 }
 
 VideoSampleInfo* MediaPacket::video_info() {
-  return std::get_if<VideoSampleInfo>(&sample_info_);
+    if (media_type_ != MediaType::VIDEO) {
+    return nullptr;
+  }
+  auto& sample_info = media_format_.sample_info();
+  return &sample_info.video();
 }
 
 const uint8_t* MediaPacket::data() const {
