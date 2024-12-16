@@ -4,7 +4,7 @@ ave_library("audio") {
   deps = [
     ":audio_base",
     ":audio_device",
-    ":default_audio_device_factory",
+    ":default_audio_device_module",
   ]
 }
 

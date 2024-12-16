@@ -94,6 +94,7 @@ ave_library("media_packet") {
   ]
   deps = [
     ":buffer",
+    ":media_format",
     "//base/units",
   ]
 }
@@ -136,7 +137,9 @@ ave_library("unittest_sources") {
   testonly = true
   deps = [
     "test:media_clock_test",
+    "test:media_format_test",
     "test:media_packet_test",
+    "test:media_utils_test",
   ]
 }
 

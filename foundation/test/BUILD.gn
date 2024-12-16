@@ -16,11 +16,29 @@ executable("looper_test") {
   ]
 }
 
+ave_source_set("media_utils_test") {
+  testonly = true
+  sources = [ "media_utils_unittest.cc" ]
+  deps = [
+    "..:media_utils",
+    "//test:test_support",
+  ]
+}
+
 ave_source_set("media_packet_test") {
   testonly = true
   sources = [ "media_packet_unittest.cc" ]
   deps = [
     "..:media_packet",
+    "//test:test_support",
+  ]
+}
+
+ave_source_set("media_format_test") {
+  testonly = true
+  sources = [ "media_format_unittest.cc" ]
+  deps = [
+    "..:media_format",
     "//test:test_support",
   ]
 }
