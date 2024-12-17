@@ -106,6 +106,8 @@ struct MediaSampleInfo {
       sample_info = OtherSampleInfo();
     }
   }
+  MediaSampleInfo() : MediaSampleInfo(MediaType::UNKNOWN) {}
+
   AudioSampleInfo& audio() { return std::get<AudioSampleInfo>(sample_info); }
   VideoSampleInfo& video() { return std::get<VideoSampleInfo>(sample_info); }
 

@@ -99,6 +99,14 @@ ave_library("media_packet") {
   ]
 }
 
+ave_library("media_frame") {
+  sources = [
+    "media_frame.cc",
+    "media_frame.h",
+  ]
+  deps = [ ":media_format" ]
+}
+
 ave_library("esds") {
   sources = [
     "esds.cc",
@@ -138,6 +146,7 @@ ave_library("unittest_sources") {
   deps = [
     "test:media_clock_test",
     "test:media_format_test",
+    "test:media_frame_test",
     "test:media_packet_test",
     "test:media_utils_test",
   ]

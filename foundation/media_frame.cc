@@ -27,7 +27,7 @@ MediaFrame::MediaFrame(size_t size, protect_parameter)
       native_handle_(nullptr),
       buffer_type_(FrameBufferType::kTypeNormal),
       media_type_(MediaType::UNKNOWN),
-      sample_info_(AudioSampleInfo{}) {}
+      sample_info_(MediaType::UNKNOWN) {}
 
 MediaFrame::MediaFrame(void* handle, protect_parameter)
     : size_(0),
@@ -35,7 +35,7 @@ MediaFrame::MediaFrame(void* handle, protect_parameter)
       native_handle_(handle),
       buffer_type_(FrameBufferType::kTypeNativeHandle),
       media_type_(MediaType::UNKNOWN),
-      sample_info_(AudioSampleInfo{}) {}
+      sample_info_(MediaType::UNKNOWN) {}
 
 MediaFrame::~MediaFrame() = default;
 
@@ -58,16 +58,7 @@ MediaFrame::MediaFrame(const MediaFrame& other) {
 void MediaFrame::SetMediaType(MediaType type) {
   if (media_type_ != type) {
     media_type_ = type;
-    switch (media_type_) {
-      case MediaType::AUDIO:
-        sample_info_ = AudioSampleInfo();
-        break;
-      case MediaType::VIDEO:
-        sample_info_ = VideoSampleInfo();
-        break;
-      default:
-        break;
-    }
+    sample_info_ = MediaSampleInfo(type);
   }
 }
 
@@ -85,11 +76,17 @@ void MediaFrame::SetData(uint8_t* data, size_t size) {
 }
 
 AudioSampleInfo* MediaFrame::audio_info() {
-  return std::get_if<AudioSampleInfo>(&sample_info_);
+  if (media_type_ != MediaType::AUDIO) {
+    return nullptr;
+  }
+  return &(sample_info_.audio());
 }
 
 VideoSampleInfo* MediaFrame::video_info() {
-  return std::get_if<VideoSampleInfo>(&sample_info_);
+  if (media_type_ != MediaType::VIDEO) {
+    return nullptr;
+  }
+  return &(sample_info_.video());
 }
 
 const uint8_t* MediaFrame::data() const {

@@ -9,7 +9,6 @@
 #define MEDIA_FRAME_H
 
 #include <memory>
-#include <variant>
 
 #include "buffer.h"
 #include "media_utils.h"
@@ -81,7 +80,7 @@ class MediaFrame {
 
   MediaType media_type_;
   // audio or video frame info
-  SampleInfo sample_info_;
+  MediaSampleInfo sample_info_;
 };
 
 }  // namespace media

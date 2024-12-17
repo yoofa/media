@@ -34,6 +34,15 @@ ave_source_set("media_packet_test") {
   ]
 }
 
+ave_source_set("media_frame_test") {
+  testonly = true
+  sources = [ "media_frame_unittest.cc" ]
+  deps = [
+    "..:media_frame",
+    "//test:test_support",
+  ]
+}
+
 ave_source_set("media_format_test") {
   testonly = true
   sources = [ "media_format_unittest.cc" ]
