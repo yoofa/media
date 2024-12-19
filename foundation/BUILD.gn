@@ -17,6 +17,25 @@ ave_source_set("message_object") {
   sources = [ "message_object.h" ]
 }
 
+ave_library("media_source_sink") {
+  sources = [
+    "media_sink_base.h",
+    "media_source_base.h",
+    "media_source_sink_interface.h",
+  ]
+  deps = [
+    ":media_frame",
+    ":media_packet",
+  ]
+}
+ave_library("video_render") {
+  sources = [ "video_render.h" ]
+  deps = [
+    ":media_source_sink",
+    ":message_object",
+  ]
+}
+
 ave_library("buffer") {
   sources = [
     "buffer.cc",
@@ -71,6 +90,7 @@ ave_library("media_source") {
   deps = [
     ":media_format",
     ":media_packet",
+    ":media_source_sink",
     ":message_object",
   ]
 }

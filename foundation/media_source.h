@@ -16,12 +16,13 @@
 #include "media_errors.h"
 #include "media_format.h"
 #include "media_packet.h"
+#include "media_source_base.h"
 #include "message_object.h"
 
 namespace ave {
 namespace media {
 
-class MediaSource : public MessageObject {
+class MediaSource : public MessageObject, public MediaPacketSource {
  public:
   // Options that modify read() behaviour. The default is to
   // a) not request a seek
