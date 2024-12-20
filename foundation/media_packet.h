@@ -11,8 +11,8 @@
 #include <memory>
 
 #include "buffer.h"
-#include "media_utils.h"
 #include "media_format.h"
+#include "media_utils.h"
 #include "message_object.h"
 
 namespace ave {
@@ -75,7 +75,7 @@ class MediaPacket : MessageObject {
   bool is_eos_;
 
   // audio or video or data sample info
-  //MediaSampleInfo sample_info_;
+  // MediaSampleInfo sample_info_;
   MediaFormat media_format_;
 };
 

@@ -93,7 +93,7 @@ AudioSampleInfo* MediaPacket::audio_info() {
 }
 
 VideoSampleInfo* MediaPacket::video_info() {
-    if (media_type_ != MediaType::VIDEO) {
+  if (media_type_ != MediaType::VIDEO) {
     return nullptr;
   }
   auto& sample_info = media_format_.sample_info();

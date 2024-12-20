@@ -11,7 +11,6 @@
 #include "media_frame.h"
 #include "media_packet.h"
 #include "media_source_sink_interface.h"
-#include "message_object.h"
 
 namespace ave {
 namespace media {

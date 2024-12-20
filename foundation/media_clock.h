@@ -76,6 +76,7 @@ class MediaClock {
                         int64_t* out_media_us,
                         bool allow_past_max_time = false) const;
   status_t GetRealTimeFor(int64_t target_media_us, int64_t* out_real_us) const;
+  
   void AddTimerEvent(std::unique_ptr<TimerEvent> event,
                      int64_t media_time_us,
                      int64_t adjust_real_us = 0);
@@ -84,7 +85,7 @@ class MediaClock {
             std::enable_if_t<
                 !std::is_convertible_v<Closure, std::unique_ptr<TimerEvent>>>* =
                 nullptr>
-  void AddTimerEvent(Closure** closure,
+  void AddTimerEvent(Closure&& closure,
                      int64_t media_time_us,
                      int64_t adjust_real_us = 0) {
     AddTimerEvent(clock_impl::ToTimerEvent(closure), media_time_us,
