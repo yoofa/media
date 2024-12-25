@@ -1,0 +1,182 @@
+import("//base/build/ave.gni")
+
+ave_library("foundation") {
+  deps = [
+    ":bit_reader",
+    ":color_utils",
+    ":esds",
+    ":handler",
+    ":media_format",
+    ":media_packet",
+    ":media_source",
+    ":media_utils",
+  ]
+}
+
+ave_source_set("message_object") {
+  sources = [ "message_object.h" ]
+}
+
+ave_library("media_source_sink") {
+  sources = [
+    "media_sink_base.h",
+    "media_source_base.h",
+    "media_source_sink_interface.h",
+  ]
+  deps = [
+    ":media_frame",
+    ":media_packet",
+  ]
+}
+ave_library("video_render") {
+  sources = [ "video_render.h" ]
+  deps = [
+    ":media_source_sink",
+    ":message_object",
+  ]
+}
+
+ave_library("buffer") {
+  sources = [
+    "buffer.cc",
+    "buffer.h",
+  ]
+  deps = [ ":handler" ]
+}
+
+ave_library("handler") {
+  sources = [
+    "handler.cc",
+    "handler.h",
+    "handler_roster.cc",
+    "handler_roster.h",
+    "looper.cc",
+    "looper.h",
+    "message.cc",
+    "message.h",
+  ]
+  deps = [
+    ":message_object",
+    "//base:count_down_latch",
+  ]
+}
+
+ave_library("avc_util") {
+  sources = [
+    "avc_utils.cc",
+    "avc_utils.h",
+  ]
+}
+
+ave_library("hevc_util") {
+  sources = [
+    "hevc_utils.cc",
+    "hevc_utils.h",
+  ]
+}
+
+ave_library("media_format") {
+  sources = [
+    "media_format.cc",
+    "media_format.h",
+  ]
+}
+
+ave_library("media_source") {
+  sources = [
+    "media_source.cc",
+    "media_source.h",
+  ]
+  deps = [
+    ":media_format",
+    ":media_packet",
+    ":media_source_sink",
+    ":message_object",
+  ]
+}
+
+ave_library("media_defs") {
+  sources = [
+    "media_defs.cc",
+    "media_defs.h",
+  ]
+}
+
+ave_library("media_utils") {
+  sources = [ "media_utils.cc" ]
+  deps = [ ":message_object" ]
+}
+
+ave_library("media_packet") {
+  sources = [
+    "media_packet.cc",
+    "media_packet.h",
+  ]
+  deps = [
+    ":buffer",
+    ":media_format",
+    "//base/units",
+  ]
+}
+
+ave_library("media_frame") {
+  sources = [
+    "media_frame.cc",
+    "media_frame.h",
+  ]
+  deps = [ ":media_format" ]
+}
+
+ave_library("esds") {
+  sources = [
+    "esds.cc",
+    "esds.h",
+  ]
+}
+
+ave_library("color_utils") {
+  sources = [
+    "color_utils.cc",
+    "color_utils.h",
+  ]
+}
+
+ave_library("bit_reader") {
+  sources = [
+    "bit_reader.cc",
+    "bit_reader.h",
+  ]
+}
+
+ave_library("media_clock") {
+  sources = [
+    "media_clock.cc",
+    "media_clock.h",
+  ]
+  deps = [
+    "//base:task_util",
+    "//base:timeutils",
+  ]
+}
+
+# Tests
+#
+ave_library("unittest_sources") {
+  testonly = true
+  deps = [
+    "test:media_clock_test",
+    "test:media_format_test",
+    "test:media_frame_test",
+    "test:media_packet_test",
+    "test:media_utils_test",
+  ]
+}
+
+executable("media_foundation_unittests") {
+  testonly = true
+  deps = [
+    ":unittest_sources",
+    "//test:test_main",
+    "//test:test_support",
+  ]
+}

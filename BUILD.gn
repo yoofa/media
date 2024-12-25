@@ -1,90 +1,17 @@
+import("//base/build/ave.gni")
+
 group("media") {
-  deps = [ ":foundation" ]
-}
-
-static_library("foundation") {
-  sources = [
-    "avc_utils.cc",
-    "avc_utils.h",
-    "bit_reader.cc",
-    "bit_reader.h",
-    "buffer.cc",
-    "buffer.h",
-    "channel_layout.cc",
-    "channel_layout.h",
-    "codec_constants.h",
-    "color_utils.cc",
-    "color_utils.h",
-    "esds.cc",
-    "esds.h",
-    "handler.cc",
-    "handler.h",
-    "handler_roster.cc",
-    "handler_roster.h",
-    "hevc_utils.cc",
-    "hevc_utils.h",
-    "looper.cc",
-    "looper.h",
-    "media_buffer.cc",
-    "media_buffer.h",
-    "media_defs.cc",
-    "media_defs.h",
-    "media_source.h",
-    "media_utils.cc",
-    "media_utils.h",
-    "message.cc",
-    "message.h",
-    "meta_data.cc",
-    "meta_data.h",
-    "meta_data_utils.cc",
-    "meta_data_utils.h",
-    "utils.cc",
-    "utils.h",
-  ]
-
-  sources += [
-    "media_packet.cc",
-    "media_packet.h",
-    "pixel_format.h",
-  ]
-
-  sources += [
-    "audio_codec_property.cc",
-    "audio_codec_property.h",
-    "codec_id.h",
-    "video_codec_property.cc",
-    "video_codec_property.h",
-  ]
-
   deps = [
-    "//base",
-    "//base:byte_utils",
-    "//base:count_down_latch",
-    "//base:logging",
-    "//base:utils",
-  ]
-
-  configs += [
-    "..:no_exit_time_destructors",
-    "..:no_global_constructors",
-  ]
-
-  defines = [ "STRINGIFY_ENUMS" ]
-}
-
-source_set("media_packet_unittest") {
-  testonly = true
-  sources = [ "test/media_packet_unittest.cc" ]
-  deps = [
-    ":foundation",
-    "//test:test_support",
+    #"audio",
+    "codec",
+    "foundation",
   ]
 }
 
-executable("media_foundation_unittests") {
+ave_executable("media_unittests") {
   testonly = true
   deps = [
-    ":media_packet_unittest",
+    "foundation:unittest_sources",
     "//test:test_main",
     "//test:test_support",
   ]

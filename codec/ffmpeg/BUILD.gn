@@ -1,0 +1,43 @@
+import("//base/build/ave.gni")
+
+ave_library("ffmpeg_codec") {
+  sources = [
+    "ffmpeg_codec.cc",
+    "ffmpeg_codec.h",
+    "ffmpeg_codec_factory.cc",
+    "ffmpeg_codec_factory.h",
+  ]
+  deps = [
+    ":ffmpeg_utils",
+    "//base:logging",
+    "//base:task_util",
+    "//base:timeutils",
+    "//media/codec:codec_buffer",
+    "//media/codec:codec_interface",
+    "//third_party/ffmpeg",
+  ]
+}
+
+ave_library("ffmpeg_utils") {
+  sources = [
+    "ffmpeg_codec_utils.cc",
+    "ffmpeg_codec_utils.h",
+  ]
+  deps = [
+    "..:codec_id",
+    "//base:logging",
+    "//third_party/ffmpeg",
+  ]
+}
+
+ave_executable("ffmpeg_codec_example") {
+  sources = [ "ffmpeg_codec_example.cc" ]
+  deps = [
+    ":ffmpeg_codec",
+    "//base:attributes",
+    "//base:logging",
+    "//media/audio:audio_channel_layout",
+    "//media/foundation:media_format",
+    "//third_party/ffmpeg",
+  ]
+}

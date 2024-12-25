@@ -1,0 +1,35 @@
+import("//base/build/ave.gni")
+
+group("codec") {
+  deps = [ "ffmpeg:ffmpeg_codec_example" ]
+}
+
+ave_library("audio_codec_properity") {
+  sources = [
+    "audio_codec_properity.cc",
+    "audio_codec_properity.h",
+  ]
+}
+
+ave_library("codec_id") {
+  sources = [
+    "codec_id.cc",
+    "codec_id.h",
+  ]
+  deps = [ "../foundation:media_defs" ]
+}
+
+ave_library("codec_buffer") {
+  sources = [
+    "codec_buffer.cc",
+    "codec_buffer.h",
+  ]
+  deps = [ "../foundation:buffer" ]
+}
+
+ave_library("codec_interface") {
+  sources = [
+    "./codec.h",
+    "./codec_factory.h",
+  ]
+}
