@@ -55,15 +55,18 @@ void MediaClock::ClearAnchor() {
   UpdateAnchorTimesAndPlaybackRate(-1, -1, playback_rate_);
 }
 
+// anchor_time_real_us must use real time from base::TimeMicros()
 void MediaClock::UpdateAnchor(int64_t anchor_time_media_us,
-                              int64_t anchor_time_real_us,
                               int64_t max_time_media_us) {
-  if (anchor_time_media_us < 0 || anchor_time_real_us < 0) {
-    AVE_LOG(LS_WARNING) << "Invalid anchor time: " << anchor_time_media_us
-                        << ", " << anchor_time_real_us;
+  if (anchor_time_media_us < 0) {
+    AVE_LOG(LS_WARNING) << "Invalid anchor time: " << anchor_time_media_us;
     return;
   }
+  auto anchor_time_real_us = base::TimeMicros();
+
   std::lock_guard<std::mutex> lock(mutex_);
+
+  // maybe pass some time when acquire lock
   int64_t now_us = base::TimeMicros();
   auto real_diff = static_cast<double>(now_us - anchor_time_real_us);
   auto media_diff = std::llround(real_diff * playback_rate_);
@@ -78,6 +81,7 @@ void MediaClock::UpdateAnchor(int64_t anchor_time_media_us,
   }
 
   if (anchor_time_real_us_ != -1) {
+    // not first anchor, check if it's too close
     auto old_real_diff = static_cast<double>(now_us - anchor_time_real_us_);
     auto old_media_diff = std::llround(old_real_diff * playback_rate_);
     auto old_media_us = anchor_time_media_us_ + old_media_diff;
@@ -88,6 +92,7 @@ void MediaClock::UpdateAnchor(int64_t anchor_time_media_us,
       return;
     }
   }
+
   UpdateAnchorTimesAndPlaybackRate(now_media_us, now_us, playback_rate_);
   PostProcessTimers();
 }
@@ -98,7 +103,7 @@ void MediaClock::UpdateMaxTimeMedia(int64_t max_time_media_us) {
 }
 
 void MediaClock::SetPlaybackRate(float rate) {
-  AVE_CHECK_GT(rate, 0.0);
+  AVE_CHECK_GE(rate, 0.0);
   std::lock_guard<std::mutex> lock(mutex_);
   if (anchor_time_media_us_ == -1) {
     playback_rate_ = rate;
@@ -147,7 +152,7 @@ status_t MediaClock::GetRealTimeFor(int64_t target_media_us,
   }
 
   std::lock_guard<std::mutex> lock(mutex_);
-  if (playback_rate_ == 0.0) {
+  if (playback_rate_ == 0.0 || anchor_time_real_us_ == -1) {
     return NO_INIT;
   }
 
@@ -158,10 +163,10 @@ status_t MediaClock::GetRealTimeFor(int64_t target_media_us,
     return status;
   }
 
-  *out_real_us =
-      now_us +
-      std::llround(static_cast<double>(target_media_us - now_media_us) /
-                   playback_rate_);
+  auto real_diff = static_cast<int64_t>(target_media_us - now_media_us);
+  auto real_us =
+      std::llround(static_cast<double>(real_diff) / playback_rate_) + now_us;
+  *out_real_us = real_us;
   return OK;
 }
 
@@ -251,6 +256,8 @@ void MediaClock::ProcessTimers() {
   auto status = GetMediaTime_l(now_us, &now_media_us, false);
 
   if (status != OK) {
+    AVE_LOG(LS_WARNING) << "ProcessTimers, get media time failed, status: "
+                        << status;
     return;
   }
 
@@ -270,6 +277,7 @@ void MediaClock::ProcessTimers() {
     } else {
       diff_media_us = static_cast<int64_t>(diff);
     }
+    AVE_LOG(LS_INFO) << "ProcessTimers, diff_media_us: " << diff_media_us;
     if (diff_media_us <= 0) {
       notify_list.push_back(std::move(it->callback));
       it = timers_.erase(it);
@@ -285,6 +293,7 @@ void MediaClock::ProcessTimers() {
       ++it;
     }
   }
+  AVE_LOG(LS_INFO) << "ProcessTimers, delay_us: " << delay_us;
 
   auto it_notify = notify_list.begin();
   while (it_notify != notify_list.end()) {
@@ -322,6 +331,7 @@ void MediaClock::ProcessTimers() {
 }
 
 void MediaClock::PostProcessTimers(int64_t delay_us) {
+  AVE_LOG(LS_INFO) << "PostProcessTimers " << delay_us;
   task_runner_->PostDelayedTask(
       [this]() {
         std::lock_guard<std::mutex> lock(mutex_);

@@ -56,6 +56,7 @@ std::unique_ptr<TimerEvent> ToTimerEvent(Closure&& closure) {
 class MediaClock {
  public:
   struct Callback {
+    virtual ~Callback() = default;
     virtual void OnDiscontinuity(int64_t anchor_media_us,
                                  int64_t anchor_real_us,
                                  float playback_rate) = 0;
@@ -67,7 +68,6 @@ class MediaClock {
   void SetStartingTimeMedia(int64_t starting_time_media_us);
   void ClearAnchor();
   void UpdateAnchor(int64_t anchor_time_media_us,
-                    int64_t anchor_time_real_us,
                     int64_t max_time_media_us = INT64_MAX);
   void UpdateMaxTimeMedia(int64_t max_time_media_us);
   void SetPlaybackRate(float rate);
