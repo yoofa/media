@@ -36,18 +36,113 @@ AVSynchronizeRender::~AVSynchronizeRender() {
   Flush();
 }
 
-void AVSynchronizeRender::QueueBuffer(int32_t stream_index,
-                                      std::shared_ptr<MediaFrame> buffer,
-                                      std::function<void()> consume_notify) {
-  QueueEntry entry;
-  entry.frame = std::move(buffer);
-  entry.consumed_notify = std::move(consume_notify);
-
-  sync_runner_->PostTask([this, stream_index, entry = std::move(entry)]() {
+void AVSynchronizeRender::QueueBuffer(
+    int32_t stream_index,
+    std::shared_ptr<MediaFrame> buffer,
+    std::unique_ptr<RenderEvent> render_event) {
+  sync_runner_->PostTask([this, stream_index, buffer = std::move(buffer),
+                          render_event = std::move(render_event)]() {
     AVE_DCHECK_RUN_ON(sync_runner_);
-
-    media_clock_->AddTimerEvent([](){}, );
+    OnQueueBuffer(stream_index, std::move(buffer), std::move(render_event));
   });
+}
+
+void AVSynchronizeRender::OnQueueBuffer(
+    int32_t stream_index,
+    std::shared_ptr<MediaFrame> frame,
+    std::unique_ptr<RenderEvent> render_event) {
+  MediaType type = frame->GetMediaType();
+  if (streams_.find(stream_index) == streams_.end()) {
+    AVE_LOG(LS_INFO) << "stream " << stream_index << " get first frame";
+    streams_[stream_index] = {type, {}};
+  }
+  // TODO: drop frame if stale
+
+  if (type == MediaType::AUDIO) {
+    has_audio_ = true;
+  } else if (type == MediaType::VIDEO) {
+    has_video_ = true;
+  }
+
+  streams_[stream_index].second.push(
+      QueueEntry{frame, std::move(render_event)});
+
+  if (type == MediaType::AUDIO) {
+    PostDrainAudioQueue(stream_index);
+  } else if (type == MediaType::VIDEO) {
+    PostDrainVideoQueue(stream_index);
+  }
+
+  // TODO: sync queues
+}
+
+void AVSynchronizeRender::PostDrainAudioQueue(int32_t stream_index) {
+  if (use_audio_callback_) {
+    return;
+  }
+
+  auto& queue = streams_[stream_index].second;
+  if (queue.empty()) {
+    return;
+  }
+}
+
+void AVSynchronizeRender::OnDrainAudioQueue(int32_t stream_index) {}
+
+void AVSynchronizeRender::PostDrainVideoQueue(int32_t stream_index) {
+  if (paused_ && !video_sample_received_) {
+    return;
+  }
+
+  auto& queue = streams_[stream_index].second;
+  if (queue.empty()) {
+    return;
+  }
+  auto& entry = queue.front();
+  bool is_eos = entry.frame->video_info()->eos;
+  if (is_eos) {
+    OnDrainVideoQueue(stream_index);
+    return;
+  }
+
+  auto pts_us = entry.frame->video_info()->pts.us();
+  if (anchor_time_media_us_ < 0) {
+    media_clock_->UpdateAnchor(pts_us, base::TimeMicros(), pts_us);
+    anchor_time_media_us_ = pts_us;
+  }
+
+  if (!has_audio_) {
+    media_clock_->UpdateMaxTimeMedia(pts_us + kDefaultVideoFrameIntervalUs);
+  }
+
+  if (!video_sample_received_ || pts_us < audio_first_anchor_time_media_us_) {
+    OnDrainVideoQueue(stream_index);
+  } else {
+    media_clock_->AddTimerEvent(
+        [this, stream_index]() {
+          sync_runner_->PostTask(
+              [this, stream_index]() { OnDrainVideoQueue(stream_index); });
+        },
+        pts_us, -2 * video_render_delay_us_);
+  }
+}
+
+void AVSynchronizeRender::OnDrainVideoQueue(int32_t stream_index) {
+  auto& queue = streams_[stream_index].second;
+  if (queue.empty()) {
+    return;
+  }
+  auto& entry = queue.front();
+  bool is_eos = entry.frame->video_info()->eos;
+  if (is_eos) {
+    // TODO: notify eos
+    queue.pop();
+    return;
+  }
+
+  auto pts_us = entry.frame->video_info()->pts.us();
+  int64_t now_us = base::TimeMicros();
+  int64_t real_time_us = media_clock_->GetRealTimeFor(pts_us, now_us);
 }
 
 void AVSynchronizeRender::Flush() {
