@@ -10,16 +10,45 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 
 #include "base/task_util/task_runner.h"
-#include "base/thread_annotation.h"
 #include "media/audio/audio_track.h"
 #include "media_clock.h"
 #include "media_frame.h"
+#include "media_sink_base.h"
 #include "media_utils.h"
 
 namespace ave {
 namespace media {
+
+struct RenderEvent {
+  virtual ~RenderEvent() = default;
+  // rendered is true if the audio frame is rendered to sink or video frame is
+  // too late rendered is false if the video frame need be rendered by source
+  virtual void OnRenderEvent(bool rendered) = 0;
+};
+
+namespace synchronizer_impl {
+
+template <typename Closure>
+class ClosureEvent : public RenderEvent {
+ public:
+  explicit ClosureEvent(Closure&& closure)
+      : closure_(std::forward<Closure>(closure)) {}
+
+ private:
+  void OnRenderEvent(bool rendered) override { closure_(rendered); }
+  std::decay_t<Closure> closure_;
+};
+
+template <typename Closure>
+std::unique_ptr<RenderEvent> ToRenderEvent(Closure&& closure) {
+  return std::make_unique<synchronizer_impl::ClosureEvent<Closure>>(
+      std::forward<Closure>(closure));
+}
+
+}  // namespace synchronizer_impl
 
 // I have 2 design options:
 // 1. avp decoder -> av_synchronize_render  ->
@@ -42,52 +71,85 @@ class AVSynchronizeRender : public MessageObject {
 
   // no need MediaType param any more, media type can get from MediaFrame
   void QueueBuffer(int32_t stream_index,
-                   std::shared_ptr<MediaFrame> buffer,
-                   std::function<void()> consume_notify = nullptr);
+                   std::shared_ptr<MediaFrame> frame,
+                   std::unique_ptr<RenderEvent> render_event = nullptr);
 
-  void QueueEos(int32_t stream_index);
+  template <
+      class Closure,
+      std::enable_if_t<
+          !std::is_convertible_v<Closure, std::unique_ptr<RenderEvent>>>* =
+          nullptr>
+  void QueueBuffer(int32_t stream_index,
+                   std::shared_ptr<MediaFrame> frame,
+                   Closure&& closure) {
+    QueueBuffer(stream_index, std::move(frame),
+                synchronizer_impl::ToRenderEvent(closure));
+  }
 
   void Flush();
 
   void Pause();
   void Resume();
 
-  status_t GetCurrentMediaTime(int64_t* out_media_time_us);
-
   void SetVideoFrameRate(float fps);
 
-  // if type is kSystem, master_stream_index is ignored
-  // if type is kAudio, master_stream_index must be a audio stream index
-  // and the audio stream will be the master clock
-  void SetMasterClock(ClockType type, int32_t master_stream_index = -1);
+  status_t SetPlaybackRate(float rate);
+  status_t GetPlaybackRate(float* rate);
 
-  // track not opened when set
+  // if type is kSystem, master_audio_stream_index is ignored
+  // if type is kAudio, master_audio_stream_index must be a audio stream index
+  // and the audio stream will be the master clock
+  void SetMasterClock(ClockType type, int32_t master_audio_stream_index = -1);
+
+  // track not opened when set, only support 1 audio sink now.
+  // multi audio stream will be mix to 1 audio stream to this audio_track
   void SetAudioTrack(std::shared_ptr<AudioTrack> audio_track);
+  // TODO: support multi audio track, each audio stream can be play to different
+  // audio track
 
  private:
-  // struct QueueEntry {
-  //   std::shared_ptr<MediaFrame> frame;
-  //   std::function<void()> consumed_notify;
-  // };
-  struct Stream {
-    MediaType type;
-
+  struct QueueEntry {
+    std::shared_ptr<MediaFrame> frame;
+    std::unique_ptr<RenderEvent> render_event;
   };
+  using StreamQueue = std::pair<MediaType, std::queue<QueueEntry>>;
 
-  void DrainAudioQueue() ;
-  void DrainVideoQueue();
+  void OnQueueBuffer(int32_t stream_index,
+                     std::shared_ptr<MediaFrame> frame,
+                     std::unique_ptr<RenderEvent> render_event);
+
+  void PostDrainAudioQueue(int32_t stream_index);
+
+  void PostDrainVideoQueue(int32_t stream_index);
+
+  void OnDrainAudioQueue(int32_t stream_index);
+
+  void OnDrainVideoQueue(int32_t stream_index);
+
+  /************** data **************/
 
   std::unique_ptr<base::TaskRunner> sync_runner_;
+  std::mutex mutex_;
 
-  std::unordered_map<int32_t, Stream> streams_ GUARDED_BY(sync_runner_);
-  std::shared_ptr<MediaClock> media_clock_ GUARDED_BY(sync_runner_);
-  ClockType clock_type_ GUARDED_BY(sync_runner_);
-  int32_t master_stream_index_ GUARDED_BY(sync_runner_);
+  // streams
+  std::unordered_map<int32_t, StreamQueue> streams_;
+
+  std::shared_ptr<MediaClock> media_clock_;
+  ClockType clock_type_;
 
   std::shared_ptr<AudioTrack> audio_track_;
   bool use_audio_callback_;
 
+  float playback_rate_;
+
+  int64_t video_render_delay_us_;
+  int64_t anchor_time_media_us_;
+  int64_t audio_first_anchor_time_media_us_;
   int64_t video_frame_interval_us_;
+  bool has_audio_;
+  bool has_video_;
+  bool paused_;
+  bool video_sample_received_;
 };
 
 }  // namespace media
