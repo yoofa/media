@@ -41,6 +41,7 @@ MediaClock::MediaClock()
       notify_callback_(nullptr) {}
 
 MediaClock::~MediaClock() {
+  std::lock_guard<std::mutex> lock(mutex_);
   Reset();
   // wait for all timers to be processed
 }
@@ -52,18 +53,21 @@ void MediaClock::SetStartingTimeMedia(int64_t starting_time_media_us) {
 
 void MediaClock::ClearAnchor() {
   std::lock_guard<std::mutex> lock(mutex_);
-  UpdateAnchorTimesAndPlaybackRate(-1, -1, playback_rate_);
+  Reset();
 }
 
+// anchor_time_real_us must use real time from base::TimeMicros()
 void MediaClock::UpdateAnchor(int64_t anchor_time_media_us,
-                              int64_t anchor_time_real_us,
                               int64_t max_time_media_us) {
-  if (anchor_time_media_us < 0 || anchor_time_real_us < 0) {
-    AVE_LOG(LS_WARNING) << "Invalid anchor time: " << anchor_time_media_us
-                        << ", " << anchor_time_real_us;
+  if (anchor_time_media_us < 0) {
+    AVE_LOG(LS_WARNING) << "Invalid anchor time: " << anchor_time_media_us;
     return;
   }
+  auto anchor_time_real_us = base::TimeMicros();
+
   std::lock_guard<std::mutex> lock(mutex_);
+
+  // maybe pass some time when acquire lock
   int64_t now_us = base::TimeMicros();
   auto real_diff = static_cast<double>(now_us - anchor_time_real_us);
   auto media_diff = std::llround(real_diff * playback_rate_);
@@ -78,6 +82,7 @@ void MediaClock::UpdateAnchor(int64_t anchor_time_media_us,
   }
 
   if (anchor_time_real_us_ != -1) {
+    // not first anchor, check if it's too close
     auto old_real_diff = static_cast<double>(now_us - anchor_time_real_us_);
     auto old_media_diff = std::llround(old_real_diff * playback_rate_);
     auto old_media_us = anchor_time_media_us_ + old_media_diff;
@@ -88,6 +93,7 @@ void MediaClock::UpdateAnchor(int64_t anchor_time_media_us,
       return;
     }
   }
+
   UpdateAnchorTimesAndPlaybackRate(now_media_us, now_us, playback_rate_);
   PostProcessTimers();
 }
@@ -98,7 +104,7 @@ void MediaClock::UpdateMaxTimeMedia(int64_t max_time_media_us) {
 }
 
 void MediaClock::SetPlaybackRate(float rate) {
-  AVE_CHECK_GT(rate, 0.0);
+  AVE_CHECK_GE(rate, 0.0);
   std::lock_guard<std::mutex> lock(mutex_);
   if (anchor_time_media_us_ == -1) {
     playback_rate_ = rate;
@@ -147,7 +153,7 @@ status_t MediaClock::GetRealTimeFor(int64_t target_media_us,
   }
 
   std::lock_guard<std::mutex> lock(mutex_);
-  if (playback_rate_ == 0.0) {
+  if (playback_rate_ == 0.0 || anchor_time_real_us_ == -1) {
     return NO_INIT;
   }
 
@@ -158,16 +164,22 @@ status_t MediaClock::GetRealTimeFor(int64_t target_media_us,
     return status;
   }
 
-  *out_real_us =
-      now_us +
-      std::llround(static_cast<double>(target_media_us - now_media_us) /
-                   playback_rate_);
+  auto real_diff = static_cast<int64_t>(target_media_us - now_media_us);
+  auto real_us =
+      std::llround(static_cast<double>(real_diff) / playback_rate_) + now_us;
+  *out_real_us = real_us;
   return OK;
 }
 
 void MediaClock::AddTimerEvent(std::unique_ptr<TimerEvent> event,
                                int64_t media_time_us,
                                int64_t adjust_real_us) {
+  if (media_time_us < 0) {
+    AVE_LOG(LS_WARNING) << "AddTimerEvent, negative media time: "
+                        << media_time_us;
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(mutex_);
   if (anchor_time_media_us_ == -1) {
     AVE_LOG(LS_WARNING) << "AddTimerEvent, no anchor time set";
@@ -190,13 +202,11 @@ void MediaClock::SetNotificationCallback(Callback* callback) {
 
 // private
 void MediaClock::Reset() {
-  std::lock_guard<std::mutex> lock(mutex_);
   // process all timers and wait for them to be processed
   auto it = timers_.begin();
   while (it != timers_.end()) {
-    task_runner_->PostTask([callback = std::move(it->callback)]() {
-      callback->OnTimerEvent(TimerReason::TIMER_REASON_RESET);
-    });
+    it->callback->OnTimerEvent(TimerReason::TIMER_REASON_RESET);
+    it = timers_.erase(it);
   }
   max_time_media_us_ = INT64_MAX;
   starting_time_media_us_ = -1;
@@ -251,6 +261,8 @@ void MediaClock::ProcessTimers() {
   auto status = GetMediaTime_l(now_us, &now_media_us, false);
 
   if (status != OK) {
+    AVE_LOG(LS_WARNING) << "ProcessTimers, get media time failed, status: "
+                        << status;
     return;
   }
 
@@ -275,11 +287,10 @@ void MediaClock::ProcessTimers() {
       it = timers_.erase(it);
     } else {
       if (playback_rate_ != 0.0 &&
-          diff_media_us <
-              static_cast<int64_t>(std::floor(static_cast<double>(INT64_MAX) *
-                                              playback_rate_))) {
-        int64_t target_delay_us =
-            std::llround(static_cast<double>(diff_media_us) / playback_rate_);
+          static_cast<double>(diff_media_us) <
+              static_cast<double>(INT64_MAX) * playback_rate_) {
+        auto target_delay_us = static_cast<int64_t>(
+            static_cast<double>(diff_media_us) / playback_rate_);
         delay_us = std::min(delay_us, target_delay_us);
       }
       ++it;
@@ -292,26 +303,6 @@ void MediaClock::ProcessTimers() {
     (*it_notify)->OnTimerEvent(TimerReason::TIMER_REASON_REACHED);
     it_notify = notify_list.erase(it_notify);
   }
-
-  // while (it != timers_.end()) {
-  //   if (it->media_time_us <= now_media_us) {
-  //     task_runner_->PostTask([callback = std::move(it->callback)](int64_t)
-  //     {
-  //       callback(TimerReason::TIMER_REASON_REACHED);
-  //     });
-  //     it = timers_.erase(it);
-  //   } else {
-  //     // calculate delay_us with playback rate
-  //     int64_t target_real_us =
-  //         anchor_time_real_us_ +
-  //         std::llround(
-  //             static_cast<double>(it->media_time_us -
-  //             anchor_time_media_us_) / playback_rate_);
-  //     delay_us =
-  //         std::min(delay_us, target_real_us - now_us + it->adjust_real_us);
-  //     ++it;
-  //   }
-  // }
 
   if (delay_us == INT64_MAX || timers_.empty() || playback_rate_ == 0.0 ||
       anchor_time_media_us_ == -1) {
