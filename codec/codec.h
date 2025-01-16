@@ -60,6 +60,12 @@ struct CodecConfig {
 };
 
 // this class is porting from Android MediaCodec
+// Design constraint:
+// Some codecs are very particular about their buffers. They may need to have a particular memory alignment,
+//  or have a certain minimum or maximum size, or it may be important to have a certain number of them available. 
+//  To accommodate the wide range of possibilities, buffer allocation is performed by the codecs themselves,
+//  rather than the application. You do not hand a buffer with data to Codec.
+//  You ask it for a buffer, and if one is available, you copy the data in.
 class Codec {
  public:
   virtual ~Codec() = default;
