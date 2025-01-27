@@ -19,12 +19,11 @@ inline static const char* GetDllError() {
   char* err = dlerror();
   if (err) {
     return err;
-  } else {
-    return "No error";
   }
+  return "No error";
 }
 
-DllHandle InternalLoadDll(absl::string_view dll_name) {
+DllHandle InternalLoadDll(std::string_view dll_name) {
   DllHandle handle = dlopen(std::string(dll_name).c_str(), RTLD_NOW);
   if (handle == kInvalidDllHandle) {
     AVE_LOG(LS_WARNING) << "Can't load " << dll_name << " : " << GetDllError();
@@ -39,20 +38,22 @@ void InternalUnloadDll(DllHandle handle) {
 }
 
 static bool LoadSymbol(DllHandle handle,
-                       absl::string_view symbol_name,
+                       std::string_view symbol_name,
                        void** symbol) {
   *symbol = dlsym(handle, std::string(symbol_name).c_str());
   char* err = dlerror();
   if (err) {
     AVE_LOG(LS_ERROR) << "Error loading symbol " << symbol_name << " : " << err;
     return false;
-  } else if (!*symbol) {
+  }
+  if (!*symbol) {
     AVE_LOG(LS_ERROR) << "Symbol " << symbol_name << " is NULL";
     return false;
   }
   return true;
 }
 
+// NOLINTBEGIN(modernize-avoid-c-arrays)
 bool InternalLoadSymbols(DllHandle handle,
                          int num_symbols,
                          const char* const symbol_names[],
@@ -67,6 +68,7 @@ bool InternalLoadSymbols(DllHandle handle,
   }
   return true;
 }
+// NOLINTEND(modernize-avoid-c-arrays)
 
 }  // namespace linux
 }  // namespace media

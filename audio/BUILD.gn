@@ -63,3 +63,11 @@ ave_library("default_audio_device_module") {
     ":audio_device",
   ]
 }
+
+# linux
+ave_library("linux_symbol_binding") {
+  sources = [
+    "linux/latebinding_symbol_table.cc",
+    "linux/latebinding_symbol_table.h",
+  ]
+}

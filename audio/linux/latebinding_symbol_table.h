@@ -13,20 +13,19 @@
 #include <cstring>
 #include <string_view>
 
-#include "base/logging.h"
-
 namespace ave {
 namespace media {
 namespace linux {
 
 using DllHandle = void*;
-constexpr DllHandle kInvalidDllHandle = nullptr;
+const DllHandle kInvalidDllHandle = nullptr;
 
 // Helper functions
 DllHandle InternalLoadDll(std::string_view dll_name);
 
 void InternalUnloadDll(DllHandle handle);
 
+// NOLINTBEGIN(modernize-avoid-c-arrays)
 bool InternalLoadSymbols(DllHandle handle,
                          int num_symbols,
                          const char* const symbol_names[],
@@ -36,9 +35,11 @@ bool InternalLoadSymbols(DllHandle handle,
 template <int SYMBOL_TABLE_SIZE,
           const char kDllName[],
           const char* const kSymbolNames[]>
+// NOLINTEND(modernize-avoid-c-arrays)
 class LateBindingSymbolTable {
  public:
-  LateBindingSymbolTable() : handle_(kInvalidDllHandle) {
+  LateBindingSymbolTable()
+      : handle_(kInvalidDllHandle), undefined_symbols_(false), symbols_{} {
     memset(symbols_, 0, sizeof(symbols_));
   }
 
@@ -48,11 +49,19 @@ class LateBindingSymbolTable {
     if (IsLoaded()) {
       return true;
     }
+
+    if (undefined_symbols_) {
+      // We do not attempt to load again because repeated attempts are not
+      // likely to succeed and DLL loading is costly.
+      return false;
+    }
+
     handle_ = InternalLoadDll(kDllName);
     if (!IsLoaded()) {
       return false;
     }
     if (!InternalLoadSymbols(handle_, NumSymbols(), kSymbolNames, symbols_)) {
+      undefined_symbols_ = true;
       Unload();
       return false;
     }
@@ -75,7 +84,10 @@ class LateBindingSymbolTable {
 
  private:
   DllHandle handle_;
+  bool undefined_symbols_;
+  // NOLINTBEGIN(modernize-avoid-c-arrays)
   void* symbols_[SYMBOL_TABLE_SIZE];
+  // NOLINTEND(modernize-avoid-c-arrays)
 };
 
 // Macros for declaring symbol tables
@@ -83,6 +95,7 @@ class LateBindingSymbolTable {
 #define LATE_BINDING_SYMBOL_TABLE_DECLARE_ENTRY(ClassName, sym) \
   ClassName##_SYMBOL_TABLE_INDEX_##sym,
 
+// NOLINTBEGIN(modernize-avoid-c-arrays)
 #define LATE_BINDING_SYMBOL_TABLE_DECLARE_END(ClassName)       \
   ClassName##_SYMBOL_TABLE_SIZE                                \
   }                                                            \
@@ -94,8 +107,8 @@ class LateBindingSymbolTable {
                                                                \
   typedef ::ave::media::linux::LateBindingSymbolTable<         \
       ClassName##_SYMBOL_TABLE_SIZE, ClassName##_kDllName,     \
-      ClassName##_kSymbolNames>                                \
-      ClassName;
+      ClassName##_kSymbolNames>(ClassName);
+// NOLINTEND(modernize-avoid-c-arrays)
 
 // Macros for defining symbol tables
 #define LATE_BINDING_SYMBOL_TABLE_DEFINE_BEGIN(ClassName, dllName) \
@@ -111,7 +124,7 @@ class LateBindingSymbolTable {
 #define LATESYM_INDEXOF(ClassName, sym) (ClassName##_SYMBOL_TABLE_INDEX_##sym)
 
 #define LATESYM_GET(ClassName, inst, sym) \
-  (*reinterpret_cast<__typeof__(&sym)>(   \
+  (*reinterpret_cast<__typeof__(&(sym))>( \
       (inst)->GetSymbol(LATESYM_INDEXOF(ClassName, sym))))
 
 }  // namespace linux
