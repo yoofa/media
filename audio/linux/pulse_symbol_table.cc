@@ -7,4 +7,19 @@
 
 #include "media/audio/linux/pulse_symbol_table.h"
 
-// ... 其余代码保持不变 ...
+namespace ave {
+namespace media {
+namespace linux {
+
+// NOLINTBEGIN(modernize-avoid-c-arrays)
+LATE_BINDING_SYMBOL_TABLE_DEFINE_BEGIN(PulseAudioSymbolTable, "libpulse.so.0")
+// NOLINTEND(modernize-avoid-c-arrays)
+#define X(sym) \
+  LATE_BINDING_SYMBOL_TABLE_DEFINE_ENTRY(PulseAudioSymbolTable, sym)
+PULSE_AUDIO_SYMBOLS_LIST
+#undef X
+LATE_BINDING_SYMBOL_TABLE_DEFINE_END(PulseAudioSymbolTable)
+
+}  // namespace linux
+}  // namespace media
+}  // namespace ave
