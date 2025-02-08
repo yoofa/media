@@ -1,14 +1,15 @@
 /*
- * audio_device_module.h
+ * audio_device.h
  * Copyright (C) 2024 youfa <vsyfar@gmail.com>
  *
  * Distributed under terms of the GPLv2 license.
  */
 
-#ifndef AUDIO_DEVICE_MODULE_H
-#define AUDIO_DEVICE_MODULE_H
+#ifndef AUDIO_DEVICE_H
+#define AUDIO_DEVICE_H
 
 #include <memory>
+#include <vector>
 
 #include "base/errors.h"
 
@@ -19,15 +20,33 @@ struct AudioDeviceInfo {};
 
 class AudioTrack;
 class AudioRecord;
+class AudioLoopback;
 
-// AudioDeviceModule is a module for creating AudioDevice objects and managing
+// AudioDevice is a module for creating AudioDevice objects and managing
 // audio devices.
-class AudioDeviceModule {
+class AudioDevice {
+  enum class PlatformType : uint8_t {
+    kDefault = 0,
+    kLinuxAlsa,
+    kLinuxPulse,
+    kAndroidJava,
+    kAndroidOpenSLES,
+    kAndroidAAudio,
+    kDummy,
+  };
+  virtual ~AudioDevice() = default;
+
+  static std::shared_ptr<AudioDevice> CreateAudioDevice(PlatformType type);
+
+  /* implement the following functions in the platform-specific code */
   // create an AudioTrack object.
   virtual std::shared_ptr<AudioTrack> CreateAudioTrack() = 0;
 
   // create an AudioRecord object.
   virtual std::shared_ptr<AudioRecord> CreateAudioRecord() = 0;
+
+  // create an AudioLoopback object.
+  virtual std::shared_ptr<AudioLoopback> CreateAudioLoopback() = 0;
 
   // get supported audio devices
   // return <device_id, device_info>
@@ -44,4 +63,4 @@ class AudioDeviceModule {
 }  // namespace media
 }  // namespace ave
 
-#endif /* !AUDIO_DEVICE_MODULE_H */
+#endif /* !AUDIO_DEVICE_H */

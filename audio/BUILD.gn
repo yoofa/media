@@ -29,13 +29,22 @@ ave_library("audio_channel_layout") {
 }
 
 # audio device
-ave_library("audio_device") {
+ave_library("audio_device_base") {
   sources = [
-    "audio_device_module.h",
+    "audio_device.h",
+    "audio_loopback.h",
     "audio_record.h",
     "audio_track.h",
   ]
   deps = [ ":audio_base" ]
+}
+
+ave_library("audio_device") {
+  sources = [ "audio_device.cc" ]
+  deps = [
+    ":audio_base",
+    ":audio_device_base",
+  ]
 }
 
 ave_library("alsa_audio_device") {
