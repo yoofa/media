@@ -12,13 +12,13 @@
 #include "base/logging.h"
 #include "media/audio/linux/alsa_symbol_table.h"
 
-// 使用符号表访问ALSA函数
-#define LATE(sym) \
-  LATESYM_GET(ave::media::linux::AlsaSymbolTable, GetAlsaSymbolTable(), sym)
+#define LATE(sym)                                                             \
+  LATESYM_GET(ave::media::linux_audio::AlsaSymbolTable, GetAlsaSymbolTable(), \
+              sym)
 
 namespace ave {
 namespace media {
-namespace linux {
+namespace linux_audio {
 
 namespace {
 // 默认的ALSA buffer参数
@@ -356,6 +356,6 @@ void AlsaAudioTrack::Close() {
   temp_buffer_.reset();
 }
 
-}  // namespace linux
+}  // namespace linux_audio
 }  // namespace media
 }  // namespace ave

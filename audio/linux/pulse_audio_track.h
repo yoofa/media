@@ -16,7 +16,7 @@
 
 namespace ave {
 namespace media {
-namespace linux {
+namespace linux_audio {
 
 class PulseAudioTrack : public AudioTrack {
  public:
@@ -70,7 +70,7 @@ class PulseAudioTrack : public AudioTrack {
   size_t temp_buffer_size_;
 };
 
-}  // namespace linux
+}  // namespace linux_audio
 }  // namespace media
 }  // namespace ave
 

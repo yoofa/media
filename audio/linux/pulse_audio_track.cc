@@ -12,13 +12,13 @@
 #include "base/logging.h"
 #include "media/audio/linux/pulse_symbol_table.h"
 
-// 使用符号表访问PulseAudio函数
-#define LATE(sym) \
-  LATESYM_GET(ave::media::linux::PulseSymbolTable, GetPulseSymbolTable(), sym)
+#define LATE(sym)                                        \
+  LATESYM_GET(ave::media::linux_audio::PulseSymbolTable, \
+              GetPulseSymbolTable(), sym)
 
 namespace ave {
 namespace media {
-namespace linux {
+namespace linux_audio {
 
 namespace {
 // 默认的buffer参数
@@ -371,6 +371,6 @@ int64_t PulseAudioTrack::GetBufferDurationInUs() const {
   return (buffer_size_ / frameSize()) * 1000000LL / config_.sample_rate;
 }
 
-}  // namespace linux
+}  // namespace linux_audio
 }  // namespace media
 }  // namespace ave

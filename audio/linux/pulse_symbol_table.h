@@ -12,7 +12,7 @@
 
 namespace ave {
 namespace media {
-namespace linux {
+namespace linux_audio {
 
 // The PulseAudio symbols we need, as an X-Macro list.
 // This list must contain precisely every libpulse function that is used in
@@ -84,7 +84,7 @@ PULSE_AUDIO_SYMBOLS_LIST
 LATE_BINDING_SYMBOL_TABLE_DECLARE_END(PulseAudioSymbolTable)
 // NOLINTEND(modernize-avoid-c-arrays)
 
-}  // namespace linux
+}  // namespace linux_audio
 }  // namespace media
 }  // namespace ave
 

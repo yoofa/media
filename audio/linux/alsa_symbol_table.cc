@@ -7,14 +7,14 @@
 
 #include "media/audio/linux/alsa_symbol_table.h"
 
-ave::media::linux::AlsaSymbolTable* GetAlsaSymbolTable() {
-  static auto* symbol_table = new ave::media::linux::AlsaSymbolTable();
+ave::media::linux_audio::AlsaSymbolTable* GetAlsaSymbolTable() {
+  static auto* symbol_table = new ave::media::linux_audio::AlsaSymbolTable();
   return symbol_table;
 }
 
 namespace ave {
 namespace media {
-namespace linux {
+namespace linux_audio {
 
 // NOLINTBEGIN(modernize-avoid-c-arrays)
 LATE_BINDING_SYMBOL_TABLE_DEFINE_BEGIN(AlsaSymbolTable, "libasound.so.2")
@@ -25,6 +25,6 @@ ALSA_SYMBOLS_LIST
 #undef X
 LATE_BINDING_SYMBOL_TABLE_DEFINE_END(AlsaSymbolTable)
 
-}  // namespace linux
+}  // namespace linux_audio
 }  // namespace media
 }  // namespace ave

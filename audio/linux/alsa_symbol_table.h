@@ -12,7 +12,7 @@
 
 namespace ave {
 namespace media {
-namespace linux {
+namespace linux_audio {
 
 // The ALSA symbols we need, as an X-Macro list.
 // This list must contain precisely every libasound function that is used in
@@ -125,11 +125,10 @@ ALSA_SYMBOLS_LIST
 LATE_BINDING_SYMBOL_TABLE_DECLARE_END(AlsaSymbolTable)
 // NOLINTEND(modernize-avoid-c-arrays)
 
-}  // namespace linux
+}  // namespace linux_audio
 }  // namespace media
 }  // namespace ave
 
-// 在namespace外部添加
-ave::media::linux::AlsaSymbolTable* GetAlsaSymbolTable();
+ave::media::linux_audio::AlsaSymbolTable* GetAlsaSymbolTable();
 
 #endif  // AVE_MEDIA_AUDIO_LINUX_ALSA_SYMBOL_TABLE_H_

@@ -13,7 +13,6 @@
 
 namespace ave {
 namespace media {
-namespace linux {
 
 inline static const char* GetDllError() {
   char* err = dlerror();
@@ -70,6 +69,5 @@ bool InternalLoadSymbols(DllHandle handle,
 }
 // NOLINTEND(modernize-avoid-c-arrays)
 
-}  // namespace linux
 }  // namespace media
 }  // namespace ave
