@@ -14,14 +14,14 @@
 #include "base/types.h"
 #include "media/audio/audio.h"
 #include "media/audio/audio_track.h"
-
+#include "media/audio/linux/alsa_symbol_table.h"
 namespace ave {
 namespace media {
 namespace linux_audio {
 
 class AlsaAudioTrack : public AudioTrack {
  public:
-  AlsaAudioTrack();
+  explicit AlsaAudioTrack(AlsaSymbolTable* symbol_table);
   ~AlsaAudioTrack() override;
 
   // AudioTrack implementation

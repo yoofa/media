@@ -26,7 +26,7 @@ constexpr size_t kDefaultPeriodSizeMs = 10;  // 10ms
 constexpr size_t kDefaultBufferCount = 4;    // 4个period
 }  // namespace
 
-AlsaAudioTrack::AlsaAudioTrack()
+AlsaAudioTrack::AlsaAudioTrack(AlsaSymbolTable* symbol_table)
     : handle_(nullptr),
       callback_(nullptr),
       cookie_(nullptr),
@@ -54,11 +54,11 @@ ssize_t AlsaAudioTrack::frameCount() const {
 }
 
 ssize_t AlsaAudioTrack::channelCount() const {
-  return config_.channel_count;
+  return ChannelLayoutToChannelCount(config_.channel_layout);
 }
 
 ssize_t AlsaAudioTrack::frameSize() const {
-  return config_.channel_count *
+  return ChannelLayoutToChannelCount(config_.channel_layout) *
          (snd_pcm_format_physical_width(SND_PCM_FORMAT_S16_LE) / 8);
 }
 
@@ -71,7 +71,7 @@ uint32_t AlsaAudioTrack::latency() const {
     return 0;
 
   snd_pcm_sframes_t delay = 0;
-  if (snd_pcm_delay(handle_, &delay) < 0) {
+  if (LATE(snd_pcm_delay)(handle_, &delay) < 0) {
     return 0;
   }
   return delay * 1000 / config_.sample_rate;
@@ -88,11 +88,11 @@ status_t AlsaAudioTrack::GetPosition(uint32_t* position) const {
   snd_pcm_sframes_t delay;
   snd_pcm_sframes_t avail;
 
-  if (snd_pcm_delay(handle_, &delay) < 0) {
+  if (LATE(snd_pcm_delay)(handle_, &delay) < 0) {
     return -EINVAL;
   }
 
-  if (snd_pcm_avail(handle_, &avail) < 0) {
+  if (LATE(snd_pcm_avail_update)(handle_) < 0) {
     return -EINVAL;
   }
 
@@ -123,7 +123,7 @@ status_t AlsaAudioTrack::Open(audio_config_t config,
 status_t AlsaAudioTrack::InitDevice() {
   // 加载ALSA符号表
   if (!GetAlsaSymbolTable()->Load()) {
-    LOG(ERROR) << "Failed to load ALSA symbols";
+    AVE_LOG(LS_ERROR) << "Failed to load ALSA symbols";
     return -ENODEV;
   }
 
@@ -133,7 +133,7 @@ status_t AlsaAudioTrack::InitDevice() {
   err = snd_pcm_open(&handle_, "default", SND_PCM_STREAM_PLAYBACK,
                      SND_PCM_NONBLOCK);
   if (err < 0) {
-    LOG(ERROR) << "Cannot open audio device: " << snd_strerror(err);
+    AVE_LOG(LS_ERROR) << "Cannot open audio device: " << snd_strerror(err);
     return err;
   }
 
@@ -163,7 +163,7 @@ status_t AlsaAudioTrack::SetHWParams() {
   // 获取完整的参数空间
   int err = LATE(snd_pcm_hw_params_any)(handle_, params);
   if (err < 0) {
-    LOG(ERROR) << "Cannot get hw params: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot get hw params: " << LATE(snd_strerror)(err);
     return err;
   }
 
@@ -171,7 +171,7 @@ status_t AlsaAudioTrack::SetHWParams() {
   err = LATE(snd_pcm_hw_params_set_access)(handle_, params,
                                            SND_PCM_ACCESS_RW_INTERLEAVED);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set access type: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set access type: " << LATE(snd_strerror)(err);
     return err;
   }
 
@@ -179,15 +179,17 @@ status_t AlsaAudioTrack::SetHWParams() {
   err = LATE(snd_pcm_hw_params_set_format)(handle_, params,
                                            SND_PCM_FORMAT_S16_LE);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set sample format: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set sample format: "
+                      << LATE(snd_strerror)(err);
     return err;
   }
 
   // 设置声道数
-  err = LATE(snd_pcm_hw_params_set_channels)(handle_, params,
-                                             config_.channel_count);
+  err = LATE(snd_pcm_hw_params_set_channels)(
+      handle_, params, ChannelLayoutToChannelCount(config_.channel_layout));
   if (err < 0) {
-    LOG(ERROR) << "Cannot set channel count: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set channel count: "
+                      << LATE(snd_strerror)(err);
     return err;
   }
 
@@ -195,7 +197,7 @@ status_t AlsaAudioTrack::SetHWParams() {
   unsigned int rate = config_.sample_rate;
   err = LATE(snd_pcm_hw_params_set_rate_near)(handle_, params, &rate, 0);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set sample rate: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set sample rate: " << LATE(snd_strerror)(err);
     return err;
   }
 
@@ -204,7 +206,7 @@ status_t AlsaAudioTrack::SetHWParams() {
   err = LATE(snd_pcm_hw_params_set_period_size_near)(handle_, params,
                                                      &period_size_, 0);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set period size: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set period size: " << LATE(snd_strerror)(err);
     return err;
   }
 
@@ -213,14 +215,14 @@ status_t AlsaAudioTrack::SetHWParams() {
   err = LATE(snd_pcm_hw_params_set_buffer_size_near)(handle_, params,
                                                      &buffer_size_);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set buffer size: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set buffer size: " << LATE(snd_strerror)(err);
     return err;
   }
 
   // 应用参数
   err = LATE(snd_pcm_hw_params)(handle_, params);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set hw params: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set hw params: " << LATE(snd_strerror)(err);
     return err;
   }
 
@@ -234,7 +236,7 @@ status_t AlsaAudioTrack::SetSWParams() {
   // 获取当前软件参数
   int err = LATE(snd_pcm_sw_params_current)(handle_, params);
   if (err < 0) {
-    LOG(ERROR) << "Cannot get sw params: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot get sw params: " << LATE(snd_strerror)(err);
     return err;
   }
 
@@ -242,21 +244,22 @@ status_t AlsaAudioTrack::SetSWParams() {
   err = LATE(snd_pcm_sw_params_set_start_threshold)(handle_, params,
                                                     buffer_size_ / 2);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set start threshold: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set start threshold: "
+                      << LATE(snd_strerror)(err);
     return err;
   }
 
   // 设置最小可用帧数
   err = LATE(snd_pcm_sw_params_set_avail_min)(handle_, params, period_size_);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set avail min: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set avail min: " << LATE(snd_strerror)(err);
     return err;
   }
 
   // 应用参数
   err = LATE(snd_pcm_sw_params)(handle_, params);
   if (err < 0) {
-    LOG(ERROR) << "Cannot set sw params: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot set sw params: " << LATE(snd_strerror)(err);
     return err;
   }
 
@@ -307,13 +310,13 @@ status_t AlsaAudioTrack::Start() {
 
   int err = LATE(snd_pcm_prepare)(handle_);
   if (err < 0) {
-    LOG(ERROR) << "Cannot prepare audio: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot prepare audio: " << LATE(snd_strerror)(err);
     return err;
   }
 
   err = LATE(snd_pcm_start)(handle_);
   if (err < 0) {
-    LOG(ERROR) << "Cannot start audio: " << LATE(snd_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Cannot start audio: " << LATE(snd_strerror)(err);
     return err;
   }
 

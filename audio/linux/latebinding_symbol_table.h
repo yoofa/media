@@ -95,20 +95,20 @@ class LateBindingSymbolTable {
   ClassName##_SYMBOL_TABLE_INDEX_##sym,
 
 // NOLINTBEGIN(modernize-avoid-c-arrays)
-#define LATE_BINDING_SYMBOL_TABLE_DECLARE_END(ClassName)                  \
-  ClassName##_SYMBOL_TABLE_SIZE                                           \
-  }                                                                       \
-  ;                                                                       \
-                                                                          \
-  extern const char ClassName##_kDllName[];                               \
-  extern const char* const                                                \
-      ClassName##_kSymbolNames[ClassName##_SYMBOL_TABLE_SIZE];            \
-                                                                          \
-  using ClassName =                                                       \
-      ::ave::media::LateBindingSymbolTable<ClassName##_SYMBOL_TABLE_SIZE, \
-                                           ClassName##_kDllName,          \
-                                           ClassName##_kSymbolNames>(     \
-          ClassName);
+#define LATE_BINDING_SYMBOL_TABLE_DECLARE_END(ClassName)                      \
+  ClassName##_SYMBOL_TABLE_SIZE                                               \
+  }                                                                           \
+  ;                                                                           \
+                                                                              \
+  extern const char ClassName##_kDllName[];                                   \
+  extern const char* const                                                    \
+      ClassName##_kSymbolNames[ClassName##_SYMBOL_TABLE_SIZE];                \
+                                                                              \
+  typedef ::ave::media::LateBindingSymbolTable<ClassName##_SYMBOL_TABLE_SIZE, \
+                                               ClassName##_kDllName,          \
+                                               ClassName##_kSymbolNames>(     \
+      ClassName);
+
 // NOLINTEND(modernize-avoid-c-arrays)
 
 // Macros for defining symbol tables

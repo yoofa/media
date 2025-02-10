@@ -11,25 +11,46 @@
 #include <algorithm>
 
 #include "base/logging.h"
-#include "media/audio/alsa/alsa_audio_track.h"
-#include "media/audio/linux/latebinding_symbol_table_linux.h"
+#include "media/audio/linux/alsa_audio_track.h"
+#include "media/audio/linux/alsa_symbol_table.h"
+#include "media/audio/linux/latebinding_symbol_table.h"
+
+// Accesses ALSA functions through our late-binding symbol table instead of
+// directly. This way we don't have to link to libasound, which means our binary
+// will work on systems that don't have it.
+#define LATE(sym) \
+  LATESYM_GET(ave::media::linux::AlsaSymbolTable, GetAlsaSymbolTable(), sym)
+
+// Redefine these here to be able to do late-binding
+#undef snd_ctl_card_info_alloca
+#define snd_ctl_card_info_alloca(ptr)                  \
+  do {                                                 \
+    *ptr = (snd_ctl_card_info_t*)__builtin_alloca(     \
+        LATE(snd_ctl_card_info_sizeof)());             \
+    memset(*ptr, 0, LATE(snd_ctl_card_info_sizeof)()); \
+  } while (0)
+
+#undef snd_pcm_info_alloca
+#define snd_pcm_info_alloca(pInfo)                                           \
+  do {                                                                       \
+    *pInfo = (snd_pcm_info_t*)__builtin_alloca(LATE(snd_pcm_info_sizeof)()); \
+    memset(*pInfo, 0, LATE(snd_pcm_info_sizeof)());                          \
+  } while (0)
 
 namespace ave {
 namespace media {
+namespace linux_audio {
 
-std::unique_ptr<AlsaAudioDevice> AlsaAudioDevice::Create() {
-  std::unique_ptr<AlsaSymbolTable> alsa_symbols(new AlsaSymbolTable());
-  if (!alsa_symbols->Load()) {
-    AVE_LOG(LS_ERROR) << "Failed to load ALSA symbols";
-    return nullptr;
-  }
-  
-  return std::unique_ptr<AlsaAudioDevice>(
-      new AlsaAudioDevice(std::move(alsa_symbols)));
-}
+static const unsigned int ALSA_PLAYOUT_FREQ = 48000;
+static const unsigned int ALSA_PLAYOUT_CH = 2;
+static const unsigned int ALSA_PLAYOUT_LATENCY = 40 * 1000;  // in us
+static const unsigned int ALSA_CAPTURE_FREQ = 48000;
+static const unsigned int ALSA_CAPTURE_CH = 2;
+static const unsigned int ALSA_CAPTURE_LATENCY = 40 * 1000;  // in us
+static const unsigned int ALSA_CAPTURE_WAIT_TIMEOUT = 5;     // in ms
 
-AlsaAudioDevice::AlsaAudioDevice(std::unique_ptr<AlsaSymbolTable> alsa_symbols)
-    : alsa_symbols_(std::move(alsa_symbols)),
+AlsaAudioDevice::AlsaAudioDevice()
+    : _initialized(false),
       current_input_device_id_(-1),
       current_output_device_id_(-1) {
   EnumerateDevices();
@@ -37,8 +58,22 @@ AlsaAudioDevice::AlsaAudioDevice(std::unique_ptr<AlsaSymbolTable> alsa_symbols)
 
 AlsaAudioDevice::~AlsaAudioDevice() = default;
 
+status_t AlsaAudioDevice::Init() {
+  // Load libasound
+  if (!GetAlsaSymbolTable()->Load()) {
+    // Alsa is not installed on this system
+    AVE_LOG(LS_ERROR) << "failed to load symbol table";
+    return -EINVAL;
+  }
+  if (_initialized) {
+    return OK;
+  }
+  _initialized = true;
+  return OK;
+}
+
 std::shared_ptr<AudioTrack> AlsaAudioDevice::CreateAudioTrack() {
-  return std::make_shared<AlsaAudioTrack>(alsa_symbols_.get());
+  return std::make_shared<AlsaAudioTrack>(GetAlsaSymbolTable());
 }
 
 std::shared_ptr<AudioRecord> AlsaAudioDevice::CreateAudioRecord() {
@@ -83,35 +118,12 @@ status_t AlsaAudioDevice::SetAudioOutputDevice(int device_id) {
 }
 
 void AlsaAudioDevice::EnumerateDevices() {
-  int card = -1;
-  snd_ctl_t* handle;
-  snd_ctl_card_info_t* info;
-  
-  // Use symbol table to call ALSA functions
-  alsa_symbols_->snd_ctl_card_info_alloca(&info);
-
-  while (alsa_symbols_->snd_card_next(&card) >= 0 && card >= 0) {
-    char name[32];
-    snprintf(name, sizeof(name), "hw:%d", card);
-
-    if (alsa_symbols_->snd_ctl_open(&handle, name, 0) < 0) {
-      continue;
-    }
-
-    if (alsa_symbols_->snd_ctl_card_info(handle, info) < 0) {
-      alsa_symbols_->snd_ctl_close(handle);
-      continue;
-    }
-
-    // Add device info to audio_devices_
-    AudioDeviceInfo device_info;
-    // TODO: Fill device_info with ALSA card information using symbol table
-    audio_devices_.emplace_back(card, device_info);
-
-    alsa_symbols_->snd_ctl_close(handle);
-  }
+  // int card = -1;
+  // snd_ctl_t* handle;
+  // snd_ctl_card_info_t* info;
 }
 
+}  // namespace linux_audio
 }  // namespace media
 }  // namespace ave
 

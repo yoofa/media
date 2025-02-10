@@ -4,7 +4,6 @@ ave_library("audio") {
   deps = [
     ":audio_base",
     ":audio_device",
-    ":default_audio_device_module",
   ]
 }
 
@@ -28,7 +27,7 @@ ave_library("audio_channel_layout") {
   ]
 }
 
-# audio device
+# audio device base
 ave_library("audio_device_base") {
   sources = [
     "audio_device.h",
@@ -39,37 +38,13 @@ ave_library("audio_device_base") {
   deps = [ ":audio_base" ]
 }
 
+# audio device
 ave_library("audio_device") {
   sources = [ "audio_device.cc" ]
   deps = [
+    ":alsa_audio_device",
     ":audio_base",
     ":audio_device_base",
-  ]
-}
-
-ave_library("alsa_audio_device") {
-  sources = [
-    "alsa/alsa_audio_device_module.cc",
-    "alsa/alsa_audio_device_module.h",
-    "alsa/alsa_audio_record.cc",
-    "alsa/alsa_audio_record.h",
-    "alsa/alsa_audio_track.cc",
-    "alsa/alsa_audio_track.h",
-  ]
-  deps = [
-    ":audio_base",
-    ":audio_device",
-  ]
-}
-
-ave_library("default_audio_device_module") {
-  sources = [
-    "default_audio_device_module.cc",
-    "default_audio_device_module.h",
-  ]
-  deps = [
-    ":alsa_audio_device",
-    ":audio_device",
   ]
 }
 
@@ -79,4 +54,41 @@ ave_library("linux_symbol_binding") {
     "linux/latebinding_symbol_table.cc",
     "linux/latebinding_symbol_table.h",
   ]
+}
+ave_library("linux_alsa_symbol") {
+  sources = [
+    "linux/alsa_symbol_table.cc",
+    "linux/alsa_symbol_table.h",
+  ]
+  deps = [ ":linux_symbol_binding" ]
+}
+ave_library("pulseaudio_symbol") {
+  sources = [
+    "pulseaudio/pulseaudio_symbol_table.cc",
+    "pulseaudio/pulseaudio_symbol_table.h",
+  ]
+  deps = [ ":linux_symbol_binding" ]
+}
+
+# linux alsa device
+ave_library("alsa_audio_device") {
+  sources = [
+    "linux/alsa_audio_device.cc",
+    "linux/alsa_audio_device.h",
+    "linux/alsa_audio_record.cc",
+    "linux/alsa_audio_record.h",
+    "linux/alsa_audio_track.cc",
+    "linux/alsa_audio_track.h",
+  ]
+  deps = [
+    ":audio_device_base",
+    ":linux_alsa_symbol",
+  ]
+}
+
+# executable
+ave_executable("yplay") {
+  testonly = true
+  sources = [ "play_audio.cc" ]
+  deps = [ ":audio_device" ]
 }

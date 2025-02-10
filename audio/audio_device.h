@@ -25,6 +25,7 @@ class AudioLoopback;
 // AudioDevice is a module for creating AudioDevice objects and managing
 // audio devices.
 class AudioDevice {
+ public:
   enum class PlatformType : uint8_t {
     kDefault = 0,
     kLinuxAlsa,
@@ -34,11 +35,15 @@ class AudioDevice {
     kAndroidAAudio,
     kDummy,
   };
-  virtual ~AudioDevice() = default;
 
   static std::shared_ptr<AudioDevice> CreateAudioDevice(PlatformType type);
 
   /* implement the following functions in the platform-specific code */
+  virtual ~AudioDevice() = default;
+
+  // initialize the audio device
+  virtual status_t Init() = 0;
+
   // create an AudioTrack object.
   virtual std::shared_ptr<AudioTrack> CreateAudioTrack() = 0;
 

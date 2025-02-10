@@ -15,26 +15,26 @@ std::shared_ptr<AudioDevice> AudioDevice::CreateAudioDevice(
   std::shared_ptr<AudioDevice> audio_device;
 
   switch (type) {
-    case kDefault: {
+    case PlatformType::kDefault: {
       break;
     }
-    case kLinuxAlsa: {
+    case PlatformType::kLinuxAlsa: {
       break;
     }
-    case kLinuxPulse: {
+    case PlatformType::kLinuxPulse: {
       break;
     }
-    case kAndroidJava: {
+    case PlatformType::kAndroidJava: {
       break;
     }
-    case kAndroidOpenSLES: {
+    case PlatformType::kAndroidOpenSLES: {
       break;
     }
-    case kAndroidAAudio: {
+    case PlatformType::kAndroidAAudio: {
       break;
     }
     default:
-    case kDummy: {
+    case PlatformType::kDummy: {
       break;
     }
   }
