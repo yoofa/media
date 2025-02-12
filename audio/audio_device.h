@@ -13,14 +13,25 @@
 
 #include "base/errors.h"
 
+#include "media/audio/audio_loopback.h"
+#include "media/audio/audio_record.h"
+#include "media/audio/audio_track.h"
+
 namespace ave {
 namespace media {
 
-struct AudioDeviceInfo {};
+enum class AudioDeviceDirection : uint8_t {
+  kInput = 0,
+  kOutput,
+  kLoopback,
+  kNone,
+};
 
-class AudioTrack;
-class AudioRecord;
-class AudioLoopback;
+struct AudioDeviceInfo {
+  AudioDeviceDirection direction = AudioDeviceDirection::kNone;
+  std::string_view name{};
+  std::vector<AudioConfig> supported_configs{};
+};
 
 // AudioDevice is a module for creating AudioDevice objects and managing
 // audio devices.

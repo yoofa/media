@@ -6,6 +6,7 @@
  */
 
 #include "audio_device.h"
+#include "linux/alsa_audio_device.h"
 
 namespace ave {
 namespace media {
@@ -19,6 +20,7 @@ std::shared_ptr<AudioDevice> AudioDevice::CreateAudioDevice(
       break;
     }
     case PlatformType::kLinuxAlsa: {
+      audio_device = std::make_shared<linux_audio::AlsaAudioDevice>();
       break;
     }
     case PlatformType::kLinuxPulse: {

@@ -29,6 +29,7 @@ namespace linux_audio {
   X(snd_pcm_prepare)                           \
   X(snd_pcm_readi)                             \
   X(snd_pcm_recover)                           \
+  X(snd_pcm_pause)                             \
   X(snd_pcm_resume)                            \
   X(snd_pcm_reset)                             \
   X(snd_pcm_state)                             \
@@ -59,6 +60,12 @@ namespace linux_audio {
   X(snd_pcm_hw_params_set_channels)            \
   X(snd_pcm_hw_params_set_rate_near)           \
   X(snd_pcm_hw_params_set_buffer_size_near)    \
+  X(snd_pcm_hw_params_set_period_size_near)    \
+  X(snd_pcm_sw_params_malloc)                  \
+  X(snd_pcm_sw_params_current)                 \
+  X(snd_pcm_sw_params_free)                    \
+  X(snd_pcm_sw_params_set_start_threshold)     \
+  X(snd_pcm_sw_params)                         \
   X(snd_card_next)                             \
   X(snd_card_get_name)                         \
   X(snd_config_update)                         \

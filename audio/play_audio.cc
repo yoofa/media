@@ -11,10 +11,11 @@
 #include <unistd.h>
 #include <memory>
 
+#include "base/logging.h"
+#include "media/audio/audio.h"
 #include "media/audio/audio_device.h"
 #include "media/audio/audio_format.h"
 #include "media/audio/audio_track.h"
-#include "media/audio/audio.h"
 #include "media/audio/channel_layout.h"
 
 using ave::media::AudioDevice;
@@ -111,6 +112,9 @@ int main(int argc, char* argv[]) {
     fclose(fp);
     return 1;
   }
+  if (audio_device->Init() != ave::OK) {
+    return 1;
+  }
 
   // Create audio track
   AudioConfig config;
@@ -124,6 +128,7 @@ int main(int argc, char* argv[]) {
     fclose(fp);
     return 1;
   }
+
   audio_track->Open(config);
 
   // Start playback

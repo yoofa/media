@@ -12,11 +12,12 @@
 #include <vector>
 
 #include "media/audio/audio_device.h"
-#include "media/audio/linux/alsa_symbol_table.h"
 
 namespace ave {
 namespace media {
 namespace linux_audio {
+
+class AlsaAudioTrack;
 
 class AlsaAudioDevice : public AudioDevice {
  public:
@@ -39,7 +40,6 @@ class AlsaAudioDevice : public AudioDevice {
   void EnumerateDevices();
 
   bool _initialized;
-  std::unique_ptr<AlsaSymbolTable> alsa_symbols_;
   std::vector<std::pair<int, AudioDeviceInfo>> audio_devices_;
   int current_input_device_id_;
   int current_output_device_id_;

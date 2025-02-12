@@ -9,12 +9,17 @@
 #define AVE_MEDIA_AUDIO_LINUX_ALSA_AUDIO_TRACK_H_
 
 #include <alsa/asoundlib.h>
+#include <sys/ioctl.h>
+#include <sys/soundcard.h>
+
 #include <memory>
 
 #include "base/types.h"
 #include "media/audio/audio.h"
 #include "media/audio/audio_track.h"
+#include "media/audio/linux/alsa_audio_device.h"
 #include "media/audio/linux/alsa_symbol_table.h"
+
 namespace ave {
 namespace media {
 namespace linux_audio {
@@ -35,8 +40,8 @@ class AlsaAudioTrack : public AudioTrack {
   float msecsPerFrame() const override;
 
   status_t GetPosition(uint32_t* position) const override;
-  int64_t GetPlayedOutDurationUs(int64_t nowUs) const override;
   status_t GetFramesWritten(uint32_t* frameswritten) const override;
+  int64_t GetPlayedOutDurationUs(int64_t nowUs) const override;
   int64_t GetBufferDurationInUs() const override;
 
   status_t Open(audio_config_t config, AudioCallback cb, void* cookie) override;
@@ -48,11 +53,11 @@ class AlsaAudioTrack : public AudioTrack {
   void Close() override;
 
  private:
-  status_t InitDevice();
-  void DestroyDevice();
   status_t SetHWParams();
   status_t SetSWParams();
+  status_t RecoverIfNeeded(int error);
 
+  AlsaSymbolTable* symbol_table_;
   snd_pcm_t* handle_;
   audio_config_t config_;
   AudioCallback callback_;
@@ -61,11 +66,9 @@ class AlsaAudioTrack : public AudioTrack {
   bool ready_;
   bool playing_;
 
-  snd_pcm_uframes_t buffer_size_;
   snd_pcm_uframes_t period_size_;
-
-  std::unique_ptr<uint8_t[]> temp_buffer_;
-  size_t temp_buffer_size_;
+  snd_pcm_uframes_t buffer_size_;
+  uint64_t frames_written_;
 };
 
 }  // namespace linux_audio

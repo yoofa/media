@@ -83,6 +83,7 @@ ave_library("alsa_audio_device") {
   deps = [
     ":audio_device_base",
     ":linux_alsa_symbol",
+    "//base:logging",
   ]
 }
 
