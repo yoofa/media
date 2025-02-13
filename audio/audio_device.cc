@@ -6,7 +6,14 @@
  */
 
 #include "audio_device.h"
+
+#if defined(AVE_LINUX)
 #include "linux/alsa_audio_device.h"
+#endif
+
+#if defined(AVE_ANDROID)
+#include "android/opensles_audio_device.h"
+#endif
 
 namespace ave {
 namespace media {
@@ -16,23 +23,31 @@ std::shared_ptr<AudioDevice> AudioDevice::CreateAudioDevice(
   std::shared_ptr<AudioDevice> audio_device;
 
   switch (type) {
-    case PlatformType::kDefault: {
-      break;
-    }
+#if !defined(AVE_ANDROID) && defined(AVE_LINUX)
     case PlatformType::kLinuxAlsa: {
       audio_device = std::make_shared<linux_audio::AlsaAudioDevice>();
       break;
     }
     case PlatformType::kLinuxPulse: {
+      // TODO
       break;
     }
+#endif
+
+#if defined(AVE_ANDROID)
     case PlatformType::kAndroidJava: {
       break;
     }
     case PlatformType::kAndroidOpenSLES: {
+      audio_device = std::make_shared<android::OpenSLESAudioDevice>();
       break;
     }
     case PlatformType::kAndroidAAudio: {
+      break;
+    }
+#endif
+
+    case PlatformType::kDefault: {
       break;
     }
     default:

@@ -29,8 +29,8 @@ enum class AudioDeviceDirection : uint8_t {
 
 struct AudioDeviceInfo {
   AudioDeviceDirection direction = AudioDeviceDirection::kNone;
-  std::string_view name{};
-  std::vector<AudioConfig> supported_configs{};
+  std::string_view name;
+  std::vector<AudioConfig> supported_configs;
 };
 
 // AudioDevice is a module for creating AudioDevice objects and managing

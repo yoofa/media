@@ -18,12 +18,11 @@
 #include "media/audio/audio_track.h"
 #include "media/audio/channel_layout.h"
 
-using ave::media::AudioDevice;
 using ave::media::AudioConfig;
+using ave::media::AudioDevice;
 using ave::media::AudioFormat;
-using ave::media::GuessChannelLayout;
 using ave::media::AudioTrack;
-
+using ave::media::GuessChannelLayout;
 
 namespace {
 volatile bool g_running = true;
@@ -36,7 +35,11 @@ void SignalHandler(int signal) {
 
 AudioDevice::PlatformType DetectPlatform() {
   // TODO: implement platform detection
+#if defined(AVE_ANDROID)
+  return AudioDevice::PlatformType::kAndroidOpenSLES;
+#elif defined(AVE_LINUX)
   return AudioDevice::PlatformType::kLinuxAlsa;
+#endif
 }
 
 void PrintUsage(const char* program) {
@@ -146,10 +149,10 @@ int main(int argc, char* argv[]) {
     size_t bytes_written = 0;
     while (bytes_written < bytes_read && g_running) {
       size_t written = audio_track->Write(buffer.get() + bytes_written,
-                                        bytes_read - bytes_written);
+                                          bytes_read - bytes_written);
       if (written == 0) {
         // Handle error or wait for buffer space
-        usleep(10000);  // Sleep for 10ms
+        usleep(1000);  // Sleep for 10ms
         continue;
       }
       bytes_written += written;

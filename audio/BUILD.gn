@@ -25,6 +25,7 @@ ave_library("audio_channel_layout") {
     "channel_layout.cc",
     "channel_layout.h",
   ]
+  deps = [ "//base:logging" ]
 }
 
 # audio device base
@@ -42,10 +43,16 @@ ave_library("audio_device_base") {
 ave_library("audio_device") {
   sources = [ "audio_device.cc" ]
   deps = [
-    ":alsa_audio_device",
     ":audio_base",
     ":audio_device_base",
   ]
+
+  if (is_linux) {
+    deps += [ ":alsa_audio_device" ]
+  }
+  if (is_android) {
+    deps += [ ":opensles_audio_device" ]
+  }
 }
 
 # linux
@@ -85,6 +92,22 @@ ave_library("alsa_audio_device") {
     ":linux_alsa_symbol",
     "//base:logging",
   ]
+}
+
+# android
+## opensles
+ave_library("opensles_audio_device") {
+  sources = [
+    "android/opensles_audio_device.cc",
+    "android/opensles_audio_device.h",
+    "android/opensles_audio_track.cc",
+    "android/opensles_audio_track.h",
+  ]
+  deps = [
+    ":audio_device_base",
+    "//base:logging",
+  ]
+  libs = [ "OpenSLES" ]
 }
 
 # executable
