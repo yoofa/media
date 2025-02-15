@@ -23,13 +23,13 @@ struct Lookup {
 
   template <typename V,
             typename = typename std::enable_if_t<!std::is_same_v<T, V>>>
-  inline bool map(const T &from, V *to) const {
+  inline bool map(const T& from, V* to) const {
     return lookup(from, to);
   }
 
   template <typename V,
             typename = typename std::enable_if_t<!std::is_same_v<T, V>>>
-  inline bool map(const V &from, T *to) const {
+  inline bool map(const V& from, T* to) const {
     return rlookup(from, to);
   }
 

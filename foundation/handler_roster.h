@@ -23,8 +23,8 @@ class HandlerRoster {
   HandlerRoster();
   virtual ~HandlerRoster() = default;
 
-  Looper::handler_id registerHandler(const std::shared_ptr<Looper> &looper,
-                                     const std::shared_ptr<Handler> &handler);
+  Looper::handler_id registerHandler(const std::shared_ptr<Looper>& looper,
+                                     const std::shared_ptr<Handler>& handler);
 
   void unregisterHandler(Looper::handler_id handler_id);
 

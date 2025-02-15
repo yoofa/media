@@ -31,7 +31,7 @@ status_t ReplyToken::setReply(const std::shared_ptr<Message>& reply) {
 Message::Message()
     : what_(static_cast<uint32_t>(0)), handler_id_(static_cast<int32_t>(0)) {}
 
-Message::Message(uint32_t what, const std::shared_ptr<Handler> &handler)
+Message::Message(uint32_t what, const std::shared_ptr<Handler>& handler)
     : what_(what), handler_id_(static_cast<int32_t>(0)) {
   setHandler(handler);
 }
@@ -48,7 +48,7 @@ uint32_t Message::what() const {
   return what_;
 }
 
-void Message::setHandler(const std::shared_ptr<Handler> &handler) {
+void Message::setHandler(const std::shared_ptr<Handler>& handler) {
   if (handler == nullptr) {
     handler_id_ = static_cast<int32_t>(0);
     handler_.reset();
@@ -227,7 +227,7 @@ bool Message::findString(const char* name, std::string& value) const {
   return false;
 }
 
-void Message::setMessage(const char *name, std::shared_ptr<Message> msg) {
+void Message::setMessage(const char* name, std::shared_ptr<Message> msg) {
   std::shared_ptr<Message::Item> item = allocateItem(name);
   item->mType = Message::kTypeMessage;
   item->value = std::move(msg);
@@ -245,7 +245,7 @@ bool Message::findMessage(const char* name,
   return false;
 }
 
-void Message::setReplyToken(const char *name,
+void Message::setReplyToken(const char* name,
                             std::shared_ptr<ReplyToken> token) {
   std::shared_ptr<Message::Item> item = allocateItem(name);
   item->mType = kTypeToken;
@@ -264,7 +264,7 @@ bool Message::findReplyToken(const char* name,
   return false;
 }
 
-void Message::setBuffer(const char *name,
+void Message::setBuffer(const char* name,
                         std::shared_ptr<ave::media::Buffer> buffer) {
   std::shared_ptr<Message::Item> item = allocateItem(name);
   item->mType = kTypeBuffer;
@@ -283,7 +283,7 @@ bool Message::findBuffer(const char* name,
   return false;
 }
 
-void Message::setObject(const char *name,
+void Message::setObject(const char* name,
                         std::shared_ptr<ave::media::MessageObject> obj) {
   std::shared_ptr<Message::Item> item = allocateItem(name);
   item->mType = kTypeObject;

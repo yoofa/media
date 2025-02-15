@@ -24,15 +24,22 @@ namespace media {
 HandlerRoster gRoster;
 
 Looper::Looper()
-    : priority_(static_cast<int32_t>(0)), thread_(nullptr), looping_(false),
-      start_latch_(1), stopped_(false) {}
+    : priority_(static_cast<int32_t>(0)),
+      thread_(nullptr),
+      looping_(false),
+      start_latch_(1),
+      stopped_(false) {}
 
-Looper::~Looper() { stop(); }
+Looper::~Looper() {
+  stop();
+}
 
-void Looper::setName(std::string name) { name_ = name; }
+void Looper::setName(std::string name) {
+  name_ = name;
+}
 
-Looper::handler_id
-Looper::registerHandler(const std::shared_ptr<Handler> &handler) {
+Looper::handler_id Looper::registerHandler(
+    const std::shared_ptr<Handler>& handler) {
   return gRoster.registerHandler(shared_from_this(), handler);
 }
 
@@ -67,7 +74,7 @@ int32_t Looper::stop() {
   return static_cast<int32_t>(0);
 }
 
-void Looper::post(const std::shared_ptr<Message> &message, int64_t delay_us) {
+void Looper::post(const std::shared_ptr<Message>& message, int64_t delay_us) {
   std::lock_guard<std::mutex> guard(mutex_);
   if (stopped_) {
     return;
@@ -101,7 +108,7 @@ void Looper::loop() {
         continue;
       }
 
-      const auto &event = event_queue_.top();
+      const auto& event = event_queue_.top();
       int64_t nowUs = getNowUs();
 
       if (event->when_us_ > nowUs) {
@@ -131,8 +138,8 @@ std::shared_ptr<ReplyToken> Looper::createReplyToken() {
   return std::make_shared<ReplyToken>(shared_from_this());
 }
 
-status_t Looper::awaitResponse(const std::shared_ptr<ReplyToken> &replyToken,
-                               std::shared_ptr<Message> &response) {
+status_t Looper::awaitResponse(const std::shared_ptr<ReplyToken>& replyToken,
+                               std::shared_ptr<Message>& response) {
   std::unique_lock<std::mutex> guard(mutex_);
   // AVE_CHECK(replyToken != NULL)
   while (!replyToken->getReply(response)) {
@@ -142,8 +149,8 @@ status_t Looper::awaitResponse(const std::shared_ptr<ReplyToken> &replyToken,
   return 0;
 }
 
-status_t Looper::postReply(const std::shared_ptr<ReplyToken> &replyToken,
-                           const std::shared_ptr<Message> &reply) {
+status_t Looper::postReply(const std::shared_ptr<ReplyToken>& replyToken,
+                           const std::shared_ptr<Message>& reply) {
   std::lock_guard<std::mutex> guard(mutex_);
   status_t err = replyToken->setReply(reply);
   if (err == 0) {
@@ -152,5 +159,5 @@ status_t Looper::postReply(const std::shared_ptr<ReplyToken> &replyToken,
   return err;
 }
 
-} // namespace media
-} // namespace ave
+}  // namespace media
+}  // namespace ave

@@ -122,8 +122,8 @@ status_t ColorUtils::unwrapColorAspectsFromColorStandard(
   if (standard >= static_cast<int32_t>(kColorStandardVendorStart)) {
     start = static_cast<int32_t>(kColorStandardVendorStart);
     numPrimaries =
-        static_cast<int32_t>(ColorAspects::PrimariesOther) + 1;      // 0x100
-    numCoeffs = static_cast<int32_t>(ColorAspects::MatrixOther) + 1; // 0x100;
+        static_cast<int32_t>(ColorAspects::PrimariesOther) + 1;       // 0x100
+    numCoeffs = static_cast<int32_t>(ColorAspects::MatrixOther) + 1;  // 0x100;
   }
   if (standard >= start && standard < start + numPrimaries * numCoeffs) {
     auto product = static_cast<int32_t>(standard - start);
@@ -146,16 +146,16 @@ static bool isDefined(ColorAspects::Range r) {
 
 //  static
 int32_t ColorUtils::wrapColorAspectsIntoColorRange(ColorAspects::Range range) {
-  ColorRange res = kColorRangeUnspecified; // Initialize with a default value
+  ColorRange res = kColorRangeUnspecified;  // Initialize with a default value
   if (sRanges.map(range, &res)) {
     return static_cast<int32_t>(res);
   }
   if (!isValid(range)) {
     return static_cast<int32_t>(kColorRangeUnspecified);
   }
-    AVE_CHECK(!isDefined(range));
-    // all platform values are in sRanges
-    return static_cast<int32_t>(kColorRangeVendorStart + range);
+  AVE_CHECK(!isDefined(range));
+  // all platform values are in sRanges
+  return static_cast<int32_t>(kColorRangeVendorStart + range);
 }
 
 // static
@@ -167,7 +167,7 @@ status_t ColorUtils::unwrapColorAspectsFromColorRange(
   }
 
   auto start = static_cast<int32_t>(kColorRangeVendorStart);
-  auto numRanges = static_cast<int32_t>(ColorAspects::RangeOther) + 1; // 0x100
+  auto numRanges = static_cast<int32_t>(ColorAspects::RangeOther) + 1;  // 0x100
   if (range >= start && range < start + numRanges) {
     *aspect = static_cast<ColorAspects::Range>(range - start);
     return OK;
@@ -345,9 +345,13 @@ void ColorUtils::convertIsoColorAspectsToCodecAspects(int32_t primaries,
       fullRange ? ColorAspects::RangeFull : ColorAspects::RangeLimited;
 }
 
-void ColorUtils::convertIsoColorAspectsToPlatformAspects(
-    int32_t primaries, int32_t transfer, int32_t coeffs, bool fullRange,
-    int32_t *range, int32_t *standard, int32_t *outtransfer) {
+void ColorUtils::convertIsoColorAspectsToPlatformAspects(int32_t primaries,
+                                                         int32_t transfer,
+                                                         int32_t coeffs,
+                                                         bool fullRange,
+                                                         int32_t* range,
+                                                         int32_t* standard,
+                                                         int32_t* outtransfer) {
   ColorAspects aspects = {};
   convertIsoColorAspectsToCodecAspects(primaries, transfer, coeffs, fullRange,
                                        aspects);
@@ -889,7 +893,6 @@ bool ColorUtils::getHDRStaticInfoFromFormat(
 bool ColorUtils::isHDRStaticInfoValid(HDRStaticInfo* info) {
   if (info->sType1.mMaxDisplayLuminance > 0 &&
       info->sType1.mMinDisplayLuminance > 0) {
-
     return true;
   }
   if (info->sType1.mMaxContentLightLevel > 0 &&

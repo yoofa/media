@@ -37,12 +37,12 @@ class Looper : public std::enable_shared_from_this<Looper> {
 
   // set looper name
   void setName(std::string name);
-  handler_id registerHandler(const std::shared_ptr<Handler> &handler);
+  handler_id registerHandler(const std::shared_ptr<Handler>& handler);
   static void unregisterHandler(handler_id handler_id);
 
   int32_t start(int32_t priority = static_cast<int32_t>(0));
   int32_t stop();
-  void post(const std::shared_ptr<Message> &message, int64_t delay_us);
+  void post(const std::shared_ptr<Message>& message, int64_t delay_us);
 
   static int64_t getNowUs() {
     auto systemClock = std::chrono::system_clock::now();

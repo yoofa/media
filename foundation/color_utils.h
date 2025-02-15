@@ -227,8 +227,8 @@ struct ColorUtils {
   static bool isHDRStaticInfoValid(HDRStaticInfo* info);
 };
 
-inline static const char *asString(ColorUtils::ColorStandard i,
-                                   const char *def = "??") {
+inline static const char* asString(ColorUtils::ColorStandard i,
+                                   const char* def = "??") {
   switch (i) {
     case ColorUtils::kColorStandardUnspecified:
       return "Unspecified";
@@ -257,8 +257,8 @@ inline static const char *asString(ColorUtils::ColorStandard i,
   }
 }
 
-inline static const char *asString(ColorUtils::ColorTransfer i,
-                                   const char *def = "??") {
+inline static const char* asString(ColorUtils::ColorTransfer i,
+                                   const char* def = "??") {
   switch (i) {
     case ColorUtils::kColorTransferUnspecified:
       return "Unspecified";
@@ -283,8 +283,8 @@ inline static const char *asString(ColorUtils::ColorTransfer i,
   }
 }
 
-inline static const char *asString(ColorUtils::ColorRange i,
-                                   const char *def = "??") {
+inline static const char* asString(ColorUtils::ColorRange i,
+                                   const char* def = "??") {
   switch (i) {
     case ColorUtils::kColorRangeUnspecified:
       return "Unspecified";

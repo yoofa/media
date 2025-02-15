@@ -2,10 +2,10 @@
 
 #include "base/checks.h"
 #include "base/logging.h"
+#include "base/sequence_checker.h"
 #include "base/task_util/default_task_runner_factory.h"
 #include "base/task_util/task_runner.h"
 #include "base/time_utils.h"
-#include "base/sequence_checker.h"
 
 namespace ave {
 namespace media {
@@ -152,7 +152,6 @@ void AVSynchronizeRender::Flush() {
     }
     media_clock_->ClearAnchor();
   });
-
 }
 
 void AVSynchronizeRender::Pause() {
@@ -173,9 +172,7 @@ status_t AVSynchronizeRender::GetCurrentMediaTime(int64_t* out_media_time_us) {
     return ret;
   }
   // media clock not started, try to start it if possible
-  {
-
-  }
+  {}
   return media_clock_->GetMediaTime(base::TimeMicros(), out_media_time_us);
 }
 
@@ -198,13 +195,9 @@ void AVSynchronizeRender::SetAudioTrack(
   audio_track_ = audio_track;
 }
 
-void AVSynchronizeRender::DrainAudioQueue() {
+void AVSynchronizeRender::DrainAudioQueue() {}
 
-}
-
-void AVSynchronizeRender::DrainVideoQueue() {
-
-}
+void AVSynchronizeRender::DrainVideoQueue() {}
 
 }  // namespace media
 }  // namespace ave

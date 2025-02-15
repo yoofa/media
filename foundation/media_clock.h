@@ -76,7 +76,7 @@ class MediaClock {
                         int64_t* out_media_us,
                         bool allow_past_max_time = false) const;
   status_t GetRealTimeFor(int64_t target_media_us, int64_t* out_real_us) const;
-  
+
   void AddTimerEvent(std::unique_ptr<TimerEvent> event,
                      int64_t media_time_us,
                      int64_t adjust_real_us = 0);

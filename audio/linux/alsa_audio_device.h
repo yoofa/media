@@ -21,7 +21,7 @@ class AlsaAudioTrack;
 
 class AlsaAudioDevice : public AudioDevice {
  public:
-  // Creates an AlsaAudioDevice. Returns nullptr if ALSA shared library 
+  // Creates an AlsaAudioDevice. Returns nullptr if ALSA shared library
   // cannot be loaded or required symbols are missing.
   AlsaAudioDevice();
   ~AlsaAudioDevice() override;
@@ -31,7 +31,8 @@ class AlsaAudioDevice : public AudioDevice {
   std::shared_ptr<AudioTrack> CreateAudioTrack() override;
   std::shared_ptr<AudioRecord> CreateAudioRecord() override;
   std::shared_ptr<AudioLoopback> CreateAudioLoopback() override;
-  std::vector<std::pair<int, AudioDeviceInfo>> GetSupportedAudioDevices() override;
+  std::vector<std::pair<int, AudioDeviceInfo>> GetSupportedAudioDevices()
+      override;
   status_t SetAudioInputDevice(int device_id) override;
   status_t SetAudioOutputDevice(int device_id) override;
 

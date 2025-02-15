@@ -89,12 +89,12 @@ class Message : public std::enable_shared_from_this<Message> {
   };
 
   Message();
-  explicit Message(uint32_t what, const std::shared_ptr<Handler> &handler);
+  explicit Message(uint32_t what, const std::shared_ptr<Handler>& handler);
   virtual ~Message();
 
   void setWhat(uint32_t what);
   uint32_t what() const;
-  void setHandler(const std::shared_ptr<Handler> &handler);
+  void setHandler(const std::shared_ptr<Handler>& handler);
 
   void clear();
 
@@ -106,10 +106,10 @@ class Message : public std::enable_shared_from_this<Message> {
   void setPointer(const char* name, void* value);
   void setString(const char* name, const char* s, ssize_t len = -1);
   void setString(const char* name, const std::string& s);
-  void setMessage(const char *name, std::shared_ptr<Message> msg);
-  void setReplyToken(const char *name, std::shared_ptr<ReplyToken> token);
-  void setBuffer(const char *name, std::shared_ptr<Buffer> buffer);
-  void setObject(const char *name, std::shared_ptr<MessageObject> obj);
+  void setMessage(const char* name, std::shared_ptr<Message> msg);
+  void setReplyToken(const char* name, std::shared_ptr<ReplyToken> token);
+  void setBuffer(const char* name, std::shared_ptr<Buffer> buffer);
+  void setObject(const char* name, std::shared_ptr<MessageObject> obj);
   void setRect(const char* name,
                int32_t left,
                int32_t top,

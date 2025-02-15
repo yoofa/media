@@ -20,16 +20,16 @@ class Message;
 
 class Handler : public std::enable_shared_from_this<Handler> {
  public:
-   Handler()
-       : id_(static_cast<int32_t>(0)),
-         message_counter_(static_cast<uint32_t>(0)) {}
-   virtual ~Handler() = default;
+  Handler()
+      : id_(static_cast<int32_t>(0)),
+        message_counter_(static_cast<uint32_t>(0)) {}
+  virtual ~Handler() = default;
 
-   Looper::handler_id id() const { return id_; }
+  Looper::handler_id id() const { return id_; }
 
-   std::shared_ptr<Looper> looper() const { return looper_.lock(); }
+  std::shared_ptr<Looper> looper() const { return looper_.lock(); }
 
-   std::weak_ptr<Looper> getLooper() const { return looper_; }
+  std::weak_ptr<Looper> getLooper() const { return looper_; }
 
  protected:
   virtual void onMessageReceived(const std::shared_ptr<Message>& message) = 0;
