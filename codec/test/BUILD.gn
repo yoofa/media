@@ -1,0 +1,24 @@
+import("//base/build/ave.gni")
+
+ave_library("dummp_codec") {
+  sources = [
+    "dummy_codec.cc",
+    "dummy_codec.h",
+    "dummy_codec_factory.cc",
+    "dummy_codec_factory.h",
+  ]
+  deps = [ "//media/codec:codec_interface" ]
+}
+
+ave_library("test_codec_support") {
+  sources = [
+    "./test_codec_helper.cc",
+    "./test_codec_helper.h",
+  ]
+  deps = []
+}
+
+ave_executable("test_decode") {
+  sources = [ "test_decode.cc" ]
+  deps = [ ":test_codec_support" ]
+}

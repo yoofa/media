@@ -18,9 +18,19 @@
 
 namespace ave {
 namespace media {
+enum CodecPlatform : uint8_t {
+  kDefault = 0,
+  kDummy,
+  kFFmpeg,
+  kAndroidNdkMediaCodec,
+  kAndroidJavaMediaCodec,
+};
 
 class CodecFactory {
  public:
+  static std::shared_ptr<CodecFactory> CreateCodecFactory(
+      CodecPlatform platform);
+
   virtual ~CodecFactory() = default;
 
   virtual std::vector<CodecInfo> GetSupportedCodecs() = 0;
