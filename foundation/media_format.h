@@ -36,7 +36,8 @@ class MediaFormat {
       MediaType stream_type = MediaType::AUDIO,
       FormatType format_type = FormatType::kSample);
 
-  explicit MediaFormat(MediaType stream_type, FormatType format_type);
+  explicit MediaFormat(MediaType stream_type = MediaType::AUDIO,
+                       FormatType format_type = FormatType::kSample);
   virtual ~MediaFormat() = default;
 
   MediaTrackInfo& track_info();

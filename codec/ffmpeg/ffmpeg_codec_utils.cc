@@ -7,11 +7,10 @@
 
 #include "ffmpeg_codec_utils.h"
 
-#include <memory>
-
-#include "../../audio/channel_layout.h"
 #include "base/attributes.h"
 #include "base/checks.h"
+#include "base/logging.h"
+#include "media/audio/channel_layout.h"
 #include "third_party/ffmpeg/libavcodec/codec_id.h"
 
 extern "C" {
