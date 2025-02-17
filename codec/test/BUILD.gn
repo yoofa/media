@@ -1,6 +1,6 @@
 import("//base/build/ave.gni")
 
-ave_library("dummp_codec") {
+ave_library("dummy_codec") {
   sources = [
     "dummy_codec.cc",
     "dummy_codec.h",
@@ -15,10 +15,22 @@ ave_library("test_codec_support") {
     "./test_codec_helper.cc",
     "./test_codec_helper.h",
   ]
-  deps = []
+  deps = [
+    "//base:logging",
+    "//base:task_util",
+    "//media/audio:audio_channel_layout",
+    "//media/foundation:media_format",
+  ]
 }
 
 ave_executable("test_decode") {
   sources = [ "test_decode.cc" ]
-  deps = [ ":test_codec_support" ]
+  deps = [
+    ":dummy_codec",
+    ":test_codec_support",
+  ]
+
+  if (enable_ffmpeg_codec) {
+    deps += [ "//media/codec/ffmpeg:ffmpeg_codec" ]
+  }
 }

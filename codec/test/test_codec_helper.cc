@@ -105,6 +105,14 @@ status_t TestCodecRunner::Stop() {
     codec_->Release();
     codec_ = nullptr;
   }
+
+  // Signal completion in case someone is waiting
+  {
+    std::lock_guard<std::mutex> lock(completion_lock_);
+    completed_ = true;
+    completion_cv_.notify_all();
+  }
+
   return OK;
 }
 
@@ -160,11 +168,20 @@ void TestCodecRunner::ProcessInput(size_t index) {
     return;
   }
 
+  {
+    std::lock_guard<std::mutex> lock(completion_lock_);
+    has_pending_input_ = true;
+  }
+
   if (bytes_read == 0) {
     // End of stream
     input_buffer->SetRange(0, 0);
     codec_->QueueInputBuffer(input_buffer, -1);
     eos_sent_ = true;
+
+    std::lock_guard<std::mutex> lock(completion_lock_);
+    has_pending_input_ = false;
+    CheckCompletion();
     return;
   }
 
@@ -172,6 +189,7 @@ void TestCodecRunner::ProcessInput(size_t index) {
   memcpy(input_buffer->data(), buffer.data(), bytes_read);
   status_t err = codec_->QueueInputBuffer(input_buffer, -1);
   if (err != OK) {
+    AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << err;
     HandleError(err);
   }
 }
@@ -186,6 +204,11 @@ void TestCodecRunner::ProcessOutput(size_t index) {
     return;
   }
 
+  {
+    std::lock_guard<std::mutex> lock(completion_lock_);
+    has_pending_output_ = true;
+  }
+
   ssize_t bytes_written =
       output_cb_(output_buffer->data(), output_buffer->size());
   if (bytes_written < 0) {
@@ -198,10 +221,25 @@ void TestCodecRunner::ProcessOutput(size_t index) {
     HandleError(err);
   }
 
-  // Check if we're done (EOS received and all output processed)
-  if (eos_sent_ && bytes_written == 0) {
-    Stop();
+  {
+    std::lock_guard<std::mutex> lock(completion_lock_);
+    has_pending_output_ = false;
+    CheckCompletion();
   }
+}
+
+void TestCodecRunner::CheckCompletion() {
+  // Must be called with completion_lock_ held
+  if (eos_sent_ && !has_pending_input_ && !has_pending_output_) {
+    completed_ = true;
+    completion_cv_.notify_all();
+  }
+}
+
+status_t TestCodecRunner::WaitForCompletion() {
+  std::unique_lock<std::mutex> lock(completion_lock_);
+  completion_cv_.wait(lock, [this]() { return completed_ || error_; });
+  return error_ ? ERROR_IO : OK;
 }
 
 void TestCodecRunner::HandleError(status_t error) {

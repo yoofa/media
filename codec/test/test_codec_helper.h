@@ -8,8 +8,10 @@
 #ifndef MEDIA_CODEC_TEST_CODEC_HELPER_H_
 #define MEDIA_CODEC_TEST_CODEC_HELPER_H_
 
+#include <condition_variable>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "base/task_util/task_runner.h"
@@ -44,6 +46,9 @@ class TestCodecRunner : public CodecCallback {
   status_t Stop();
   bool IsRunning() const { return running_; }
 
+  // Wait for processing to complete
+  status_t WaitForCompletion();
+
   // CodecCallback implementation
   void OnInputBufferAvailable(size_t index) override;
   void OnOutputBufferAvailable(size_t index) override;
@@ -55,6 +60,7 @@ class TestCodecRunner : public CodecCallback {
   void ProcessInput(size_t index);
   void ProcessOutput(size_t index);
   void HandleError(status_t error);
+  void CheckCompletion();
 
   CodecFactory* factory_;
   std::shared_ptr<Codec> codec_;
@@ -67,6 +73,13 @@ class TestCodecRunner : public CodecCallback {
   bool running_ = false;
   bool error_ = false;
   bool eos_sent_ = false;
+
+  // Completion tracking
+  std::mutex completion_lock_;
+  std::condition_variable completion_cv_;
+  bool completed_ = false;
+  bool has_pending_input_ = false;
+  bool has_pending_output_ = false;
 };
 
 }  // namespace test

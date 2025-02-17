@@ -9,6 +9,7 @@
 #define MEDIA_CODEC_TEST_DUMMY_CODEC_H_
 
 #include <queue>
+#include "base/task_util/task_runner.h"
 #include "media/codec/codec.h"
 
 namespace ave {
@@ -39,10 +40,34 @@ class DummyCodec : public Codec {
                                bool render) override;
 
  private:
+  enum class BufferState {
+    FREE,     // Buffer is available for use
+    PENDING,  // Buffer is notified but not yet acquired
+    INUSE     // Buffer is being used
+  };
+
   struct BufferEntry {
-    bool in_use{false};
+    BufferState state{BufferState::FREE};
     std::shared_ptr<CodecBuffer> buffer;
   };
+
+  // Helper functions for buffer state management
+  bool IsBufferAvailable(const BufferEntry& entry) const {
+    return entry.state == BufferState::FREE;
+  }
+
+  bool IsBufferPending(const BufferEntry& entry) const {
+    return entry.state == BufferState::PENDING;
+  }
+
+  bool IsBufferInUse(const BufferEntry& entry) const {
+    return entry.state == BufferState::INUSE;
+  }
+
+  void RequestInputBuffer();
+  void ProcessBuffer(size_t input_index);
+  std::shared_ptr<CodecBuffer> FindAvailableInputBuffer(int32_t index);
+  std::shared_ptr<CodecBuffer> FindAvailableOutputBuffer();
 
   const bool is_encoder_;
   std::mutex lock_;
@@ -51,9 +76,9 @@ class DummyCodec : public Codec {
   CodecCallback* callback_ = nullptr;
   std::vector<BufferEntry> input_buffers_;
   std::vector<BufferEntry> output_buffers_;
-  std::queue<size_t> input_queue_;
   std::queue<size_t> output_queue_;
 
+  std::unique_ptr<base::TaskRunner> task_runner_;
   bool started_ = false;
   std::shared_ptr<CodecConfig> config_;
 };

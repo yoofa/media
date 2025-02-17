@@ -47,18 +47,21 @@ std::shared_ptr<Codec> DummyCodecFactory::CreateCodecByType(CodecId codec_id,
 
 std::shared_ptr<Codec> DummyCodecFactory::CreateCodecByName(
     const std::string& name) {
-  if (name == "dummy_encoder")
+  if (name == "dummy_encoder") {
     return std::make_shared<DummyCodec>(true);
-  if (name == "dummy_decoder")
+  }
+  if (name == "dummy_decoder") {
     return std::make_shared<DummyCodec>(false);
+  }
   return nullptr;
 }
 
 std::shared_ptr<Codec> DummyCodecFactory::CreateCodecByMime(
     const std::string& mime,
     bool encoder) {
-  if (mime == "video/dummy" || mime == "audio/dummy")
+  if (mime == "video/dummy" || mime == "audio/dummy") {
     return std::make_shared<DummyCodec>(encoder);
+  }
   return nullptr;
 }
 

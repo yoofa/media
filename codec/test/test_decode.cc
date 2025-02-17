@@ -12,6 +12,7 @@
 #include "base/logging.h"
 #include "base/task_util/default_task_runner_factory.h"
 #include "dummy_codec_factory.h"
+#include "media/audio/channel_layout.h"
 #include "media/codec/codec_factory.h"
 #include "media/codec/ffmpeg/ffmpeg_codec_factory.h"
 #include "test_codec_helper.h"
@@ -40,8 +41,11 @@ void PrintUsage(const char* program) {
 int main(int argc, char* argv[]) {
   std::string codec_platform_name = "ffmpeg";
   std::string mime;
-  int width = 0;
-  int height = 0;
+  // video
+  int16_t width = 0;
+  int16_t height = 0;
+
+  // audio
   int sample_rate = 0;
   int channels = 0;
 
@@ -55,10 +59,10 @@ int main(int argc, char* argv[]) {
         mime = optarg;
         break;
       case 'w':
-        width = atoi(optarg);
+        width = static_cast<int16_t>(atoi(optarg));
         break;
       case 'h':
-        height = atoi(optarg);
+        height = static_cast<int16_t>(atoi(optarg));
         break;
       case 'r':
         sample_rate = atoi(optarg);
@@ -107,16 +111,24 @@ int main(int argc, char* argv[]) {
       return 1;
   }
 
+  if (factory == nullptr) {
+    AVE_LOG(LS_ERROR) << "Failed to create codec factory";
+    return 1;
+  }
+
   auto task_runner_factory = ave::base::CreateDefaultTaskRunnerFactory();
 
   // Create media format
   auto format = MediaFormat::CreatePtr();
-  if (mime.find("video") != std::string::npos) {
+
+  const bool is_video = mime.substr(0, 5) == "video";
+
+  if (is_video) {
     format->SetWidth(width);
     format->SetHeight(height);
-  } else if (mime.find("audio") != std::string::npos) {
+  } else {
+    format->SetChannelLayout(ave::media::GuessChannelLayout(channels));
     format->SetSampleRate(sample_rate);
-    format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
   }
 
   // Open input/output files
@@ -139,6 +151,7 @@ int main(int argc, char* argv[]) {
   // Create test runner
   TestCodecRunner runner(factory.get(), task_runner_factory.get(), input_cb,
                          output_cb);
+
   status_t err = runner.Init(mime, false, format);
   if (err != ave::OK) {
     AVE_LOG(LS_ERROR) << "Failed to initialize codec runner: " << err;
@@ -153,6 +166,11 @@ int main(int argc, char* argv[]) {
   }
 
   // Wait for completion
+  err = runner.WaitForCompletion();
+  if (err != ave::OK) {
+    AVE_LOG(LS_ERROR) << "Failed to wait for completion: " << err;
+    return 1;
+  }
 
   fclose(in_fp);
   fclose(out_fp);
