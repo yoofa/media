@@ -84,6 +84,17 @@ std::vector<CodecInfo> FFmpegCodecFactory::GetSupportedCodecs() {
     info.hardware_accelerated =
         (codec->capabilities & AV_CODEC_CAP_HARDWARE) != 0;
 
+    // Add logic to retrieve additional information
+    info.max_resolution = {codec->max_lowres, codec->max_lowres};
+    info.max_bitrate = codec->bit_rate;
+    info.profile = codec->profile;
+    info.level = codec->level;
+    info.supported_color_formats = {codec->pix_fmts};
+    info.frame_rate_range = {codec->framerate.num, codec->framerate.den};
+    info.supported_sample_rates = {codec->supported_samplerates};
+    info.supported_channel_layouts = {codec->channel_layouts};
+    info.latency = codec->delay;
+
     supported_codecs_.push_back(info);
   }
 
