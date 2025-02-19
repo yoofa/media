@@ -28,13 +28,6 @@ ave_library("media_source_sink") {
     ":media_packet",
   ]
 }
-ave_library("video_render") {
-  sources = [ "video_render.h" ]
-  deps = [
-    ":media_source_sink",
-    ":message_object",
-  ]
-}
 
 ave_library("buffer") {
   sources = [
