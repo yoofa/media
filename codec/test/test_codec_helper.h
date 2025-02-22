@@ -52,7 +52,8 @@ class TestCodecRunner : public CodecCallback {
   // CodecCallback implementation
   void OnInputBufferAvailable(size_t index) override;
   void OnOutputBufferAvailable(size_t index) override;
-  void OnOutputFormatChanged(const std::shared_ptr<Message>& format) override;
+  void OnOutputFormatChanged(
+      const std::shared_ptr<MediaFormat>& format) override;
   void OnError(status_t error) override;
   void OnFrameRendered(std::shared_ptr<Message> notify) override;
 

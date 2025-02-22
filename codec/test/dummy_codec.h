@@ -30,6 +30,14 @@ class DummyCodec : public Codec {
   status_t Flush() override;
   status_t Release() override;
 
+  std::vector<std::shared_ptr<CodecBuffer>> InputBuffers() override;
+  std::vector<std::shared_ptr<CodecBuffer>> OutputBuffers() override;
+
+  status_t GetInputBuffer(size_t index,
+                          std::shared_ptr<CodecBuffer>& buffer) override;
+  status_t GetOutputBuffer(size_t index,
+                           std::shared_ptr<CodecBuffer>& buffer) override;
+
   std::shared_ptr<CodecBuffer> DequeueInputBuffer(int32_t index,
                                                   int64_t timeout_ms) override;
   status_t QueueInputBuffer(std::shared_ptr<CodecBuffer>& buffer,
@@ -52,15 +60,15 @@ class DummyCodec : public Codec {
   };
 
   // Helper functions for buffer state management
-  bool IsBufferAvailable(const BufferEntry& entry) const {
+  static bool IsBufferAvailable(const BufferEntry& entry) {
     return entry.state == BufferState::FREE;
   }
 
-  bool IsBufferPending(const BufferEntry& entry) const {
+  static bool IsBufferPending(const BufferEntry& entry) {
     return entry.state == BufferState::PENDING;
   }
 
-  bool IsBufferInUse(const BufferEntry& entry) const {
+  static bool IsBufferInUse(const BufferEntry& entry) {
     return entry.state == BufferState::INUSE;
   }
 

@@ -136,7 +136,7 @@ void TestCodecRunner::OnOutputBufferAvailable(size_t index) {
 }
 
 void TestCodecRunner::OnOutputFormatChanged(
-    const std::shared_ptr<Message>& format) {
+    const std::shared_ptr<MediaFormat>& format) {
   AVE_LOG(LS_INFO) << "Output format changed";
 }
 

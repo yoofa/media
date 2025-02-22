@@ -57,6 +57,36 @@ status_t DummyCodec::SetCallback(CodecCallback* callback) {
   return OK;
 }
 
+std::vector<std::shared_ptr<CodecBuffer>> DummyCodec::InputBuffers() {
+  std::vector<std::shared_ptr<CodecBuffer>> buffers;
+  std::lock_guard<std::mutex> lock(lock_);
+  for (auto& entry : input_buffers_) {
+    buffers.push_back(entry.buffer);
+  }
+  return buffers;
+}
+std::vector<std::shared_ptr<CodecBuffer>> DummyCodec::OutputBuffers() {
+  std::vector<std::shared_ptr<CodecBuffer>> buffers;
+  std::lock_guard<std::mutex> lock(lock_);
+  for (auto& entry : output_buffers_) {
+    buffers.push_back(entry.buffer);
+  }
+  return buffers;
+}
+
+status_t DummyCodec::GetInputBuffer(size_t index,
+                                    std::shared_ptr<CodecBuffer>& buffer) {
+  std::lock_guard<std::mutex> lock(lock_);
+  buffer = input_buffers_[index].buffer;
+  return OK;
+}
+status_t DummyCodec::GetOutputBuffer(size_t index,
+                                     std::shared_ptr<CodecBuffer>& buffer) {
+  std::lock_guard<std::mutex> lock(lock_);
+  buffer = output_buffers_[index].buffer;
+  return OK;
+}
+
 status_t DummyCodec::Start() {
   std::lock_guard<std::mutex> lock(lock_);
   if (started_) {

@@ -44,7 +44,7 @@ class CodecCallback {
   virtual void OnOutputBufferAvailable(size_t index) = 0;
   // output format is changed
   virtual void OnOutputFormatChanged(
-      const std::shared_ptr<Message>& format) = 0;
+      const std::shared_ptr<MediaFormat>& format) = 0;
   // error happened
   virtual void OnError(status_t error) = 0;
   // frame is rendered
@@ -83,6 +83,29 @@ class Codec {
   virtual status_t Reset() = 0;
   virtual status_t Flush() = 0;
   virtual status_t Release() = 0;
+
+  /*
+   * get input buffers refs from codec, can be used after Configure
+   */
+  virtual std::vector<std::shared_ptr<CodecBuffer>> InputBuffers() = 0;
+
+  /*
+   * get output buffers refs from codec, can be used after Configure
+   */
+  virtual std::vector<std::shared_ptr<CodecBuffer>> OutputBuffers() = 0;
+
+  /*
+   * get input buffer from codec, can be used after DequeueInputBuffer
+   * can be used to fill the buffer
+   */
+  virtual status_t GetInputBuffer(size_t index,
+                                  std::shared_ptr<CodecBuffer>& buffer) = 0;
+  /*
+   * get output buffer from codec, can be used after DequeueOutputBuffer
+   * can be used to render the buffer
+   */
+  virtual status_t GetOutputBuffer(size_t index,
+                                   std::shared_ptr<CodecBuffer>& buffer) = 0;
 
   virtual std::shared_ptr<CodecBuffer> DequeueInputBuffer(
       int32_t index,
