@@ -86,6 +86,8 @@ class AVSynchronizeRender : public MessageObject {
                 synchronizer_impl::ToRenderEvent(closure));
   }
 
+  void QueueEOS(int32_t stream_index, status_t final_result = OK);
+
   void Flush();
 
   void Pause();
@@ -102,10 +104,18 @@ class AVSynchronizeRender : public MessageObject {
   void SetMasterClock(ClockType type, int32_t master_audio_stream_index = -1);
 
   // track not opened when set, only support 1 audio sink now.
-  // multi audio stream will be mix to 1 audio stream to this audio_track
+  // multi audio stream will be mix to 1 audio stream to this audio_track\
+  // deprecated, use OpenAudioSink instead, because audio sink open and write
+  // or other operation must be in the same thread
   void SetAudioTrack(std::shared_ptr<AudioTrack> audio_track);
   // TODO: support multi audio track, each audio stream can be play to different
   // audio track
+
+  status_t OpenAudioSink(const std::shared_ptr<MediaFormat>& format,
+                         bool has_video = false,
+                         bool offload_only = false,
+                         bool* is_offloaded = nullptr,
+                         bool is_streaming = false);
 
  private:
   struct QueueEntry {
