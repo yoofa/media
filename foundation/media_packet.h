@@ -19,12 +19,6 @@ namespace ave {
 namespace media {
 
 class MediaPacket : MessageObject {
- protected:
-  // for private construct
-  struct protect_parameter {
-    explicit protect_parameter() = default;
-  };
-
  public:
   enum class PacketBufferType {
     kTypeNormal,
@@ -34,11 +28,10 @@ class MediaPacket : MessageObject {
   static MediaPacket Create(size_t size);
   static MediaPacket CreateWithHandle(void* handle);
 
- private:
-  explicit MediaPacket(size_t size, protect_parameter);
-  explicit MediaPacket(void* handle, protect_parameter);
+  static std::shared_ptr<MediaPacket> CreateShared(size_t size);
+  static std::shared_ptr<MediaPacket> CreateSharedWithHandle(void* handle);
 
- public:
+  MediaPacket() = delete;
   ~MediaPacket() override;
   // only support copy construct
   MediaPacket(const MediaPacket& other);
@@ -54,7 +47,7 @@ class MediaPacket : MessageObject {
   AudioSampleInfo* audio_info();
   VideoSampleInfo* video_info();
 
-  size_t size() const { return size_; }
+  size_t size() const { return data_ ? data_->size() : size_; }
   std::shared_ptr<Buffer>& buffer() { return data_; }
   const uint8_t* data() const;
 
@@ -66,6 +59,13 @@ class MediaPacket : MessageObject {
   bool is_eos() const { return is_eos_; }
 
  private:
+  MediaPacket(size_t size);
+  MediaPacket(void* handle);
+  template <typename... Args>
+  static std::shared_ptr<MediaPacket> make_shared_internal(Args&&... args) {
+    return std::make_shared<MediaPacket>(std::forward<Args>(args)...);
+  }
+
   size_t size_;
   std::shared_ptr<Buffer> data_;
   void* native_handle_;

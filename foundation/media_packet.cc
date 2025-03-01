@@ -12,14 +12,22 @@ namespace ave {
 namespace media {
 
 MediaPacket MediaPacket::Create(size_t size) {
-  return MediaPacket(size, protect_parameter());
+  return {size};
 }
 
 MediaPacket MediaPacket::CreateWithHandle(void* handle) {
-  return MediaPacket(handle, protect_parameter());
+  return {handle};
 }
 
-MediaPacket::MediaPacket(size_t size, protect_parameter)
+std::shared_ptr<MediaPacket> MediaPacket::CreateShared(size_t size) {
+  return make_shared_internal<MediaPacket>(size);
+}
+
+std::shared_ptr<MediaPacket> MediaPacket::CreateSharedWithHandle(void* handle) {
+  return make_shared_internal<MediaPacket>(handle);
+}
+
+MediaPacket::MediaPacket(size_t size)
     : size_(size),
       data_(std::make_shared<Buffer>(size)),
       native_handle_(nullptr),
@@ -28,7 +36,7 @@ MediaPacket::MediaPacket(size_t size, protect_parameter)
       is_eos_(false),
       media_format_(MediaFormat::Create(MediaType::UNKNOWN)) {}
 
-MediaPacket::MediaPacket(void* handle, protect_parameter)
+MediaPacket::MediaPacket(void* handle)
     : size_(0),
       data_(nullptr),
       native_handle_(handle),

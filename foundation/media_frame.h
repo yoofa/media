@@ -12,6 +12,7 @@
 
 #include "buffer.h"
 #include "media_utils.h"
+#include "message_object.h"
 
 namespace ave {
 namespace media {
@@ -31,7 +32,7 @@ struct VideoFrameInfo {
   int64_t timestamp_us;
 };
 
-class MediaFrame {
+class MediaFrame : public MessageObject {
  protected:
   // for private construct
   struct protect_parameter {
@@ -48,7 +49,7 @@ class MediaFrame {
   static MediaFrame CreateWithHandle(void* handle);
 
   MediaFrame(const MediaFrame& other);
-  ~MediaFrame();
+  ~MediaFrame() override;
 
   // Media type operations
   void SetMediaType(MediaType type);
