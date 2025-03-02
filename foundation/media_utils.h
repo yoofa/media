@@ -61,9 +61,9 @@ struct AudioSampleInfo {
   int64_t samples_per_channel = -1;
   int16_t bits_per_sample = -1;
 
-  base::Timestamp pts = base::Timestamp::Zero();
-  base::Timestamp dts = base::Timestamp::Zero();
-  base::TimeDelta duration = base::TimeDelta::Zero();
+  base::Timestamp pts = base::Timestamp::MinusInfinity();
+  base::Timestamp dts = base::Timestamp::MinusInfinity();
+  base::TimeDelta duration = base::TimeDelta::MinusInfinity();
 
   bool eos = false;
 
@@ -78,9 +78,9 @@ struct VideoSampleInfo {
   int16_t rotation = -1;
 
   // timestamp
-  base::Timestamp pts = base::Timestamp::Zero();
-  base::Timestamp dts = base::Timestamp::Zero();
-  base::TimeDelta duration = base::TimeDelta::Zero();
+  base::Timestamp pts = base::Timestamp::MinusInfinity();
+  base::Timestamp dts = base::Timestamp::MinusInfinity();
+  base::TimeDelta duration = base::TimeDelta::MinusInfinity();
 
   bool eos = false;
 
