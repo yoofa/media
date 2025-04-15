@@ -23,7 +23,7 @@ namespace ave {
 namespace media {
 
 // Both used for track and sample
-class MediaFormat : MessageObject {
+class MediaFormat : public MessageObject {
  public:
   enum class FormatType {
     kTrack,
