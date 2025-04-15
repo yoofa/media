@@ -47,6 +47,9 @@ class MediaPacket : MessageObject {
   AudioSampleInfo* audio_info();
   VideoSampleInfo* video_info();
 
+  // use meta() to get media metadata, other functions will be deprecated
+  MediaFormat* meta() { return &media_format_; }
+
   size_t size() const { return data_ ? data_->size() : size_; }
   std::shared_ptr<Buffer>& buffer() { return data_; }
   const uint8_t* data() const;
