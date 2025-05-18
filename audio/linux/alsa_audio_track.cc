@@ -45,11 +45,11 @@ bool AlsaAudioTrack::ready() const {
 }
 
 ssize_t AlsaAudioTrack::bufferSize() const {
-  return buffer_size_ * frameSize();
+  return static_cast<ssize_t>(buffer_size_) * frameSize();
 }
 
 ssize_t AlsaAudioTrack::frameCount() const {
-  return buffer_size_;
+  return static_cast<ssize_t>(buffer_size_);
 }
 
 ssize_t AlsaAudioTrack::channelCount() const {
@@ -67,8 +67,9 @@ uint32_t AlsaAudioTrack::sampleRate() const {
 }
 
 uint32_t AlsaAudioTrack::latency() const {
-  if (!ready_)
+  if (!ready_) {
     return 0;
+  }
 
   snd_pcm_sframes_t delay = 0;
   if (LATE(snd_pcm_delay)(handle_, &delay) < 0) {
@@ -78,7 +79,7 @@ uint32_t AlsaAudioTrack::latency() const {
 }
 
 float AlsaAudioTrack::msecsPerFrame() const {
-  return 1000.0f / config_.sample_rate;
+  return 1000.0f / static_cast<float>(config_.sample_rate);
 }
 
 status_t AlsaAudioTrack::GetPosition(uint32_t* position) const {

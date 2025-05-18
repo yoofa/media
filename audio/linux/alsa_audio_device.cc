@@ -11,6 +11,7 @@
 #include <algorithm>
 
 #include "base/logging.h"
+#include "media/audio/linux/alsa_audio_record.h"
 #include "media/audio/linux/alsa_audio_track.h"
 #include "media/audio/linux/alsa_symbol_table.h"
 #include "media/audio/linux/latebinding_symbol_table.h"
@@ -78,8 +79,7 @@ std::shared_ptr<AudioTrack> AlsaAudioDevice::CreateAudioTrack() {
 }
 
 std::shared_ptr<AudioRecord> AlsaAudioDevice::CreateAudioRecord() {
-  // TODO: Implement AlsaAudioRecord
-  return nullptr;
+  return std::make_shared<AlsaAudioRecord>(GetAlsaSymbolTable());
 }
 
 std::shared_ptr<AudioLoopback> AlsaAudioDevice::CreateAudioLoopback() {
