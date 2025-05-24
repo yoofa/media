@@ -47,6 +47,7 @@ class PulseAudioTrack : public AudioTrack {
   void Close() override;
 
  private:
+  static void ContextStateCallback(pa_context* c, void* userdata);
   static void StreamStateCallback(pa_stream* s, void* userdata);
   static void StreamWriteCallback(pa_stream* s, size_t length, void* userdata);
   static void StreamUnderflowCallback(pa_stream* s, void* userdata);

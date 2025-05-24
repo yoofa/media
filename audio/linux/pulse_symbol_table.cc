@@ -23,3 +23,9 @@ LATE_BINDING_SYMBOL_TABLE_DEFINE_END(PulseAudioSymbolTable)
 }  // namespace linux_audio
 }  // namespace media
 }  // namespace ave
+
+extern "C" ave::media::linux_audio::PulseAudioSymbolTable*
+GetPulseSymbolTable() {
+  static ave::media::linux_audio::PulseAudioSymbolTable table;
+  return &table;
+}

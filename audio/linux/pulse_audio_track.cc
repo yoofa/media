@@ -9,11 +9,13 @@
 
 #include <algorithm>
 
+#include "base/attributes.h"
 #include "base/logging.h"
+#include "media/audio/channel_layout.h"
 #include "media/audio/linux/pulse_symbol_table.h"
 
-#define LATE(sym)                                        \
-  LATESYM_GET(ave::media::linux_audio::PulseSymbolTable, \
+#define LATE(sym)                                             \
+  LATESYM_GET(ave::media::linux_audio::PulseAudioSymbolTable, \
               GetPulseSymbolTable(), sym)
 
 namespace ave {
@@ -21,7 +23,7 @@ namespace media {
 namespace linux_audio {
 
 namespace {
-// 默认的buffer参数
+// default latency is 20ms
 constexpr size_t kDefaultLatencyMs = 20;  // 20ms latency
 }  // namespace
 
@@ -42,18 +44,18 @@ PulseAudioTrack::~PulseAudioTrack() {
 }
 
 void PulseAudioTrack::StreamStateCallback(pa_stream* s, void* userdata) {
-  PulseAudioTrack* track = static_cast<PulseAudioTrack*>(userdata);
+  auto* track = static_cast<PulseAudioTrack*>(userdata);
   pa_stream_state_t state = LATE(pa_stream_get_state)(s);
 
   switch (state) {
     case PA_STREAM_READY:
-      LOG(INFO) << "Stream is ready";
+      AVE_LOG(LS_INFO) << "Stream is ready";
       break;
     case PA_STREAM_FAILED:
-      LOG(ERROR) << "Stream has failed";
+      AVE_LOG(LS_ERROR) << "Stream has failed";
       break;
     case PA_STREAM_TERMINATED:
-      LOG(INFO) << "Stream was terminated";
+      AVE_LOG(LS_INFO) << "Stream was terminated";
       break;
     default:
       break;
@@ -62,63 +64,102 @@ void PulseAudioTrack::StreamStateCallback(pa_stream* s, void* userdata) {
   LATE(pa_threaded_mainloop_signal)(track->mainloop_, 0);
 }
 
+void PulseAudioTrack::ContextStateCallback(pa_context* c, void* userdata) {
+  auto* self = static_cast<PulseAudioTrack*>(userdata);
+  switch (LATE(pa_context_get_state)(c)) {
+    case PA_CONTEXT_READY:
+    case PA_CONTEXT_TERMINATED:
+    case PA_CONTEXT_FAILED:
+      LATE(pa_threaded_mainloop_signal)(self->mainloop_, 0);
+      break;
+    default:
+      break;
+  }
+}
+
 void PulseAudioTrack::StreamWriteCallback(pa_stream* s,
                                           size_t length,
                                           void* userdata) {
-  PulseAudioTrack* track = static_cast<PulseAudioTrack*>(userdata);
-  if (track->callback_) {
-    track->callback_(track, track->temp_buffer_.get(), length, track->cookie_,
-                     CB_EVENT_FILL_BUFFER);
+  auto* track = static_cast<PulseAudioTrack*>(userdata);
+  if (!track->callback_) {
+    return;
+  }
+
+  if (track->temp_buffer_size_ < length) {
+    track->temp_buffer_.reset(new uint8_t[length]);
+    track->temp_buffer_size_ = length;
+  }
+
+  // Ask upper layer to fill buffer
+  track->callback_(track, track->temp_buffer_.get(), length, track->cookie_,
+                   CB_EVENT_FILL_BUFFER);
+
+  // Write to PulseAudio stream
+  int err = LATE(pa_stream_write)(s, track->temp_buffer_.get(), length, nullptr,
+                                  0, PA_SEEK_RELATIVE);
+  if (err < 0) {
+    AVE_LOG(LS_ERROR) << "PulseAudio write in callback failed: "
+                      << LATE(pa_strerror)(err);
   }
 }
 
-void PulseAudioTrack::StreamUnderflowCallback(pa_stream* s, void* userdata) {
-  LOG(WARNING) << "Stream underflow occurred";
+void PulseAudioTrack::StreamUnderflowCallback(pa_stream* s AVE_MAYBE_UNUSED,
+                                              void* userdata AVE_MAYBE_UNUSED) {
+  AVE_LOG(LS_WARNING) << "Stream underflow occurred";
 }
 
 status_t PulseAudioTrack::InitPulseAudio() {
-  // 加载PulseAudio符号表
+  // load PulseAudio symbol table
   if (!GetPulseSymbolTable()->Load()) {
-    LOG(ERROR) << "Failed to load PulseAudio symbols";
+    AVE_LOG(LS_ERROR) << "Failed to load PulseAudio symbols";
     return -ENODEV;
   }
 
-  // 创建主循环
+  // create mainloop
   mainloop_ = LATE(pa_threaded_mainloop_new)();
   if (!mainloop_) {
-    LOG(ERROR) << "Failed to create mainloop";
+    AVE_LOG(LS_ERROR) << "Failed to create mainloop";
     return -ENOMEM;
   }
 
-  // 获取mainloop API
+  // get mainloop API
   pa_mainloop_api* mainloop_api = LATE(pa_threaded_mainloop_get_api)(mainloop_);
 
-  // 创建context
+  // create context
   context_ = LATE(pa_context_new)(mainloop_api, "AVE Audio");
   if (!context_) {
-    LOG(ERROR) << "Failed to create context";
+    AVE_LOG(LS_ERROR) << "Failed to create context";
     return -ENOMEM;
   }
 
-  // 启动主循环
+  // start mainloop
   int err = LATE(pa_threaded_mainloop_start)(mainloop_);
   if (err < 0) {
-    LOG(ERROR) << "Failed to start mainloop";
+    AVE_LOG(LS_ERROR) << "Failed to start mainloop";
     return err;
   }
 
-  // 连接到服务器
+  // connect to server
   LATE(pa_threaded_mainloop_lock)(mainloop_);
+  LATE(pa_context_set_state_callback)(context_, ContextStateCallback, this);
   err =
       LATE(pa_context_connect)(context_, nullptr, PA_CONTEXT_NOFLAGS, nullptr);
   if (err < 0) {
-    LOG(ERROR) << "Failed to connect to PulseAudio server";
+    AVE_LOG(LS_ERROR) << "Failed to connect to PulseAudio server";
     LATE(pa_threaded_mainloop_unlock)(mainloop_);
     return err;
   }
 
-  // 等待连接完成
-  while (LATE(pa_context_get_state)(context_) != PA_CONTEXT_READY) {
+  // wait for connection to complete
+  for (;;) {
+    pa_context_state_t st = LATE(pa_context_get_state)(context_);
+    if (st == PA_CONTEXT_READY) {
+      break;
+    }
+    if (st == PA_CONTEXT_FAILED || st == PA_CONTEXT_TERMINATED) {
+      LATE(pa_threaded_mainloop_unlock)(mainloop_);
+      return -EIO;
+    }
     LATE(pa_threaded_mainloop_wait)(mainloop_);
   }
 
@@ -143,37 +184,40 @@ status_t PulseAudioTrack::Open(audio_config_t config,
     return res;
   }
 
-  // 创建采样规格
+  // create sample spec
   pa_sample_spec spec = {
       .format = PA_SAMPLE_S16LE,
-      .rate = config_.sample_rate,
-      .channels = static_cast<uint8_t>(config_.channel_count)};
+      .rate = static_cast<uint32_t>(config_.sample_rate),
+      .channels = static_cast<uint8_t>(
+          ChannelLayoutToChannelCount(config_.channel_layout))};
 
-  // 创建stream
+  // create stream
   LATE(pa_threaded_mainloop_lock)(mainloop_);
   stream_ = LATE(pa_stream_new)(context_, "Playback", &spec, nullptr);
   if (!stream_) {
-    LOG(ERROR) << "Failed to create stream";
+    AVE_LOG(LS_ERROR) << "Failed to create stream";
     LATE(pa_threaded_mainloop_unlock)(mainloop_);
     return -ENOMEM;
   }
 
-  // 设置回调
+  // set callbacks
   LATE(pa_stream_set_state_callback)(stream_, StreamStateCallback, this);
   LATE(pa_stream_set_write_callback)(stream_, StreamWriteCallback, this);
   LATE(pa_stream_set_underflow_callback)
   (stream_, StreamUnderflowCallback, this);
 
-  // 设置buffer属性
+  // set buffer attributes
   pa_buffer_attr attr = {
       .maxlength = static_cast<uint32_t>(-1),
-      .tlength = config_.sample_rate * config_.channel_count * 2 *
-                 kDefaultLatencyMs / 1000,
+      .tlength = static_cast<uint32_t>(
+          config_.sample_rate *
+          ChannelLayoutToChannelCount(config_.channel_layout) * 2 *
+          kDefaultLatencyMs / 1000),
       .prebuf = static_cast<uint32_t>(-1),
       .minreq = static_cast<uint32_t>(-1),
   };
 
-  // 连接到sink
+  // connect to sink
   int err = LATE(pa_stream_connect_playback)(
       stream_, nullptr, &attr,
       static_cast<pa_stream_flags_t>(PA_STREAM_ADJUST_LATENCY |
@@ -181,21 +225,23 @@ status_t PulseAudioTrack::Open(audio_config_t config,
       nullptr, nullptr);
 
   if (err < 0) {
-    LOG(ERROR) << "Failed to connect playback stream";
+    AVE_LOG(LS_ERROR) << "Failed to connect playback stream";
     LATE(pa_threaded_mainloop_unlock)(mainloop_);
     return err;
   }
 
-  // 等待stream就绪
+  // wait for stream to be ready
   while (LATE(pa_stream_get_state)(stream_) != PA_STREAM_READY) {
     LATE(pa_threaded_mainloop_wait)(mainloop_);
   }
 
   LATE(pa_threaded_mainloop_unlock)(mainloop_);
 
-  // 分配临时buffer
-  buffer_size_ = config_.sample_rate * config_.channel_count * 2 *
-                 kDefaultLatencyMs / 1000;
+  // allocate temporary buffer
+  buffer_size_ =
+      static_cast<size_t>(config_.sample_rate) *
+      static_cast<size_t>(ChannelLayoutToChannelCount(config_.channel_layout)) *
+      2 * kDefaultLatencyMs / 1000;
   temp_buffer_ = std::make_unique<uint8_t[]>(buffer_size_);
 
   ready_ = true;
@@ -203,8 +249,9 @@ status_t PulseAudioTrack::Open(audio_config_t config,
 }
 
 ssize_t PulseAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
-  if (!ready_ || !playing_)
+  if (!ready_ || !playing_) {
     return -EINVAL;
+  }
 
   LATE(pa_threaded_mainloop_lock)(mainloop_);
 
@@ -227,28 +274,33 @@ ssize_t PulseAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
   LATE(pa_threaded_mainloop_unlock)(mainloop_);
 
   if (err < 0) {
-    LOG(ERROR) << "Failed to write to stream: " << LATE(pa_strerror)(err);
+    AVE_LOG(LS_ERROR) << "Failed to write to stream: "
+                      << LATE(pa_strerror)(err);
     return err;
   }
 
-  return write_size;
+  return static_cast<ssize_t>(write_size);
 }
 
 status_t PulseAudioTrack::Start() {
-  if (!ready_)
+  if (!ready_) {
     return -EINVAL;
-  if (playing_)
+  }
+  if (playing_) {
     return 0;
+  }
 
   playing_ = true;
   return 0;
 }
 
 void PulseAudioTrack::Stop() {
-  if (!ready_)
+  if (!ready_) {
     return;
-  if (!playing_)
+  }
+  if (!playing_) {
     return;
+  }
 
   LATE(pa_threaded_mainloop_lock)(mainloop_);
   LATE(pa_stream_disconnect)(stream_);
@@ -262,8 +314,9 @@ void PulseAudioTrack::Pause() {
 }
 
 void PulseAudioTrack::Flush() {
-  if (!ready_)
+  if (!ready_) {
     return;
+  }
 
   Stop();
   Start();
@@ -298,19 +351,20 @@ bool PulseAudioTrack::ready() const {
 }
 
 ssize_t PulseAudioTrack::bufferSize() const {
-  return buffer_size_;
+  return static_cast<ssize_t>(buffer_size_);
 }
 
 ssize_t PulseAudioTrack::frameCount() const {
-  return buffer_size_ / frameSize();
+  return static_cast<ssize_t>(buffer_size_ / frameSize());
 }
 
 ssize_t PulseAudioTrack::channelCount() const {
-  return config_.channel_count;
+  return ChannelLayoutToChannelCount(config_.channel_layout);
 }
 
 ssize_t PulseAudioTrack::frameSize() const {
-  return config_.channel_count * 2;  // 16-bit samples
+  return ChannelLayoutToChannelCount(config_.channel_layout) *
+         2;  // 16-bit samples
 }
 
 uint32_t PulseAudioTrack::sampleRate() const {
@@ -318,13 +372,14 @@ uint32_t PulseAudioTrack::sampleRate() const {
 }
 
 uint32_t PulseAudioTrack::latency() const {
-  if (!ready_ || !playing_)
+  if (!ready_ || !playing_) {
     return 0;
+  }
 
   LATE(pa_threaded_mainloop_lock)(mainloop_);
 
-  pa_usec_t latency;
-  int negative;
+  pa_usec_t latency = 0;
+  int negative = 0;
 
   if (LATE(pa_stream_get_latency)(stream_, &latency, &negative) < 0) {
     LATE(pa_threaded_mainloop_unlock)(mainloop_);
@@ -333,16 +388,17 @@ uint32_t PulseAudioTrack::latency() const {
 
   LATE(pa_threaded_mainloop_unlock)(mainloop_);
 
-  return latency * 1000 / config_.sample_rate;
+  return static_cast<uint32_t>(latency * 1000 / config_.sample_rate);
 }
 
 float PulseAudioTrack::msecsPerFrame() const {
-  return 1000.0f / config_.sample_rate;
+  return 1000.0f / static_cast<float>(config_.sample_rate);
 }
 
 status_t PulseAudioTrack::GetPosition(uint32_t* position) const {
-  if (!ready_ || !position)
+  if (!ready_ || !position) {
     return -EINVAL;
+  }
 
   // PulseAudio doesn't provide direct position information
   // We could calculate it based on written frames and latency
@@ -350,17 +406,20 @@ status_t PulseAudioTrack::GetPosition(uint32_t* position) const {
   return 0;
 }
 
-int64_t PulseAudioTrack::GetPlayedOutDurationUs(int64_t nowUs) const {
-  if (!ready_)
+int64_t PulseAudioTrack::GetPlayedOutDurationUs(
+    int64_t nowUs AVE_MAYBE_UNUSED) const {
+  if (!ready_) {
     return 0;
+  }
 
   // TODO: Implement based on written frames and latency
   return 0;
 }
 
 status_t PulseAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
-  if (!ready_ || !frameswritten)
+  if (!ready_ || !frameswritten) {
     return -EINVAL;
+  }
 
   // TODO: Track written frames
   *frameswritten = 0;
@@ -368,7 +427,8 @@ status_t PulseAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
 }
 
 int64_t PulseAudioTrack::GetBufferDurationInUs() const {
-  return (buffer_size_ / frameSize()) * 1000000LL / config_.sample_rate;
+  return static_cast<int64_t>((buffer_size_ / frameSize()) * 1000000LL /
+                              config_.sample_rate);
 }
 
 }  // namespace linux_audio

@@ -88,4 +88,12 @@ LATE_BINDING_SYMBOL_TABLE_DECLARE_END(PulseAudioSymbolTable)
 }  // namespace media
 }  // namespace ave
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+ave::media::linux_audio::PulseAudioSymbolTable* GetPulseSymbolTable();
+#ifdef __cplusplus
+}
+#endif
+
 #endif  // AVE_MEDIA_AUDIO_LINUX_PULSE_SYMBOL_TABLE_H_
