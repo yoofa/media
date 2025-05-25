@@ -9,9 +9,11 @@
 
 #if defined(AVE_LINUX)
 #include "linux/alsa_audio_device.h"
+#include "linux/pulse_audio_device.h"
 #endif
 
 #if defined(AVE_ANDROID)
+#include "android/aaudio_audio_device.h"
 #include "android/opensles_audio_device.h"
 #endif
 
@@ -29,7 +31,7 @@ std::shared_ptr<AudioDevice> AudioDevice::CreateAudioDevice(
       break;
     }
     case PlatformType::kLinuxPulse: {
-      // TODO
+      audio_device = std::make_shared<linux_audio::PulseAudioDevice>();
       break;
     }
 #endif
@@ -43,6 +45,7 @@ std::shared_ptr<AudioDevice> AudioDevice::CreateAudioDevice(
       break;
     }
     case PlatformType::kAndroidAAudio: {
+      audio_device = std::make_shared<android::AAudioAudioDevice>();
       break;
     }
 #endif

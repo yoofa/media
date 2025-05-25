@@ -48,10 +48,16 @@ ave_library("audio_device") {
   ]
 
   if (is_linux) {
-    deps += [ ":alsa_audio_device" ]
+    deps += [
+      ":alsa_audio_device",
+      ":pulse_audio",
+    ]
   }
   if (is_android) {
-    deps += [ ":opensles_audio_device" ]
+    deps += [
+      ":aaudio_audio_device",
+      ":opensles_audio_device",
+    ]
   }
 }
 
@@ -66,6 +72,13 @@ ave_library("linux_alsa_symbol") {
   sources = [
     "linux/alsa_symbol_table.cc",
     "linux/alsa_symbol_table.h",
+  ]
+  deps = [ ":linux_symbol_binding" ]
+}
+ave_library("linux_pulse_symbol") {
+  sources = [
+    "linux/pulse_symbol_table.cc",
+    "linux/pulse_symbol_table.h",
   ]
   deps = [ ":linux_symbol_binding" ]
 }
@@ -94,6 +107,24 @@ ave_library("alsa_audio_device") {
   ]
 }
 
+# linux pulse support (track + record)
+ave_library("pulse_audio") {
+  sources = [
+    "linux/pulse_audio_device.cc",
+    "linux/pulse_audio_device.h",
+    "linux/pulse_audio_record.cc",
+    "linux/pulse_audio_record.h",
+    "linux/pulse_audio_track.cc",
+    "linux/pulse_audio_track.h",
+  ]
+  deps = [
+    ":audio_device_base",
+    ":linux_pulse_symbol",
+    "//base:logging",
+  ]
+  libs = [ "pulse" ]
+}
+
 # android
 ## opensles
 ave_library("opensles_audio_device") {
@@ -110,9 +141,38 @@ ave_library("opensles_audio_device") {
   libs = [ "OpenSLES" ]
 }
 
+## aaudio
+ave_library("aaudio_audio_device") {
+  sources = [
+    "android/aaudio_audio_device.cc",
+    "android/aaudio_audio_device.h",
+    "android/aaudio_audio_record.cc",
+    "android/aaudio_audio_record.h",
+    "android/aaudio_audio_track.cc",
+    "android/aaudio_audio_track.h",
+  ]
+  deps = [
+    ":audio_device_base",
+    "//base:logging",
+  ]
+  libs = [ "aaudio" ]
+}
+
 # executable
-ave_executable("yplay") {
+ave_executable("aplay") {
   testonly = true
-  sources = [ "play_audio.cc" ]
-  deps = [ ":audio_device" ]
+  sources = [ "samples/play_audio.cc" ]
+  deps = [
+    ":audio_device",
+    "//base:task_util",
+  ]
+}
+
+ave_executable("arec") {
+  testonly = true
+  sources = [ "samples/record_audio.cc" ]
+  deps = [
+    ":audio_device",
+    "//base:task_util",
+  ]
 }
