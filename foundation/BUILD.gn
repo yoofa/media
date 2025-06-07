@@ -13,8 +13,9 @@ ave_library("foundation") {
   ]
 }
 
-ave_source_set("message_object") {
+ave_library("message_object") {
   sources = [ "message_object.h" ]
+  public_configs = [ "//build/config/compiler:rtti" ]
 }
 
 ave_library("media_source_sink") {
@@ -73,6 +74,7 @@ ave_library("media_format") {
     "media_format.cc",
     "media_format.h",
   ]
+  deps = [ ":message_object" ]
 }
 
 ave_library("media_source") {
@@ -117,7 +119,10 @@ ave_library("media_frame") {
     "media_frame.cc",
     "media_frame.h",
   ]
-  deps = [ ":media_format" ]
+  deps = [
+    ":media_format",
+    ":message_object",
+  ]
 }
 
 ave_library("esds") {
