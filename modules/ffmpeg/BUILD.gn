@@ -1,0 +1,13 @@
+import("//base/build/ave.gni")
+
+ave_library("ffmpeg_utils") {
+  sources = [
+    "ffmpeg_codec_utils.cc",
+    "ffmpeg_codec_utils.h",
+  ]
+  deps = [
+    "../../codec:codec_id",
+    "//base:logging",
+    "//third_party/ffmpeg",
+  ]
+}

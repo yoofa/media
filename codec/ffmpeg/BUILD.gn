@@ -8,24 +8,12 @@ ave_library("ffmpeg_codec") {
     "ffmpeg_codec_factory.h",
   ]
   deps = [
-    ":ffmpeg_utils",
+    "../../modules/ffmpeg:ffmpeg_utils",
     "//base:logging",
     "//base:task_util",
     "//base:timeutils",
     "//media/codec:codec_buffer",
     "//media/codec:codec_interface",
-    "//third_party/ffmpeg",
-  ]
-}
-
-ave_library("ffmpeg_utils") {
-  sources = [
-    "ffmpeg_codec_utils.cc",
-    "ffmpeg_codec_utils.h",
-  ]
-  deps = [
-    "..:codec_id",
-    "//base:logging",
     "//third_party/ffmpeg",
   ]
 }

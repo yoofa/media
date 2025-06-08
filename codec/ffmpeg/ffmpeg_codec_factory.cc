@@ -7,9 +7,9 @@
 
 #include "base/logging.h"
 
+#include "../../modules/ffmpeg/ffmpeg_codec_utils.h"
 #include "ffmpeg_codec.h"
 #include "ffmpeg_codec_factory.h"
-#include "ffmpeg_codec_utils.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>

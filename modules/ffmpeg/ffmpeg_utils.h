@@ -12,8 +12,8 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
+#include "../../codec/codec_id.h"
 #include "../../foundation/media_format.h"
-#include "../codec_id.h"
 
 namespace ave {
 namespace media {

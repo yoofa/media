@@ -11,7 +11,7 @@
 #include "base/sequence_checker.h"
 #include "base/task_util/default_task_runner_factory.h"
 
-#include "ffmpeg_codec_utils.h"
+#include "../../modules/ffmpeg/ffmpeg_codec_utils.h"
 
 namespace ave {
 namespace media {
