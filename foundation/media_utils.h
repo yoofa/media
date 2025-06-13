@@ -47,6 +47,55 @@ enum class PictureType {
   D,
 };
 
+enum class ColorPrimaries {
+  kUNSPECIFIED = -1,
+  kBT470M,
+  kBT470BG,
+  kBT601_6_525,
+  kBT601_6_625,
+  kBT709,
+  kSMPTE170M,
+  kSMPTE24M,
+  kBT2020,
+};
+
+enum class ColorTransfer {
+  kUNSPECIFIED = -1,
+  kBT709,
+  kBT470M,
+  kBT601_6_525,
+  kBT601_6_625,
+  kSMPTE170M,
+  kSMPTE240M,
+  kBT2020_10BIT,
+  kBT2020_12BIT,
+};
+
+enum class ColorSpace {
+  kUNSPECIFIED = -1,
+  kBT709,
+  kBT470M,
+  kBT601_6_525,
+  kBT601_6_625,
+  kSMPTE170M,
+  kSMPTE240M,
+  kBT2020_NCL,  ///< Non-constant luminance
+  kBT2020_CL,   ///< Constant luminance
+};
+
+enum class ColorRange {
+  kUNSPECIFIED = -1,
+  kFULL,     ///< Full range
+  kLIMITED,  ///< Limited range
+};
+
+enum class FieldOrder {
+  kUNSPECIFIED = -1,
+  kPROGRESSIVE,  ///< Progressive scan
+  kTOP_FIELD_FIRST,
+  kBOTTOM_FIELD_FIRST,
+};
+
 // max csd data size 4k
 static constexpr size_t kMaxCsdSize =
     4096;  // or whatever maximum size is appropriate
@@ -72,9 +121,9 @@ struct AudioSampleInfo {
 
 struct VideoSampleInfo {
   CodecId codec_id = CodecId::AVE_CODEC_ID_NONE;
-  int16_t stride = -1;
-  int16_t width = -1;
-  int16_t height = -1;
+  int32_t stride = -1;
+  int32_t width = -1;
+  int32_t height = -1;
   int16_t rotation = -1;
 
   // timestamp
@@ -86,6 +135,13 @@ struct VideoSampleInfo {
 
   // raw
   PixelFormat pixel_format = PixelFormat::AVE_PIX_FMT_NONE;
+  ColorPrimaries color_primaries = ColorPrimaries::kUNSPECIFIED;
+  ColorTransfer color_transfer = ColorTransfer::kUNSPECIFIED;
+  ColorSpace color_space = ColorSpace::kUNSPECIFIED;
+  ColorRange color_range = ColorRange::kUNSPECIFIED;
+  FieldOrder field_order = FieldOrder::kUNSPECIFIED;
+
+  std::pair<int32_t, int32_t> sample_aspect_ratio = {1, 1};
 
   // encoded
   PictureType picture_type = PictureType::NONE;
@@ -139,12 +195,24 @@ struct VideoTrackInfo {
   CodecId codec_id = CodecId::AVE_CODEC_ID_NONE;
   base::TimeDelta duration = base::TimeDelta::Zero();
   int64_t bitrate_bps = -1;
-  int16_t stride = -1;
-  int16_t width = -1;
-  int16_t height = -1;
+  int32_t stride = -1;
+  int32_t width = -1;
+  int32_t height = -1;
   int16_t rotation = -1;
+
   PixelFormat pixel_format = PixelFormat::AVE_PIX_FMT_NONE;
-  int16_t fps = -1;
+  ColorPrimaries color_primaries = ColorPrimaries::kUNSPECIFIED;
+  ColorTransfer color_transfer = ColorTransfer::kUNSPECIFIED;
+  ColorSpace color_space = ColorSpace::kUNSPECIFIED;
+  ColorRange color_range = ColorRange::kUNSPECIFIED;
+  FieldOrder field_order = FieldOrder::kUNSPECIFIED;
+
+  int32_t fps = -1;
+  std::pair<int32_t, int32_t> sample_aspect_ratio = {1, 1};
+  std::pair<int32_t, int32_t> time_base = {1, 1000};
+
+  int32_t codec_profile = -1;
+  int32_t codec_level = -1;
 
   std::shared_ptr<base::Buffer> private_data;
 };
