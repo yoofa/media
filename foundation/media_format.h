@@ -86,17 +86,17 @@ class MediaFormat : public MessageObject {
   int16_t bits_per_sample() const;
 
   /****** 1.3 video use ******/
-  MediaFormat& SetWidth(int16_t width);
-  int16_t width() const;
+  MediaFormat& SetWidth(int32_t width);
+  int32_t width() const;
 
-  MediaFormat& SetHeight(int16_t height);
-  int16_t height() const;
+  MediaFormat& SetHeight(int32_t height);
+  int32_t height() const;
 
-  MediaFormat& SetStride(int16_t stride);
-  int16_t stride() const;
+  MediaFormat& SetStride(int32_t stride);
+  int32_t stride() const;
 
-  MediaFormat& SetFrameRate(int16_t fps);
-  int16_t fps() const;
+  MediaFormat& SetFrameRate(int32_t fps);
+  int32_t fps() const;
 
   MediaFormat& SetPixelFormat(PixelFormat pixel_format);
   PixelFormat pixel_format() const;
@@ -110,12 +110,39 @@ class MediaFormat : public MessageObject {
   MediaFormat& SetQp(int16_t qp);
   int16_t qp() const;
 
+  MediaFormat& SetColorPrimaries(ColorPrimaries color_primaries);
+  ColorPrimaries color_primaries() const;
+
+  MediaFormat& SetColorTransfer(ColorTransfer color_transfer);
+  ColorTransfer color_transfer() const;
+
+  MediaFormat& SetColorSpace(ColorSpace color_space);
+  ColorSpace color_space() const;
+
+  MediaFormat& SetColorRange(ColorRange color_range);
+  ColorRange color_range() const;
+
+  MediaFormat& SetFieldOrder(FieldOrder field_order);
+  FieldOrder field_order() const;
+
+  MediaFormat& SetSampleAspectRatio(std::pair<int16_t, int16_t> sar);
+  std::pair<int16_t, int16_t> sample_aspect_ratio() const;
+
   /****** 2. track info ******/
   /****** 2.1 all track same info ******/
 
   /****** 2.2 audio track specific ******/
 
   /****** 2.3 video track specific ******/
+  MediaFormat& SetCodecProfile(int32_t profile);
+  int32_t codec_profile() const;
+
+  MediaFormat& SetCodecLevel(int32_t level);
+  int32_t codec_level() const;
+
+  // TODO(youfa): really need this?
+  MediaFormat& SetTimeBase(std::pair<int32_t, int32_t> time_base);
+  std::pair<int32_t, int32_t> time_base() const;
 
   /****** 3. sample specific ******/
   /****** 3.1 all sample same info ******/
@@ -128,9 +155,9 @@ class MediaFormat : public MessageObject {
   MediaFormat& SetEos(bool eos);
   bool eos() const;
 
-  /****** 3.1 all sample same info ******/
+  /****** 3.2 audio sample same info ******/
 
-  /****** 3.1 all sample same info ******/
+  /****** 3.3 video sample same info ******/
 
   // meta data
   std::shared_ptr<Message>& meta();

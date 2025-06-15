@@ -336,7 +336,7 @@ MediaFormat& MediaFormat::ClearPrivateData() {
 }
 
 // Video specific methods
-MediaFormat& MediaFormat::SetWidth(int16_t width) {
+MediaFormat& MediaFormat::SetWidth(int32_t width) {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "SetWidth failed, stream type is not video";
     return *this;
@@ -350,7 +350,7 @@ MediaFormat& MediaFormat::SetWidth(int16_t width) {
   return *this;
 }
 
-int16_t MediaFormat::width() const {
+int32_t MediaFormat::width() const {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "width failed, stream type is not video";
     return -1;
@@ -362,7 +362,7 @@ int16_t MediaFormat::width() const {
   return std::get<MediaSampleInfo>(info_).video().width;
 }
 
-MediaFormat& MediaFormat::SetHeight(int16_t height) {
+MediaFormat& MediaFormat::SetHeight(int32_t height) {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "SetHeight failed, stream type is not video";
     return *this;
@@ -376,7 +376,7 @@ MediaFormat& MediaFormat::SetHeight(int16_t height) {
   return *this;
 }
 
-int16_t MediaFormat::height() const {
+int32_t MediaFormat::height() const {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "height failed, stream type is not video";
     return -1;
@@ -388,7 +388,7 @@ int16_t MediaFormat::height() const {
   return std::get<MediaSampleInfo>(info_).video().height;
 }
 
-MediaFormat& MediaFormat::SetStride(int16_t stride) {
+MediaFormat& MediaFormat::SetStride(int32_t stride) {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "SetStride failed, stream type is not video";
     return *this;
@@ -402,7 +402,7 @@ MediaFormat& MediaFormat::SetStride(int16_t stride) {
   return *this;
 }
 
-int16_t MediaFormat::stride() const {
+int32_t MediaFormat::stride() const {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "stride failed, stream type is not video";
     return -1;
@@ -414,7 +414,7 @@ int16_t MediaFormat::stride() const {
   return std::get<MediaSampleInfo>(info_).video().stride;
 }
 
-MediaFormat& MediaFormat::SetFrameRate(int16_t fps) {
+MediaFormat& MediaFormat::SetFrameRate(int32_t fps) {
   if (stream_type_ != MediaType::VIDEO || format_type_ != FormatType::kTrack) {
     AVE_LOG(LS_WARNING) << "SetFrameRate failed, invalid format";
     return *this;
@@ -423,7 +423,7 @@ MediaFormat& MediaFormat::SetFrameRate(int16_t fps) {
   return *this;
 }
 
-int16_t MediaFormat::fps() const {
+int32_t MediaFormat::fps() const {
   if (stream_type_ != MediaType::VIDEO || format_type_ != FormatType::kTrack) {
     AVE_LOG(LS_WARNING) << "fps failed, invalid format";
     return -1;
@@ -513,6 +513,169 @@ int16_t MediaFormat::qp() const {
     return -1;
   }
   return std::get<MediaSampleInfo>(info_).video().qp;
+}
+
+MediaFormat& MediaFormat::SetColorPrimaries(ColorPrimaries color_primaries) {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "SetColorPrimaries failed, stream type is not video";
+    return *this;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    track_info().video().color_primaries = color_primaries;
+  } else {
+    sample_info().video().color_primaries = color_primaries;
+  }
+  return *this;
+}
+
+ColorPrimaries MediaFormat::color_primaries() const {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "color_primaries failed, stream type is not video";
+    return ColorPrimaries::kUNSPECIFIED;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    return std::get<MediaTrackInfo>(info_).video().color_primaries;
+  }
+  return std::get<MediaSampleInfo>(info_).video().color_primaries;
+}
+
+MediaFormat& MediaFormat::SetColorTransfer(ColorTransfer color_transfer) {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "SetColorTransfer failed, stream type is not video";
+    return *this;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    track_info().video().color_transfer = color_transfer;
+  } else {
+    sample_info().video().color_transfer = color_transfer;
+  }
+  return *this;
+}
+
+ColorTransfer MediaFormat::color_transfer() const {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "color_transfer failed, stream type is not video";
+    return ColorTransfer::kUNSPECIFIED;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    return std::get<MediaTrackInfo>(info_).video().color_transfer;
+  }
+  return std::get<MediaSampleInfo>(info_).video().color_transfer;
+}
+
+MediaFormat& MediaFormat::SetColorSpace(ColorSpace color_space) {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "SetColorSpace failed, stream type is not video";
+    return *this;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    track_info().video().color_space = color_space;
+  } else {
+    sample_info().video().color_space = color_space;
+  }
+  return *this;
+}
+
+ColorSpace MediaFormat::color_space() const {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "color_space failed, stream type is not video";
+    return ColorSpace::kUNSPECIFIED;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    return std::get<MediaTrackInfo>(info_).video().color_space;
+  }
+  return std::get<MediaSampleInfo>(info_).video().color_space;
+}
+
+MediaFormat& MediaFormat::SetColorRange(ColorRange color_range) {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "SetColorRange failed, stream type is not video";
+    return *this;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    track_info().video().color_range = color_range;
+  } else {
+    sample_info().video().color_range = color_range;
+  }
+  return *this;
+}
+
+ColorRange MediaFormat::color_range() const {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "color_range failed, stream type is not video";
+    return ColorRange::kUNSPECIFIED;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    return std::get<MediaTrackInfo>(info_).video().color_range;
+  }
+  return std::get<MediaSampleInfo>(info_).video().color_range;
+}
+
+MediaFormat& MediaFormat::SetFieldOrder(FieldOrder field_order) {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "SetFieldOrder failed, stream type is not video";
+    return *this;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    track_info().video().field_order = field_order;
+  } else {
+    sample_info().video().field_order = field_order;
+  }
+  return *this;
+}
+
+FieldOrder MediaFormat::field_order() const {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING) << "field_order failed, stream type is not video";
+    return FieldOrder::kUNSPECIFIED;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    return std::get<MediaTrackInfo>(info_).video().field_order;
+  }
+  return std::get<MediaSampleInfo>(info_).video().field_order;
+}
+
+MediaFormat& MediaFormat::SetSampleAspectRatio(
+    std::pair<int16_t, int16_t> sar) {
+  if (stream_type_ != MediaType::VIDEO) {
+    AVE_LOG(LS_WARNING)
+        << "SetSampleAspectRatio failed, stream type is not video";
+    return *this;
+  }
+
+  if (format_type_ == FormatType::kTrack) {
+    track_info().video().sample_aspect_ratio = sar;
+  } else {
+    sample_info().video().sample_aspect_ratio = sar;
+  }
+  return *this;
+}
+
+MediaFormat& MediaFormat::SetTimeBase(std::pair<int32_t, int32_t> time_base) {
+  if (stream_type_ != MediaType::VIDEO || format_type_ != FormatType::kTrack) {
+    AVE_LOG(LS_WARNING) << "SetTimeBase failed, invalid format";
+    return *this;
+  }
+  track_info().video().time_base = time_base;
+  return *this;
+}
+
+std::pair<int32_t, int32_t> MediaFormat::time_base() const {
+  if (stream_type_ != MediaType::VIDEO || format_type_ != FormatType::kTrack) {
+    AVE_LOG(LS_WARNING) << "time_base failed, invalid format";
+    return {1, 1};
+  }
+  return std::get<MediaTrackInfo>(info_).video().time_base;
 }
 
 // Audio specific methods
@@ -612,6 +775,43 @@ int16_t MediaFormat::bits_per_sample() const {
     return std::get<MediaTrackInfo>(info_).audio().bits_per_sample;
   }
   return -1;
+}
+
+// 2. Track specific methods
+
+// 2.3 Video Track specific methods
+MediaFormat& MediaFormat::SetCodecProfile(int32_t profile) {
+  if (stream_type_ != MediaType::VIDEO || format_type_ != FormatType::kTrack) {
+    AVE_LOG(LS_WARNING) << "SetCodecProfile failed, invalid format";
+    return *this;
+  }
+  track_info().video().codec_profile = profile;
+  return *this;
+}
+
+int32_t MediaFormat::codec_profile() const {
+  if (stream_type_ != MediaType::VIDEO || format_type_ != FormatType::kTrack) {
+    AVE_LOG(LS_WARNING) << "codec_profile failed, invalid format";
+    return -1;
+  }
+  return std::get<MediaTrackInfo>(info_).video().codec_profile;
+}
+
+MediaFormat& MediaFormat::SetCodecLevel(int32_t level) {
+  if (stream_type_ != MediaType::VIDEO || format_type_ != FormatType::kTrack) {
+    AVE_LOG(LS_WARNING) << "SetCodecLevel failed, invalid format";
+    return *this;
+  }
+  track_info().video().codec_level = level;
+  return *this;
+}
+
+int32_t MediaFormat::codec_level() const {
+  if (stream_type_ != MediaType::VIDEO || format_type_ != FormatType::kTrack) {
+    AVE_LOG(LS_WARNING) << "codec_level failed, invalid format";
+    return -1;
+  }
+  return std::get<MediaTrackInfo>(info_).video().codec_level;
 }
 
 // Sample specific methods

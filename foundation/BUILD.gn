@@ -4,7 +4,6 @@ ave_library("foundation") {
   deps = [
     ":bit_reader",
     ":color_utils",
-    ":esds",
     ":handler",
     ":media_format",
     ":media_packet",
@@ -20,6 +19,7 @@ ave_library("message_object") {
 
 ave_library("media_source_sink") {
   sources = [
+    "media_sink_base.cc",
     "media_sink_base.h",
     "media_source_base.h",
     "media_source_sink_interface.h",
@@ -27,6 +27,7 @@ ave_library("media_source_sink") {
   deps = [
     ":media_frame",
     ":media_packet",
+    ":message_object",
   ]
 }
 
@@ -110,6 +111,7 @@ ave_library("media_packet") {
   deps = [
     ":buffer",
     ":media_format",
+    ":message_object",
     "//base/units",
   ]
 }
