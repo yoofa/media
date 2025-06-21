@@ -11,7 +11,7 @@
 #include "base/sequence_checker.h"
 #include "base/task_util/default_task_runner_factory.h"
 
-#include "../../modules/ffmpeg/ffmpeg_codec_utils.h"
+#include "../../modules/ffmpeg/ffmpeg_utils.h"
 
 namespace ave {
 namespace media {
@@ -54,9 +54,9 @@ status_t FFmpegCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
     // TODO: config to codec_ctx_ mapping
     auto format = config->format;
     if (format->stream_type() == MediaType::VIDEO) {
-      ConfigureVideoCodec(format.get(), codec_ctx_);
+      ffmpeg_utils::ConfigureVideoCodec(format.get(), codec_ctx_);
     } else if (format->stream_type() == MediaType::AUDIO) {
-      ConfigureAudioCodec(format.get(), codec_ctx_);
+      ffmpeg_utils::ConfigureAudioCodec(format.get(), codec_ctx_);
     }
 
     // TODO: use buffer cnt in config

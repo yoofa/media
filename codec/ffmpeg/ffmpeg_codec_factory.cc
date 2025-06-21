@@ -7,7 +7,7 @@
 
 #include "base/logging.h"
 
-#include "../../modules/ffmpeg/ffmpeg_codec_utils.h"
+#include "../../modules/ffmpeg/ffmpeg_utils.h"
 #include "ffmpeg_codec.h"
 #include "ffmpeg_codec_factory.h"
 
@@ -23,7 +23,7 @@ FFmpegCodecFactory::~FFmpegCodecFactory() = default;
 
 std::shared_ptr<Codec> FFmpegCodecFactory::CreateCodecByType(CodecId codec_id,
                                                              bool encoder) {
-  AVCodecID ffmpeg_codec_id = ConvertToFFmpegCodecId(codec_id);
+  AVCodecID ffmpeg_codec_id = ffmpeg_utils::ConvertToFFmpegCodecId(codec_id);
   if (ffmpeg_codec_id == AV_CODEC_ID_NONE) {
     return nullptr;
   }
