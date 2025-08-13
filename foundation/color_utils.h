@@ -33,7 +33,7 @@ struct ColorUtils {
   /**
    * graphic.h constants changed in Android 8.0 after ColorStandard values were
    * already public in Android 7.0. We will not deal with the break in graphic.h
-   * here, but list the public Android SDK MediaFormat values here.
+   * here, but list the public Android SDK MediaMeta values here.
    */
   enum ColorStandard : uint32_t {
     kColorStandardUnspecified = 0,

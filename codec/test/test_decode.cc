@@ -20,7 +20,7 @@
 using ave::status_t;
 using ave::media::CHANNEL_LAYOUT_STEREO;
 using ave::media::CodecFactory;
-using ave::media::MediaFormat;
+using ave::media::MediaMeta;
 using ave::media::test::DummyCodecFactory;
 using ave::media::test::TestCodecRunner;
 
@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
   auto task_runner_factory = ave::base::CreateDefaultTaskRunnerFactory();
 
   // Create media format
-  auto format = MediaFormat::CreatePtr();
+  auto format = MediaMeta::CreatePtr();
 
   const bool is_video = mime.substr(0, 5) == "video";
 

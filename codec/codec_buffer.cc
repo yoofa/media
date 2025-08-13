@@ -19,7 +19,7 @@ CodecBuffer::CodecBuffer(size_t capacity)
       texture_id_(-1),
       native_handle_(nullptr),
       buffer_type_(BufferType::kTypeNormal),
-      format_(std::make_shared<MediaFormat>()) {}
+      format_(std::make_shared<MediaMeta>()) {}
 
 CodecBuffer::~CodecBuffer() = default;
 

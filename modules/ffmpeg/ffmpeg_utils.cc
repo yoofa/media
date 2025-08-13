@@ -233,7 +233,7 @@ ChannelLayout ChannelLayoutToAveChannelLayout(const AVChannelLayout& ch_layout,
 }
 
 void ExtractMetaFromAudioStream(const AVStream* audio_stream,
-                                std::shared_ptr<MediaFormat>& meta) {
+                                std::shared_ptr<MediaMeta>& meta) {
   // AVE_CHECK_NE(audio_stream, nullptr);
   AVE_CHECK_EQ(audio_stream->codecpar->codec_type, AVMEDIA_TYPE_AUDIO);
 
@@ -258,7 +258,7 @@ void ExtractMetaFromAudioStream(const AVStream* audio_stream,
 }
 
 void ExtractMetaFromVideoStream(const AVStream* video_stream,
-                                std::shared_ptr<MediaFormat>& meta) {
+                                std::shared_ptr<MediaMeta>& meta) {
   // AVE_CHECK_NE(video_stream, nullptr);
   AVE_CHECK_EQ(video_stream->codecpar->codec_type, AVMEDIA_TYPE_VIDEO);
 
@@ -299,21 +299,21 @@ void ExtractMetaFromVideoStream(const AVStream* video_stream,
   }
 }
 
-std::shared_ptr<MediaFormat> ExtractMetaFromAVStream(const AVStream* stream) {
+std::shared_ptr<MediaMeta> ExtractMetaFromAVStream(const AVStream* stream) {
   if (!stream || !stream->codecpar) {
     AVE_LOG(LS_ERROR) << "Invalid AVStream or codecpar";
     return nullptr;
   }
 
-  std::shared_ptr<MediaFormat> meta;
+  std::shared_ptr<MediaMeta> meta;
 
   if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-    meta = MediaFormat::CreatePtr(ave::media::MediaType::AUDIO,
-                                  MediaFormat::FormatType::kTrack);
+    meta = MediaMeta::CreatePtr(ave::media::MediaType::AUDIO,
+                                MediaMeta::FormatType::kTrack);
     ExtractMetaFromAudioStream(stream, meta);
   } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-    meta = MediaFormat::CreatePtr(ave::media::MediaType::VIDEO,
-                                  MediaFormat::FormatType::kTrack);
+    meta = MediaMeta::CreatePtr(ave::media::MediaType::VIDEO,
+                                MediaMeta::FormatType::kTrack);
     ExtractMetaFromVideoStream(stream, meta);
   } else {
     return nullptr;
@@ -355,7 +355,7 @@ std::shared_ptr<MediaPacket> CreateMediaPacketFromAVPacket(
   return packet;
 }
 
-void ConfigureAudioCodec(MediaFormat* format, AVCodecContext* codec_context) {
+void ConfigureAudioCodec(MediaMeta* format, AVCodecContext* codec_context) {
   AVE_DCHECK(format->stream_type() == MediaType::AUDIO);
 
   codec_context->codec_type = AVMEDIA_TYPE_AUDIO;
@@ -389,7 +389,7 @@ void ConfigureAudioCodec(MediaFormat* format, AVCodecContext* codec_context) {
   // TODO: extra data
 }
 
-void ConfigureVideoCodec(MediaFormat* format, AVCodecContext* codec_context) {
+void ConfigureVideoCodec(MediaMeta* format, AVCodecContext* codec_context) {
   AVE_CHECK(format->stream_type() == MediaType::VIDEO);
   codec_context->codec_type = AVMEDIA_TYPE_VIDEO;
   codec_context->codec_id = ConvertToFFmpegCodecId(format->codec());

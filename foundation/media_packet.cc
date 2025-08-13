@@ -34,7 +34,7 @@ MediaPacket::MediaPacket(size_t size)
       buffer_type_(PacketBufferType::kTypeNormal),
       media_type_(MediaType::UNKNOWN),
       is_eos_(false),
-      media_format_(MediaFormat::Create(MediaType::UNKNOWN)) {}
+      media_meta_(MediaMeta::Create(MediaType::UNKNOWN)) {}
 
 MediaPacket::MediaPacket(void* handle)
     : size_(0),
@@ -43,7 +43,7 @@ MediaPacket::MediaPacket(void* handle)
       buffer_type_(PacketBufferType::kTypeNativeHandle),
       media_type_(MediaType::UNKNOWN),
       is_eos_(false),
-      media_format_(MediaFormat::Create(MediaType::UNKNOWN)) {}
+      media_meta_(MediaMeta::Create(MediaType::UNKNOWN)) {}
 
 MediaPacket::~MediaPacket() = default;
 
@@ -51,7 +51,7 @@ MediaPacket::MediaPacket(const MediaPacket& other)
     : size_(other.size_),
       media_type_(other.media_type_),
       is_eos_(other.is_eos_),
-      media_format_(other.media_format_) {
+      media_meta_(other.media_meta_) {
   if (other.buffer_type_ == PacketBufferType::kTypeNormal) {
     data_ = other.data_;
     native_handle_ = nullptr;
@@ -68,10 +68,10 @@ void MediaPacket::SetMediaType(MediaType type) {
     media_type_ = type;
     switch (media_type_) {
       case MediaType::AUDIO:
-        media_format_ = MediaFormat::Create(MediaType::AUDIO);
+        media_meta_ = MediaMeta::Create(MediaType::AUDIO);
         break;
       case MediaType::VIDEO:
-        media_format_ = MediaFormat::Create(MediaType::VIDEO);
+        media_meta_ = MediaMeta::Create(MediaType::VIDEO);
         break;
       default:
         break;
@@ -96,7 +96,7 @@ AudioSampleInfo* MediaPacket::audio_info() {
   if (media_type_ != MediaType::AUDIO) {
     return nullptr;
   }
-  auto& sample_info = media_format_.sample_info();
+  auto& sample_info = media_meta_.sample_info();
   return &sample_info.audio();
 }
 
@@ -104,7 +104,7 @@ VideoSampleInfo* MediaPacket::video_info() {
   if (media_type_ != MediaType::VIDEO) {
     return nullptr;
   }
-  auto& sample_info = media_format_.sample_info();
+  auto& sample_info = media_meta_.sample_info();
   return &sample_info.video();
 }
 

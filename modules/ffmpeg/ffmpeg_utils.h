@@ -14,7 +14,7 @@ extern "C" {
 }
 
 #include "../../codec/codec_id.h"
-#include "../../foundation/media_format.h"
+#include "../../foundation/media_meta.h"
 #include "../../foundation/media_packet.h"
 
 namespace ave {
@@ -50,18 +50,18 @@ PixelFormat ConvertFromFFmpegPixelFormat(AVPixelFormat pixel_format);
 
 // avstream
 void ExtractMetaFromAudioStream(const AVStream* audio_stream,
-                                std::shared_ptr<MediaFormat>& meta);
+                                std::shared_ptr<MediaMeta>& meta);
 void ExtractMetaFromVideoStream(const AVStream* video_stream,
-                                std::shared_ptr<MediaFormat>& meta);
-std::shared_ptr<MediaFormat> ExtractMetaFromAVStream(const AVStream* stream);
+                                std::shared_ptr<MediaMeta>& meta);
+std::shared_ptr<MediaMeta> ExtractMetaFromAVStream(const AVStream* stream);
 
 // avpacket
 std::shared_ptr<MediaPacket> CreateMediaPacketFromAVPacket(
     const AVPacket* av_packet);
 
 // codec
-void ConfigureAudioCodec(MediaFormat* format, AVCodecContext* codec_context);
-void ConfigureVideoCodec(MediaFormat* format, AVCodecContext* codec_context);
+void ConfigureAudioCodec(MediaMeta* format, AVCodecContext* codec_context);
+void ConfigureVideoCodec(MediaMeta* format, AVCodecContext* codec_context);
 
 }  // namespace ffmpeg_utils
 }  // namespace media

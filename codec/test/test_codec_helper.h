@@ -41,7 +41,7 @@ class TestCodecRunner : public CodecCallback {
 
   status_t Init(const std::string& mime,
                 bool is_encoder,
-                const std::shared_ptr<MediaFormat>& format);
+                const std::shared_ptr<MediaMeta>& format);
   status_t Start();
   status_t Stop();
   bool IsRunning() const { return running_; }
@@ -52,8 +52,7 @@ class TestCodecRunner : public CodecCallback {
   // CodecCallback implementation
   void OnInputBufferAvailable(size_t index) override;
   void OnOutputBufferAvailable(size_t index) override;
-  void OnOutputFormatChanged(
-      const std::shared_ptr<MediaFormat>& format) override;
+  void OnOutputFormatChanged(const std::shared_ptr<MediaMeta>& format) override;
   void OnError(status_t error) override;
   void OnFrameRendered(std::shared_ptr<Message> notify) override;
 
@@ -68,7 +67,7 @@ class TestCodecRunner : public CodecCallback {
   InputDataCallback input_cb_;
   OutputDataCallback output_cb_;
   bool is_encoder_;
-  std::shared_ptr<MediaFormat> format_;
+  std::shared_ptr<MediaMeta> format_;
 
   std::unique_ptr<base::TaskRunner> task_runner_;
   bool running_ = false;

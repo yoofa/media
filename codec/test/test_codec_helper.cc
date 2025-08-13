@@ -48,7 +48,7 @@ TestCodecRunner::~TestCodecRunner() {
 
 status_t TestCodecRunner::Init(const std::string& mime,
                                bool is_encoder,
-                               const std::shared_ptr<MediaFormat>& format) {
+                               const std::shared_ptr<MediaMeta>& format) {
   is_encoder_ = is_encoder;
   format_ = format;
 
@@ -136,7 +136,7 @@ void TestCodecRunner::OnOutputBufferAvailable(size_t index) {
 }
 
 void TestCodecRunner::OnOutputFormatChanged(
-    const std::shared_ptr<MediaFormat>& format) {
+    const std::shared_ptr<MediaMeta>& format) {
   AVE_LOG(LS_INFO) << "Output format changed";
 }
 

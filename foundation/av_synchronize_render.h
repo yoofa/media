@@ -111,7 +111,7 @@ class AVSynchronizeRender : public MessageObject {
   // TODO: support multi audio track, each audio stream can be play to different
   // audio track
 
-  status_t OpenAudioSink(const std::shared_ptr<MediaFormat>& format,
+  status_t OpenAudioSink(const std::shared_ptr<MediaMeta>& format,
                          bool has_video = false,
                          bool offload_only = false,
                          bool* is_offloaded = nullptr,

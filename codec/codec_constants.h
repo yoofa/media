@@ -997,7 +997,7 @@ constexpr char FEATURE_QpBounds[] = "qp-bounds";
 constexpr char FEATURE_SecurePlayback[] = "secure-playback";
 constexpr char FEATURE_TunneledPlayback[] = "tunneled-playback";
 
-// from MediaFormat.java
+// from MediaMeta.java
 constexpr char MIMETYPE_VIDEO_VP8[] = "video/x-vnd.on2.vp8";
 constexpr char MIMETYPE_VIDEO_VP9[] = "video/x-vnd.on2.vp9";
 constexpr char MIMETYPE_VIDEO_AV1[] = "video/av01";

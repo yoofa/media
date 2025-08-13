@@ -43,11 +43,11 @@ ave_source_set("media_frame_test") {
   ]
 }
 
-ave_source_set("media_format_test") {
+ave_source_set("media_meta_test") {
   testonly = true
-  sources = [ "media_format_unittest.cc" ]
+  sources = [ "media_meta_unittest.cc" ]
   deps = [
-    "..:media_format",
+    "..:media_meta",
     "//test:test_support",
   ]
 }

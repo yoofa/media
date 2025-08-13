@@ -13,7 +13,7 @@
 #include "base/errors.h"
 
 #include "../crypto/crypto.h"
-#include "../foundation/media_format.h"
+#include "../foundation/media_meta.h"
 #include "../foundation/media_utils.h"
 #include "../foundation/message.h"
 #include "../video/video_render.h"
@@ -44,7 +44,7 @@ class CodecCallback {
   virtual void OnOutputBufferAvailable(size_t index) = 0;
   // output format is changed
   virtual void OnOutputFormatChanged(
-      const std::shared_ptr<MediaFormat>& format) = 0;
+      const std::shared_ptr<MediaMeta>& format) = 0;
   // error happened
   virtual void OnError(status_t error) = 0;
   // frame is rendered
@@ -56,7 +56,7 @@ struct CodecConfig {
   CodecInfo info;
   std::shared_ptr<VideoRender> video_render;
   std::shared_ptr<Crypto> crypto;
-  std::shared_ptr<MediaFormat> format;
+  std::shared_ptr<MediaMeta> format;
 };
 
 // this class is porting from Android MediaCodec

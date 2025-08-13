@@ -19,7 +19,7 @@ ave_library("test_codec_support") {
     "//base:logging",
     "//base:task_util",
     "//media/audio:audio_channel_layout",
-    "//media/foundation:media_format",
+    "//media/foundation:media_meta",
   ]
 }
 

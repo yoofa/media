@@ -5,7 +5,7 @@ ave_library("foundation") {
     ":bit_reader",
     ":color_utils",
     ":handler",
-    ":media_format",
+    ":media_meta",
     ":media_packet",
     ":media_source",
     ":media_utils",
@@ -70,10 +70,10 @@ ave_library("hevc_util") {
   ]
 }
 
-ave_library("media_format") {
+ave_library("media_meta") {
   sources = [
-    "media_format.cc",
-    "media_format.h",
+    "media_meta.cc",
+    "media_meta.h",
   ]
   deps = [ ":message_object" ]
 }
@@ -84,7 +84,7 @@ ave_library("media_source") {
     "media_source.h",
   ]
   deps = [
-    ":media_format",
+    ":media_meta",
     ":media_packet",
     ":media_source_sink",
     ":message_object",
@@ -110,7 +110,7 @@ ave_library("media_packet") {
   ]
   deps = [
     ":buffer",
-    ":media_format",
+    ":media_meta",
     ":message_object",
     "//base/units",
   ]
@@ -122,7 +122,7 @@ ave_library("media_frame") {
     "media_frame.h",
   ]
   deps = [
-    ":media_format",
+    ":media_meta",
     ":message_object",
   ]
 }
@@ -165,8 +165,8 @@ ave_library("unittest_sources") {
   testonly = true
   deps = [
     "test:media_clock_test",
-    "test:media_format_test",
     "test:media_frame_test",
+    "test:media_meta_test",
     "test:media_packet_test",
     "test:media_utils_test",
   ]

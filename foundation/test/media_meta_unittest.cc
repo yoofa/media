@@ -1,11 +1,11 @@
 /*
- * media_format_unittest.cc
+ * media_meta_unittest.cc
  * Copyright (C) 2024 youfa <vsyfar@gmail.com>
  *
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "../media_format.h"
+#include "../media_meta.h"
 #include <optional>
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -16,20 +16,20 @@ class MediaFormatTest : public testing::Test {
  protected:
   void SetUp() override {
     track_format_ =
-        MediaFormat::Create(MediaType::VIDEO, MediaFormat::FormatType::kTrack);
+        MediaMeta::Create(MediaType::VIDEO, MediaMeta::FormatType::kTrack);
     sample_format_ =
-        MediaFormat::Create(MediaType::VIDEO, MediaFormat::FormatType::kSample);
+        MediaMeta::Create(MediaType::VIDEO, MediaMeta::FormatType::kSample);
   }
 
-  std::optional<MediaFormat> track_format_;
-  std::optional<MediaFormat> sample_format_;
+  std::optional<MediaMeta> track_format_;
+  std::optional<MediaMeta> sample_format_;
 };
 
 TEST_F(MediaFormatTest, Creation) {
-  auto format = MediaFormat::Create();
+  auto format = MediaMeta::Create();
   EXPECT_EQ(format.stream_type(), MediaType::AUDIO);
 
-  auto ptr_format = MediaFormat::CreatePtr();
+  auto ptr_format = MediaMeta::CreatePtr();
   EXPECT_NE(ptr_format, nullptr);
   EXPECT_EQ(ptr_format->stream_type(), MediaType::AUDIO);
 }
@@ -120,7 +120,7 @@ TEST_F(MediaFormatTest, VideoProperties) {
 
 TEST_F(MediaFormatTest, AudioProperties) {
   auto audio_format =
-      MediaFormat::Create(MediaType::AUDIO, MediaFormat::FormatType::kTrack);
+      MediaMeta::Create(MediaType::AUDIO, MediaMeta::FormatType::kTrack);
 
   // Test sample rate
   audio_format.SetSampleRate(44100);
@@ -162,7 +162,7 @@ TEST_F(MediaFormatTest, MetaData) {
 
 TEST_F(MediaFormatTest, InvalidOperations) {
   // Test invalid video operations on audio format
-  auto audio_format = MediaFormat::Create(MediaType::AUDIO);
+  auto audio_format = MediaMeta::Create(MediaType::AUDIO);
   EXPECT_EQ(audio_format.width(), -1);
   EXPECT_EQ(audio_format.height(), -1);
   EXPECT_EQ(audio_format.stride(), -1);
@@ -171,7 +171,7 @@ TEST_F(MediaFormatTest, InvalidOperations) {
   EXPECT_EQ(audio_format.qp(), -1);
 
   // Test invalid audio operations on video format
-  auto video_format = MediaFormat::Create(MediaType::VIDEO);
+  auto video_format = MediaMeta::Create(MediaType::VIDEO);
   EXPECT_EQ(video_format.sample_rate(), static_cast<uint32_t>(0));
   EXPECT_EQ(video_format.channel_layout(), CHANNEL_LAYOUT_NONE);
   EXPECT_EQ(video_format.samples_per_channel(), -1);

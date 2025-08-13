@@ -25,7 +25,7 @@ ave_executable("ffmpeg_codec_example") {
     "//base:attributes",
     "//base:logging",
     "//media/audio:audio_channel_layout",
-    "//media/foundation:media_format",
+    "//media/foundation:media_meta",
     "//third_party/ffmpeg",
   ]
 }

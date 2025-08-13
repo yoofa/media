@@ -14,7 +14,7 @@
 #include "base/constructor_magic.h"
 
 #include "media_errors.h"
-#include "media_format.h"
+#include "media_meta.h"
 #include "media_packet.h"
 #include "media_source_base.h"
 #include "message_object.h"
@@ -83,7 +83,7 @@ class MediaSource : public MessageObject, public MediaPacketSource {
   virtual status_t Stop() = 0;
 
   // Returns the format of the data output by this media source.
-  virtual std::shared_ptr<MediaFormat> GetFormat() = 0;
+  virtual std::shared_ptr<MediaMeta> GetFormat() = 0;
 
   virtual bool SupportReadMultiple() { return false; }
 

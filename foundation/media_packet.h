@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "buffer.h"
-#include "media_format.h"
+#include "media_meta.h"
 #include "media_utils.h"
 #include "message_object.h"
 
@@ -48,7 +48,7 @@ class MediaPacket : MessageObject {
   VideoSampleInfo* video_info();
 
   // use meta() to get media metadata, other functions will be deprecated
-  MediaFormat* meta() { return &media_format_; }
+  MediaMeta* meta() { return &media_meta_; }
 
   size_t size() const { return data_ ? data_->size() : size_; }
   std::shared_ptr<Buffer>& buffer() { return data_; }
@@ -79,7 +79,7 @@ class MediaPacket : MessageObject {
 
   // audio or video or data sample info
   // MediaSampleInfo sample_info_;
-  MediaFormat media_format_;
+  MediaMeta media_meta_;
 };
 
 }  // namespace media

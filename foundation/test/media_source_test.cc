@@ -7,7 +7,7 @@
 #include <memory>
 #include "base/errors.h"
 
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/media_source.h"
 #include "media/foundation/media_source_sink_interface.h"
 
@@ -32,7 +32,7 @@ class TestSource : public MediaSource {
 
   status_t Stop() override { return ERROR_UNSUPPORTED; }
   status_t Pause() override { return ERROR_UNSUPPORTED; }
-  std::shared_ptr<MediaFormat> GetFormat() override { return nullptr; }
+  std::shared_ptr<MediaMeta> GetFormat() override { return nullptr; }
 
   status_t SetBuffers(
       const std::vector<std::shared_ptr<MediaPacket>>& buffers) override {

@@ -9,7 +9,7 @@
 #define CODEC_BUFFER_H
 
 #include "../foundation/buffer.h"
-#include "../foundation/media_format.h"
+#include "../foundation/media_meta.h"
 
 namespace ave {
 namespace media {
@@ -57,7 +57,7 @@ class CodecBuffer {
 
   BufferType buffer_type() const { return buffer_type_; }
 
-  std::shared_ptr<MediaFormat>& format() { return format_; }
+  std::shared_ptr<MediaMeta>& format() { return format_; }
 
  private:
   std::shared_ptr<Buffer> buffer_;
@@ -65,7 +65,7 @@ class CodecBuffer {
   int32_t texture_id_;
   void* native_handle_;
   BufferType buffer_type_;
-  std::shared_ptr<MediaFormat> format_;
+  std::shared_ptr<MediaMeta> format_;
 };
 
 }  // namespace media
