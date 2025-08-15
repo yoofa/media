@@ -24,7 +24,7 @@ ave_library("codec_buffer") {
     "codec_buffer.cc",
     "codec_buffer.h",
   ]
-  deps = [ "../foundation:buffer" ]
+  deps = [ "../foundation:media_buffer" ]
 }
 
 ave_library("codec_interface") {

@@ -159,8 +159,7 @@ class MediaMeta : public MessageObject {
 
   /****** 3.3 video sample same info ******/
 
-  // meta data
-  std::shared_ptr<Message>& ext_msg();
+  // TODO(youfa): add meta filed like Message
 
  private:
   FormatType format_type_;
@@ -171,7 +170,6 @@ class MediaMeta : public MessageObject {
   std::string full_name_;
 
   FormatInfo info_;
-  std::shared_ptr<Message> ext_msg_;
 };
 
 // std::string ToLogString(const MediaMeta& format);

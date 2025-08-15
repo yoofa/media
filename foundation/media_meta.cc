@@ -34,8 +34,7 @@ std::shared_ptr<MediaMeta> MediaMeta::CreatePtr(MediaType stream_type,
 MediaMeta::MediaMeta(MediaType stream_type, FormatType format_type)
     : format_type_(format_type),
       stream_type_(stream_type),
-      info_(CreateFormatInfo(format_type, stream_type)),
-      ext_msg_(nullptr) {}
+      info_(CreateFormatInfo(format_type, stream_type)) {}
 
 MediaTrackInfo& MediaMeta::track_info() {
   if (format_type_ != FormatType::kTrack) {
@@ -921,13 +920,6 @@ bool MediaMeta::eos() const {
     default:
       return false;
   }
-}
-
-std::shared_ptr<Message>& MediaMeta::ext_msg() {
-  if (!ext_msg_) {
-    ext_msg_ = std::make_shared<Message>();
-  }
-  return ext_msg_;
 }
 
 }  // namespace media

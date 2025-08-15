@@ -17,6 +17,13 @@ ave_library("message_object") {
   public_configs = [ "//build/config/compiler:rtti" ]
 }
 
+ave_library("media_buffer") {
+  sources = [
+    "buffer.cc",
+    "buffer.h",
+  ]
+}
+
 ave_library("media_source_sink") {
   sources = [
     "media_sink_base.cc",
@@ -29,14 +36,6 @@ ave_library("media_source_sink") {
     ":media_packet",
     ":message_object",
   ]
-}
-
-ave_library("buffer") {
-  sources = [
-    "buffer.cc",
-    "buffer.h",
-  ]
-  deps = [ ":handler" ]
 }
 
 ave_library("handler") {
@@ -109,7 +108,7 @@ ave_library("media_packet") {
     "media_packet.h",
   ]
   deps = [
-    ":buffer",
+    ":media_buffer",
     ":media_meta",
     ":message_object",
     "//base/units",

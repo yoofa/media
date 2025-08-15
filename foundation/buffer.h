@@ -39,10 +39,7 @@ class Buffer {
   void setInt32Data(int32_t data) { int32_data_ = data; }
   int32_t int32Data() const { return int32_data_; }
 
-  std::shared_ptr<Message>& meta();
-
  private:
-  std::shared_ptr<Message> meta_;
   std::unique_ptr<base::Buffer> buffer_;
 
   void* data_;

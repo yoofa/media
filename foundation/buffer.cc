@@ -69,12 +69,5 @@ void Buffer::ensureCapacity(size_t capacity, bool copy) {
   capacity_ = capacity;
 }
 
-std::shared_ptr<Message>& Buffer::meta() {
-  if (meta_ == nullptr) {
-    meta_ = std::make_shared<Message>();
-  }
-  return meta_;
-}
-
 }  // namespace media
 }  // namespace ave
