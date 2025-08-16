@@ -21,7 +21,7 @@
 namespace ave {
 namespace media {
 
-class MediaSource : public MessageObject, public MediaPacketSource {
+class MediaSource : public MessageObject, public MediaFrameSource {
  public:
   // Options that modify read() behaviour. The default is to
   // a) not request a seek
@@ -93,11 +93,11 @@ class MediaSource : public MessageObject, public MediaPacketSource {
   // A result of INFO_FORMAT_CHANGED indicates that the format of this
   // MediaSource has changed mid-stream, the client can continue reading
   // but should be prepared for buffers of the new configuration.
-  virtual status_t Read(std::shared_ptr<MediaPacket>& packet,
+  virtual status_t Read(std::shared_ptr<MediaFrame>& frame,
                         const ReadOptions* options) = 0;
 
   virtual status_t ReadMultiple(
-      std::vector<std::shared_ptr<MediaPacket>>& /* packets */,
+      std::vector<std::shared_ptr<MediaFrame>>& /* frames */,
       size_t /* count */,
       const ReadOptions* /* options */) {
     return ERROR_UNSUPPORTED;
@@ -115,7 +115,7 @@ class MediaSource : public MessageObject, public MediaPacketSource {
   // first read() call.
   // Callee assumes ownership of the buffers if no error is returned.
   virtual status_t SetBuffers(
-      const std::vector<std::shared_ptr<MediaPacket>>& /* buffers */) {
+      const std::vector<std::shared_ptr<MediaFrame>>& /* buffers */) {
     return ERROR_UNSUPPORTED;
   }
 

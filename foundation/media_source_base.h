@@ -63,19 +63,6 @@ class MediaSourceBase : public MediaSourceInterface<MediaFrameT> {
   std::vector<SinkPair> sinks_;
 };
 
-class MediaPacketSource : public MediaSourceBase<std::shared_ptr<MediaPacket>> {
- public:
-  ~MediaPacketSource() override = default;
-  void AddOrUpdateSink(MediaSinkInterface<std::shared_ptr<MediaPacket>>* sink,
-                       const MediaSinkWants& wants) override {
-    MediaSourceBase<std::shared_ptr<MediaPacket>>::AddOrUpdateSink(sink, wants);
-  }
-  void RemoveSink(
-      MediaSinkInterface<std::shared_ptr<MediaPacket>>* sink) override {
-    MediaSourceBase<std::shared_ptr<MediaPacket>>::RemoveSink(sink);
-  }
-};
-
 class MediaFrameSource : public MediaSourceBase<std::shared_ptr<MediaFrame>> {
  public:
   ~MediaFrameSource() override = default;

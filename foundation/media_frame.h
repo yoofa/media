@@ -30,16 +30,11 @@ class MediaFrame : public MediaMeta {
       size_t size = 0,
       MediaType media_type = MediaType::AUDIO);
 
-  // struct private_tag {};
   MediaFrame() = delete;
   MediaFrame(size_t size, MediaType media_type);
-  ~MediaFrame() override;
+  ~MediaFrame() override = default;
   // only support copy construct
   MediaFrame(const MediaFrame& other);
-
-  // 友元类声明，允许std::make_shared访问私有构造函数
-  template <typename T>
-  friend class std::allocator;
 
   // use meta() to get media metadata, other functions will be deprecated
   MediaMeta* meta() { return this; }

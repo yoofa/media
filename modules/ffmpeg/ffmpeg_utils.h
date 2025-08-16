@@ -14,6 +14,7 @@ extern "C" {
 }
 
 #include "../../codec/codec_id.h"
+#include "../../foundation/media_frame.h"
 #include "../../foundation/media_meta.h"
 
 namespace ave {
@@ -55,7 +56,7 @@ void ExtractMetaFromVideoStream(const AVStream* video_stream,
 std::shared_ptr<MediaMeta> ExtractMetaFromAVStream(const AVStream* stream);
 
 // avpacket
-std::shared_ptr<MediaPacket> CreateMediaPacketFromAVPacket(
+std::shared_ptr<MediaFrame> CreateMediaFrameFromAVPacket(
     const AVPacket* av_packet);
 
 // codec

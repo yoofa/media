@@ -7,13 +7,14 @@
 
 #include "ffmpeg_utils.h"
 
-#include "../../audio/channel_layout.h"
-#include "../../codec/codec_id.h"
-#include "../../foundation/media_defs.h"
 #include "base/attributes.h"
 #include "base/checks.h"
 #include "base/logging.h"
-#include "media/foundation/media_utils.h"
+
+#include "../../audio/channel_layout.h"
+#include "../../codec/codec_id.h"
+#include "../../foundation/media_utils.h"
+
 #include "third_party/ffmpeg/libavcodec/codec_id.h"
 
 extern "C" {
@@ -333,14 +334,14 @@ std::shared_ptr<MediaMeta> ExtractMetaFromAVStream(const AVStream* stream) {
 }
 
 // avpacket
-std::shared_ptr<MediaPacket> CreateMediaPacketFromAVPacket(
+std::shared_ptr<MediaFrame> CreateMediaFrameFromAVPacket(
     const AVPacket* av_packet) {
   if (!av_packet) {
     AVE_LOG(LS_ERROR) << "Invalid AVPacket";
     return nullptr;
   }
 
-  auto packet = MediaPacket::CreateShared(av_packet->size);
+  auto packet = MediaFrame::CreateShared(av_packet->size);
   packet->SetData(av_packet->data, av_packet->size);
 
   // packet->SetStreamIndex(av_packet->stream_index);

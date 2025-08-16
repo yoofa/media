@@ -21,7 +21,7 @@ class TestSource : public MediaSource {
   TestSource() = default;
   ~TestSource() override = default;
 
-  status_t Read(std::shared_ptr<MediaPacket>& packet,
+  status_t Read(std::shared_ptr<MediaFrame>& packet,
                 const ReadOptions* options) override {
     return ERROR_UNSUPPORTED;
   }
@@ -35,10 +35,10 @@ class TestSource : public MediaSource {
   std::shared_ptr<MediaMeta> GetFormat() override { return nullptr; }
 
   status_t SetBuffers(
-      const std::vector<std::shared_ptr<MediaPacket>>& buffers) override {
+      const std::vector<std::shared_ptr<MediaFrame>>& buffers) override {
     return ERROR_UNSUPPORTED;
   }
-  status_t ReadMultiple(std::vector<std::shared_ptr<MediaPacket>>& packets,
+  status_t ReadMultiple(std::vector<std::shared_ptr<MediaFrame>>& packets,
                         size_t count,
                         const ReadOptions* options) override {
     return ERROR_UNSUPPORTED;

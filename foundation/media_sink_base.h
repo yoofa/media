@@ -14,18 +14,9 @@
 namespace ave {
 namespace media {
 
-class MediaPacketSink
-    : public MediaSinkInterface<std::shared_ptr<MediaPacket>> {
- public:
-  ~MediaPacketSink() override;
-
-  // MediaSinkInterface
-  void OnFrame(const std::shared_ptr<MediaPacket>& packet) override;
-};
-
 class MediaFrameSink : public MediaSinkInterface<std::shared_ptr<MediaFrame>> {
  public:
-  ~MediaFrameSink() override;
+  ~MediaFrameSink() override = default;
 
   // MediaSinkInterface
   void OnFrame(const std::shared_ptr<MediaFrame>& frame) override;

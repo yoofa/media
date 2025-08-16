@@ -1,5 +1,5 @@
 /*
- * media_packet.cc
+ * media_frame.cc
  * Copyright (C) 2023 youfa <vsyfar@gmail.com>
  *
  * Distributed under terms of the GPLv2 license.
