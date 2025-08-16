@@ -36,18 +36,20 @@ MediaMeta::MediaMeta(MediaType stream_type, FormatType format_type)
       stream_type_(stream_type),
       info_(CreateFormatInfo(format_type, stream_type)) {}
 
-MediaTrackInfo& MediaMeta::track_info() {
+MediaTrackInfo* MediaMeta::track_info() {
   if (format_type_ != FormatType::kTrack) {
     AVE_LOG(LS_ERROR) << "Accessing track info on sample format";
+    return nullptr;
   }
-  return std::get<MediaTrackInfo>(info_);
+  return &std::get<MediaTrackInfo>(info_);
 }
 
-MediaSampleInfo& MediaMeta::sample_info() {
+MediaSampleInfo* MediaMeta::sample_info() {
   if (format_type_ != FormatType::kSample) {
     AVE_LOG(LS_ERROR) << "Accessing sample info on track format";
+    return nullptr;
   }
-  return std::get<MediaSampleInfo>(info_);
+  return &std::get<MediaSampleInfo>(info_);
 }
 
 MediaMeta& MediaMeta::SetStreamType(MediaType stream_type) {
@@ -107,25 +109,25 @@ const std::string& MediaMeta::full_name() const {
 
 MediaMeta& MediaMeta::SetCodec(CodecId codec) {
   if (format_type_ == FormatType::kTrack) {
-    auto& track = track_info();
+    auto* track = track_info();
     switch (stream_type_) {
       case MediaType::VIDEO:
-        track.video().codec_id = codec;
+        track->video().codec_id = codec;
         break;
       case MediaType::AUDIO:
-        track.audio().codec_id = codec;
+        track->audio().codec_id = codec;
         break;
       default:
         break;
     }
   } else {
-    auto& sample = sample_info();
+    auto* sample = sample_info();
     switch (stream_type_) {
       case MediaType::VIDEO:
-        sample.video().codec_id = codec;
+        sample->video().codec_id = codec;
         break;
       case MediaType::AUDIO:
-        sample.audio().codec_id = codec;
+        sample->audio().codec_id = codec;
         break;
       default:
         break;
@@ -164,13 +166,13 @@ MediaMeta& MediaMeta::SetBitrate(int64_t bps) {
     return *this;
   }
 
-  auto& track = track_info();
+  auto* track = track_info();
   switch (stream_type_) {
     case MediaType::VIDEO:
-      track.video().bitrate_bps = bps;
+      track->video().bitrate_bps = bps;
       break;
     case MediaType::AUDIO:
-      track.audio().bitrate_bps = bps;
+      track->audio().bitrate_bps = bps;
       break;
     default:
       break;
@@ -197,25 +199,25 @@ int64_t MediaMeta::bitrate() const {
 
 MediaMeta& MediaMeta::SetDuration(base::TimeDelta duration) {
   if (format_type_ == FormatType::kTrack) {
-    auto& track = track_info();
+    auto* track = track_info();
     switch (stream_type_) {
       case MediaType::VIDEO:
-        track.video().duration = duration;
+        track->video().duration = duration;
         break;
       case MediaType::AUDIO:
-        track.audio().duration = duration;
+        track->audio().duration = duration;
         break;
       default:
         break;
     }
   } else {
-    auto& sample = sample_info();
+    auto* sample = sample_info();
     switch (stream_type_) {
       case MediaType::VIDEO:
-        sample.video().duration = duration;
+        sample->video().duration = duration;
         break;
       case MediaType::AUDIO:
-        sample.audio().duration = duration;
+        sample->audio().duration = duration;
         break;
       default:
         break;
@@ -258,10 +260,10 @@ MediaMeta& MediaMeta::SetPrivateData(uint32_t size, void* data) {
   if (format_type_ == FormatType::kTrack) {
     switch (stream_type_) {
       case MediaType::VIDEO:
-        track_info().video().private_data = buffer;
+        track_info()->video().private_data = buffer;
         break;
       case MediaType::AUDIO:
-        track_info().audio().private_data = buffer;
+        track_info()->audio().private_data = buffer;
         break;
       default:
         break;
@@ -269,10 +271,10 @@ MediaMeta& MediaMeta::SetPrivateData(uint32_t size, void* data) {
   } else {
     switch (stream_type_) {
       case MediaType::VIDEO:
-        sample_info().video().private_data = buffer;
+        sample_info()->video().private_data = buffer;
         break;
       case MediaType::AUDIO:
-        sample_info().audio().private_data = buffer;
+        sample_info()->audio().private_data = buffer;
         break;
       default:
         break;
@@ -286,18 +288,18 @@ std::shared_ptr<base::Buffer> MediaMeta::private_data() {
   if (format_type_ == FormatType::kTrack) {
     switch (stream_type_) {
       case MediaType::VIDEO:
-        return track_info().video().private_data;
+        return track_info()->video().private_data;
       case MediaType::AUDIO:
-        return track_info().audio().private_data;
+        return track_info()->audio().private_data;
       default:
         break;
     }
   } else {
     switch (stream_type_) {
       case MediaType::VIDEO:
-        return sample_info().video().private_data;
+        return sample_info()->video().private_data;
       case MediaType::AUDIO:
-        return sample_info().audio().private_data;
+        return sample_info()->audio().private_data;
       default:
         break;
     }
@@ -309,10 +311,10 @@ MediaMeta& MediaMeta::ClearPrivateData() {
   if (format_type_ == FormatType::kTrack) {
     switch (stream_type_) {
       case MediaType::VIDEO:
-        track_info().video().private_data = nullptr;
+        track_info()->video().private_data = nullptr;
         break;
       case MediaType::AUDIO:
-        track_info().audio().private_data = nullptr;
+        track_info()->audio().private_data = nullptr;
         break;
       default:
         break;
@@ -320,10 +322,10 @@ MediaMeta& MediaMeta::ClearPrivateData() {
   } else {
     switch (stream_type_) {
       case MediaType::VIDEO:
-        sample_info().video().private_data = nullptr;
+        sample_info()->video().private_data = nullptr;
         break;
       case MediaType::AUDIO:
-        sample_info().audio().private_data = nullptr;
+        sample_info()->audio().private_data = nullptr;
         break;
       default:
         break;
@@ -340,9 +342,9 @@ MediaMeta& MediaMeta::SetWidth(int32_t width) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().width = width;
+    track_info()->video().width = width;
   } else {
-    sample_info().video().width = width;
+    sample_info()->video().width = width;
   }
   return *this;
 }
@@ -366,9 +368,9 @@ MediaMeta& MediaMeta::SetHeight(int32_t height) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().height = height;
+    track_info()->video().height = height;
   } else {
-    sample_info().video().height = height;
+    sample_info()->video().height = height;
   }
   return *this;
 }
@@ -392,9 +394,9 @@ MediaMeta& MediaMeta::SetStride(int32_t stride) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().stride = stride;
+    track_info()->video().stride = stride;
   } else {
-    sample_info().video().stride = stride;
+    sample_info()->video().stride = stride;
   }
   return *this;
 }
@@ -416,7 +418,7 @@ MediaMeta& MediaMeta::SetFrameRate(int32_t fps) {
     AVE_LOG(LS_WARNING) << "SetFrameRate failed, invalid format";
     return *this;
   }
-  track_info().video().fps = fps;
+  track_info()->video().fps = fps;
   return *this;
 }
 
@@ -435,7 +437,7 @@ MediaMeta& MediaMeta::SetPixelFormat(PixelFormat pixel_format) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().pixel_format = pixel_format;
+    track_info()->video().pixel_format = pixel_format;
   }
   return *this;
 }
@@ -457,7 +459,7 @@ MediaMeta& MediaMeta::SetPictureType(PictureType picture_type) {
     AVE_LOG(LS_WARNING) << "SetPictureType failed, invalid format";
     return *this;
   }
-  sample_info().video().picture_type = picture_type;
+  sample_info()->video().picture_type = picture_type;
   return *this;
 }
 
@@ -476,9 +478,9 @@ MediaMeta& MediaMeta::SetRotation(int16_t rotation) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().rotation = rotation;
+    track_info()->video().rotation = rotation;
   } else {
-    sample_info().video().rotation = rotation;
+    sample_info()->video().rotation = rotation;
   }
   return *this;
 }
@@ -500,7 +502,7 @@ MediaMeta& MediaMeta::SetQp(int16_t qp) {
     AVE_LOG(LS_WARNING) << "SetQp failed, invalid format";
     return *this;
   }
-  sample_info().video().qp = qp;
+  sample_info()->video().qp = qp;
   return *this;
 }
 
@@ -519,9 +521,9 @@ MediaMeta& MediaMeta::SetColorPrimaries(ColorPrimaries color_primaries) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().color_primaries = color_primaries;
+    track_info()->video().color_primaries = color_primaries;
   } else {
-    sample_info().video().color_primaries = color_primaries;
+    sample_info()->video().color_primaries = color_primaries;
   }
   return *this;
 }
@@ -545,9 +547,9 @@ MediaMeta& MediaMeta::SetColorTransfer(ColorTransfer color_transfer) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().color_transfer = color_transfer;
+    track_info()->video().color_transfer = color_transfer;
   } else {
-    sample_info().video().color_transfer = color_transfer;
+    sample_info()->video().color_transfer = color_transfer;
   }
   return *this;
 }
@@ -571,9 +573,9 @@ MediaMeta& MediaMeta::SetColorSpace(ColorSpace color_space) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().color_space = color_space;
+    track_info()->video().color_space = color_space;
   } else {
-    sample_info().video().color_space = color_space;
+    sample_info()->video().color_space = color_space;
   }
   return *this;
 }
@@ -597,9 +599,9 @@ MediaMeta& MediaMeta::SetColorRange(ColorRange color_range) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().color_range = color_range;
+    track_info()->video().color_range = color_range;
   } else {
-    sample_info().video().color_range = color_range;
+    sample_info()->video().color_range = color_range;
   }
   return *this;
 }
@@ -623,9 +625,9 @@ MediaMeta& MediaMeta::SetFieldOrder(FieldOrder field_order) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().field_order = field_order;
+    track_info()->video().field_order = field_order;
   } else {
-    sample_info().video().field_order = field_order;
+    sample_info()->video().field_order = field_order;
   }
   return *this;
 }
@@ -650,9 +652,9 @@ MediaMeta& MediaMeta::SetSampleAspectRatio(std::pair<int16_t, int16_t> sar) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().video().sample_aspect_ratio = sar;
+    track_info()->video().sample_aspect_ratio = sar;
   } else {
-    sample_info().video().sample_aspect_ratio = sar;
+    sample_info()->video().sample_aspect_ratio = sar;
   }
   return *this;
 }
@@ -662,7 +664,7 @@ MediaMeta& MediaMeta::SetTimeBase(std::pair<int32_t, int32_t> time_base) {
     AVE_LOG(LS_WARNING) << "SetTimeBase failed, invalid format";
     return *this;
   }
-  track_info().video().time_base = time_base;
+  track_info()->video().time_base = time_base;
   return *this;
 }
 
@@ -682,7 +684,7 @@ MediaMeta& MediaMeta::SetSampleRate(uint32_t sample_rate_hz) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().audio().sample_rate_hz = sample_rate_hz;
+    track_info()->audio().sample_rate_hz = sample_rate_hz;
   }
   return *this;
 }
@@ -706,7 +708,7 @@ MediaMeta& MediaMeta::SetChannelLayout(ChannelLayout channel_layout) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().audio().channel_layout = channel_layout;
+    track_info()->audio().channel_layout = channel_layout;
   }
   return *this;
 }
@@ -731,7 +733,7 @@ MediaMeta& MediaMeta::SetSamplesPerChannel(int64_t samples_per_channel) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().audio().samples_per_channel = samples_per_channel;
+    track_info()->audio().samples_per_channel = samples_per_channel;
   }
   return *this;
 }
@@ -756,7 +758,7 @@ MediaMeta& MediaMeta::SetBitsPerSample(int16_t bits_per_sample) {
   }
 
   if (format_type_ == FormatType::kTrack) {
-    track_info().audio().bits_per_sample = bits_per_sample;
+    track_info()->audio().bits_per_sample = bits_per_sample;
   }
   return *this;
 }
@@ -781,7 +783,7 @@ MediaMeta& MediaMeta::SetCodecProfile(int32_t profile) {
     AVE_LOG(LS_WARNING) << "SetCodecProfile failed, invalid format";
     return *this;
   }
-  track_info().video().codec_profile = profile;
+  track_info()->video().codec_profile = profile;
   return *this;
 }
 
@@ -798,7 +800,7 @@ MediaMeta& MediaMeta::SetCodecLevel(int32_t level) {
     AVE_LOG(LS_WARNING) << "SetCodecLevel failed, invalid format";
     return *this;
   }
-  track_info().video().codec_level = level;
+  track_info()->video().codec_level = level;
   return *this;
 }
 
@@ -817,13 +819,13 @@ MediaMeta& MediaMeta::SetPts(base::Timestamp pts) {
     return *this;
   }
 
-  auto& sample = sample_info();
+  auto* sample = sample_info();
   switch (stream_type_) {
     case MediaType::VIDEO:
-      sample.video().pts = pts;
+      sample->video().pts = pts;
       break;
     case MediaType::AUDIO:
-      sample.audio().pts = pts;
+      sample->audio().pts = pts;
       break;
     default:
       break;
@@ -854,13 +856,13 @@ MediaMeta& MediaMeta::SetDts(base::Timestamp dts) {
     return *this;
   }
 
-  auto& sample = sample_info();
+  auto* sample = sample_info();
   switch (stream_type_) {
     case MediaType::VIDEO:
-      sample.video().dts = dts;
+      sample->video().dts = dts;
       break;
     case MediaType::AUDIO:
-      sample.audio().dts = dts;
+      sample->audio().dts = dts;
       break;
     default:
       break;
@@ -891,13 +893,13 @@ MediaMeta& MediaMeta::SetEos(bool eos) {
     return *this;
   }
 
-  auto& sample = sample_info();
+  auto* sample = sample_info();
   switch (stream_type_) {
     case MediaType::VIDEO:
-      sample.video().eos = eos;
+      sample->video().eos = eos;
       break;
     case MediaType::AUDIO:
-      sample.audio().eos = eos;
+      sample->audio().eos = eos;
       break;
     default:
       break;

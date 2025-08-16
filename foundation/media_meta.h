@@ -41,8 +41,8 @@ class MediaMeta : public MessageObject {
                      FormatType format_type = FormatType::kSample);
   ~MediaMeta() override = default;
 
-  MediaTrackInfo& track_info();
-  MediaSampleInfo& sample_info();
+  MediaTrackInfo* track_info();
+  MediaSampleInfo* sample_info();
 
   /****** 1. track and sample all use ******/
   /****** 1.1 all use ******/

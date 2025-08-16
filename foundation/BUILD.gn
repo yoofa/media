@@ -23,6 +23,17 @@ ave_library("media_buffer") {
   ]
 }
 
+ave_library("media_frame") {
+  sources = [
+    "media_frame.cc",
+    "media_frame.h",
+  ]
+  deps = [
+    ":media_buffer",
+    ":media_meta",
+  ]
+}
+
 ave_library("media_source_sink") {
   sources = [
     "media_sink_base.cc",
