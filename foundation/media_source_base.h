@@ -9,7 +9,6 @@
 #define MEDIA_SOURCE_BASE_H
 
 #include "media_frame.h"
-#include "media_packet.h"
 #include "media_source_sink_interface.h"
 
 namespace ave {

@@ -6,7 +6,6 @@ ave_library("foundation") {
     ":color_utils",
     ":handler",
     ":media_meta",
-    ":media_packet",
     ":media_source",
     ":media_utils",
   ]
@@ -31,11 +30,7 @@ ave_library("media_source_sink") {
     "media_source_base.h",
     "media_source_sink_interface.h",
   ]
-  deps = [
-    ":media_frame",
-    ":media_packet",
-    ":message_object",
-  ]
+  deps = [ ":message_object" ]
 }
 
 ave_library("handler") {
@@ -84,7 +79,6 @@ ave_library("media_source") {
   ]
   deps = [
     ":media_meta",
-    ":media_packet",
     ":media_source_sink",
     ":message_object",
   ]
@@ -100,30 +94,6 @@ ave_library("media_defs") {
 ave_library("media_utils") {
   sources = [ "media_utils.cc" ]
   deps = [ ":message_object" ]
-}
-
-ave_library("media_packet") {
-  sources = [
-    "media_packet.cc",
-    "media_packet.h",
-  ]
-  deps = [
-    ":media_buffer",
-    ":media_meta",
-    ":message_object",
-    "//base/units",
-  ]
-}
-
-ave_library("media_frame") {
-  sources = [
-    "media_frame.cc",
-    "media_frame.h",
-  ]
-  deps = [
-    ":media_meta",
-    ":message_object",
-  ]
 }
 
 ave_library("esds") {
@@ -164,9 +134,7 @@ ave_library("unittest_sources") {
   testonly = true
   deps = [
     "test:media_clock_test",
-    "test:media_frame_test",
     "test:media_meta_test",
-    "test:media_packet_test",
     "test:media_utils_test",
   ]
 }

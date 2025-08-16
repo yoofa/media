@@ -7,7 +7,6 @@ ave_library("ffmpeg_utils") {
   ]
   deps = [
     "../../codec:codec_id",
-    "../../foundation:media_packet",
     "//base:logging",
     "//third_party/ffmpeg",
   ]
