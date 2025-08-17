@@ -15,6 +15,7 @@
 #include "../../codec/codec_id.h"
 #include "../../foundation/media_utils.h"
 
+#include "libavutil/channel_layout.h"
 #include "third_party/ffmpeg/libavcodec/codec_id.h"
 
 extern "C" {
@@ -73,6 +74,12 @@ CodecId ConvertToAVECodecId(AVCodecID ffmpeg_codec_id) {
     };
 
     /* audio codecs */
+    case AV_CODEC_ID_PCM_S16LE: {
+      return CodecId::AVE_CODEC_ID_PCM_S16LE;
+    }
+    case AV_CODEC_ID_PCM_S16BE: {
+      return CodecId::AVE_CODEC_ID_PCM_S16BE;
+    }
     case AV_CODEC_ID_MP3: {
       return CodecId::AVE_CODEC_ID_MP3;
     }
@@ -120,6 +127,12 @@ AVCodecID ConvertToFFmpegCodecId(CodecId codec_id) {
     };
 
     // audio codecs
+    case CodecId::AVE_CODEC_ID_PCM_S16LE: {
+      return AV_CODEC_ID_PCM_S16LE;
+    }
+    case CodecId::AVE_CODEC_ID_PCM_S16BE: {
+      return AV_CODEC_ID_PCM_S16BE;
+    }
     case CodecId::AVE_CODEC_ID_MP3: {
       return AV_CODEC_ID_MP3;
     }
@@ -219,6 +232,9 @@ ChannelLayout ChannelLayoutToAveChannelLayout(uint64_t layout, int channels) {
 
 ChannelLayout ChannelLayoutToAveChannelLayout(const AVChannelLayout& ch_layout,
                                               int channels) {
+  if (ch_layout.order == AV_CHANNEL_ORDER_UNSPEC) {
+    return GuessChannelLayout(channels);
+  }
   if (ch_layout.order == AV_CHANNEL_ORDER_NATIVE) {
     return ChannelLayoutToAveChannelLayout(ch_layout.u.mask, channels);
   }
@@ -227,8 +243,8 @@ ChannelLayout ChannelLayoutToAveChannelLayout(const AVChannelLayout& ch_layout,
     return CHANNEL_LAYOUT_UNSUPPORTED;
   }
   {
-    AVE_LOG(LS_ERROR) << "Unsupported channel layout order: "
-                      << ch_layout.order;
+    AVE_LOG(LS_ERROR) << "Unsupported channel layout order: " << ch_layout.order
+                      << ", channels: " << channels;
   }
   return CHANNEL_LAYOUT_UNSUPPORTED;
 }
@@ -334,6 +350,16 @@ std::shared_ptr<MediaMeta> ExtractMetaFromAVStream(const AVStream* stream) {
 }
 
 // avpacket
+void ExtractMetaFromAudioPacket(const AVPacket* av_packet,
+                                std::shared_ptr<MediaMeta>& meta) {
+  //
+}
+
+void ExtractMetaFromVideoPacket(const AVPacket* av_packet,
+                                std::shared_ptr<MediaMeta>& meta) {
+  //
+}
+
 std::shared_ptr<MediaFrame> CreateMediaFrameFromAVPacket(
     const AVPacket* av_packet) {
   if (!av_packet) {

@@ -56,6 +56,10 @@ void ExtractMetaFromVideoStream(const AVStream* video_stream,
 std::shared_ptr<MediaMeta> ExtractMetaFromAVStream(const AVStream* stream);
 
 // avpacket
+void ExtractMetaFromAudioPacket(const AVPacket* av_packet,
+                                std::shared_ptr<MediaMeta>& meta);
+void ExtractMetaFromVideoPacket(const AVPacket* av_packet,
+                                std::shared_ptr<MediaMeta>& meta);
 std::shared_ptr<MediaFrame> CreateMediaFrameFromAVPacket(
     const AVPacket* av_packet);
 
