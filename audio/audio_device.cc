@@ -20,8 +20,23 @@
 namespace ave {
 namespace media {
 
+namespace {
+AudioDevice::PlatformType DetectPlatform() {
+  // TODO: implement platform detection
+#if defined(AVE_ANDROID)
+  return AudioDevice::PlatformType::kAndroidAAudio;
+#elif defined(AVE_LINUX)
+  return AudioDevice::PlatformType::kLinuxAlsa;
+#endif
+}
+
+}  // namespace
+
 std::shared_ptr<AudioDevice> AudioDevice::CreateAudioDevice(
     AudioDevice::PlatformType type) {
+  if (type == PlatformType::kDefault) {
+    type = DetectPlatform();
+  }
   std::shared_ptr<AudioDevice> audio_device;
 
   switch (type) {

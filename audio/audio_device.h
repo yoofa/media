@@ -47,7 +47,8 @@ class AudioDevice {
     kDummy,
   };
 
-  static std::shared_ptr<AudioDevice> CreateAudioDevice(PlatformType type);
+  static std::shared_ptr<AudioDevice> CreateAudioDevice(
+      PlatformType type = PlatformType::kDefault);
 
   /* implement the following functions in the platform-specific code */
   virtual ~AudioDevice() = default;
