@@ -66,7 +66,7 @@ VideoSampleInfo* MediaFrame::video_info() {
   return &sample_info->video();
 }
 
-const uint8_t* MediaFrame::data() const {
+uint8_t* MediaFrame::data() const {
   if (buffer_type_ == FrameBufferType::kTypeNormal) {
     return data_ == nullptr ? nullptr : data_->data();
   }

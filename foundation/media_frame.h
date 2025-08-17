@@ -42,9 +42,12 @@ class MediaFrame : public MediaMeta {
   // buffer releated
   void SetSize(size_t size);
   void SetData(uint8_t* data, size_t size);
-  size_t size() const { return data_ ? data_->size() : 0; }
   std::shared_ptr<media::Buffer>& buffer() { return data_; }
-  const uint8_t* data() const;
+  uint8_t* base() { return data_ ? data_->base() : nullptr; }
+  uint8_t* data() const;
+  size_t capacity() const { return data_ ? data_->capacity() : 0; }
+  size_t size() const { return data_ ? data_->size() : 0; }
+  size_t offset() const { return data_ ? data_->offset() : 0; }
 
   // releated with this class
   // TODO(youfa): other sample info

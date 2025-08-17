@@ -685,6 +685,8 @@ MediaMeta& MediaMeta::SetSampleRate(uint32_t sample_rate_hz) {
 
   if (format_type_ == FormatType::kTrack) {
     track_info()->audio().sample_rate_hz = sample_rate_hz;
+  } else {
+    sample_info()->audio().sample_rate_hz = sample_rate_hz;
   }
   return *this;
 }
@@ -698,6 +700,10 @@ uint32_t MediaMeta::sample_rate() const {
   if (format_type_ == FormatType::kTrack) {
     return std::get<MediaTrackInfo>(info_).audio().sample_rate_hz;
   }
+
+  if (format_type_ == FormatType::kSample) {
+    return std::get<MediaSampleInfo>(info_).audio().sample_rate_hz;
+  }
   return 0;
 }
 
@@ -709,6 +715,8 @@ MediaMeta& MediaMeta::SetChannelLayout(ChannelLayout channel_layout) {
 
   if (format_type_ == FormatType::kTrack) {
     track_info()->audio().channel_layout = channel_layout;
+  } else {
+    sample_info()->audio().channel_layout = channel_layout;
   }
   return *this;
 }
@@ -722,6 +730,9 @@ ChannelLayout MediaMeta::channel_layout() const {
   if (format_type_ == FormatType::kTrack) {
     return std::get<MediaTrackInfo>(info_).audio().channel_layout;
   }
+  if (format_type_ == FormatType::kSample) {
+    return std::get<MediaSampleInfo>(info_).audio().channel_layout;
+  }
   return CHANNEL_LAYOUT_NONE;
 }
 
@@ -734,6 +745,8 @@ MediaMeta& MediaMeta::SetSamplesPerChannel(int64_t samples_per_channel) {
 
   if (format_type_ == FormatType::kTrack) {
     track_info()->audio().samples_per_channel = samples_per_channel;
+  } else {
+    sample_info()->audio().samples_per_channel = samples_per_channel;
   }
   return *this;
 }
@@ -747,6 +760,10 @@ int64_t MediaMeta::samples_per_channel() const {
 
   if (format_type_ == FormatType::kTrack) {
     return std::get<MediaTrackInfo>(info_).audio().samples_per_channel;
+  }
+
+  if (format_type_ == FormatType::kSample) {
+    return std::get<MediaSampleInfo>(info_).audio().samples_per_channel;
   }
   return -1;
 }
