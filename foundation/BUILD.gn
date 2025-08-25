@@ -95,11 +95,19 @@ ave_library("media_source") {
   ]
 }
 
+ave_library("media_mimes") {
+  sources = [
+    "media_mimes.cc",
+    "media_mimes.h",
+  ]
+}
+
 ave_library("media_defs") {
   sources = [
     "media_defs.cc",
     "media_defs.h",
   ]
+  public_deps = [ ":media_mimes" ]
 }
 
 ave_library("media_utils") {
