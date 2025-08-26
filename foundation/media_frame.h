@@ -29,6 +29,10 @@ class MediaFrame : public MediaMeta {
   static std::shared_ptr<MediaFrame> CreateShared(
       size_t size = 0,
       MediaType media_type = MediaType::AUDIO);
+  static std::shared_ptr<MediaFrame> CreateSharedAsCopy(
+      void* data,
+      size_t size = 0,
+      MediaType media_type = MediaType::AUDIO);
 
   MediaFrame() = delete;
   MediaFrame(size_t size, MediaType media_type);
@@ -40,14 +44,14 @@ class MediaFrame : public MediaMeta {
   MediaMeta* meta() { return this; }
 
   // buffer releated
-  void SetSize(size_t size);
-  void SetData(uint8_t* data, size_t size);
   std::shared_ptr<media::Buffer>& buffer() { return data_; }
   uint8_t* base() { return data_ ? data_->base() : nullptr; }
   uint8_t* data() const;
   size_t capacity() const { return data_ ? data_->capacity() : 0; }
   size_t size() const { return data_ ? data_->size() : 0; }
   size_t offset() const { return data_ ? data_->offset() : 0; }
+  void setRange(size_t offset, size_t size);
+  void ensureCapacity(size_t capacity, bool copy = true);
 
   // releated with this class
   // TODO(youfa): other sample info

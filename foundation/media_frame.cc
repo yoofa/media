@@ -17,8 +17,14 @@ MediaFrame MediaFrame::Create(size_t size, MediaType media_type) {
 
 std::shared_ptr<MediaFrame> MediaFrame::CreateShared(size_t size,
                                                      MediaType media_type) {
-  return std::allocate_shared<MediaFrame>(std::allocator<MediaFrame>(), size,
-                                          media_type);
+  return std::make_shared<MediaFrame>(size, media_type);
+}
+
+std::shared_ptr<MediaFrame>
+MediaFrame::CreateSharedAsCopy(void* data, size_t size, MediaType media_type) {
+  auto frame = std::make_shared<MediaFrame>(size, media_type);
+  std::memcpy(frame->data(), data, size);
+  return frame;
 }
 
 MediaFrame::MediaFrame(size_t size, MediaType media_type)
@@ -39,15 +45,18 @@ MediaFrame::MediaFrame(const MediaFrame& other) : MediaMeta(other) {
   }
 }
 
-void MediaFrame::SetSize(size_t size) {
-  AVE_DCHECK(buffer_type_ == FrameBufferType::kTypeNormal);
-  AVE_DCHECK(size > 0);
-  data_ = std::make_shared<Buffer>(size);
+void MediaFrame::setRange(size_t offset, size_t size) {
+  if (data_) {
+    data_->setRange(offset, size);
+  }
 }
 
-void MediaFrame::SetData(uint8_t* data, size_t size) {
-  AVE_DCHECK(buffer_type_ == FrameBufferType::kTypeNormal);
-  data_ = std::make_shared<Buffer>(data, size);
+void MediaFrame::ensureCapacity(size_t capacity, bool copy) {
+  if (data_) {
+    data_->ensureCapacity(capacity, copy);
+  } else {
+    data_ = std::make_shared<media::Buffer>(capacity);
+  }
 }
 
 AudioSampleInfo* MediaFrame::audio_info() {
