@@ -9,6 +9,7 @@
 #define CODEC_ID_H
 
 #include <cstdint>
+#include <string>
 
 namespace ave {
 namespace media {
@@ -573,6 +574,8 @@ enum class CodecId : uint32_t {
 
 CodecId MimeToCodecId(const char* mime);
 const char* CodecIdToMime(CodecId codec_id);
+
+std::string ToLogString(CodecId codec_id);
 
 }  // namespace media
 }  // namespace ave

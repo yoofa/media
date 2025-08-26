@@ -18,50 +18,68 @@ namespace media {
 // TODO: not complete, refine when check more test files
 
 CodecId MimeToCodecId(const char* mime) {
-  // VIDEO
+  /*****************    VIDEO     *****************/
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_VP8, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_VP8;
   }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_VP9, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_VP9;
   }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_AV1, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_AV1;
   }
+
+  if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_APV, mime, strlen(mime))) {
+    return CodecId::AVE_CODEC_ID_AV1;
+  }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_H264;
   }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_HEVC, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_HEVC;
   }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_MPEG4, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_MPEG4;
   }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_H263, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_H263;
   }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_MPEG2, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_MPEG2VIDEO;
   }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_RAW, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_RAWVIDEO;
   }
+
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_DOLBY_VISION, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_HEVC;
   }
+
+  //   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_SCRAMBLED, mime, strlen(mime))) {
+  //     return ?;
+  //   }
   //   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_DIVX;
+  //     return ?;
   //   }
   //   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_DIVX3, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_DIVX3;
+  //     return ?;
   //   }
   //   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_XVID, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_XVID;
+  //     return ?;
   //   }
   if (!strncasecmp(MEDIA_MIMETYPE_VIDEO_MJPEG, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_MJPEG;
   }
-  // AUDIO
+
+  /*****************    AUDIO    *****************/
   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_AMR_NB, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_AMR_NB;
   }
@@ -77,9 +95,9 @@ CodecId MimeToCodecId(const char* mime) {
   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_MP2;
   }
-  //   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MIDI, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_MIDI;
-  //   }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MIDI, mime, strlen(mime))) {
+  //   return ?;
+  // }
   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_AAC, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_AAC;
   }
@@ -98,14 +116,14 @@ CodecId MimeToCodecId(const char* mime) {
   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_G711_MLAW, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_PCM_MULAW;
   }
-  //   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_RAW, mime, strlen(mime))) {
-  //     return AUDIO_RAW;
-  //   }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_RAW, mime, strlen(mime))) {
+  //   return ?;
+  // }
   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_FLAC, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_FLAC;
   }
   //   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_AAC_ADTS, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_AAC_ADTS;
+  //     return ?;
   //   }
   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MSGSM, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_GSM_MS;
@@ -116,24 +134,37 @@ CodecId MimeToCodecId(const char* mime) {
   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_EAC3, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_EAC3;
   }
-  //   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_EAC3_JOC, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_EAC3_JOC;
-  //   }
-  //   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_AC4, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_AC4;
-  //   }
-  //   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEGH_MHA1, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_MPEGH_MHA1;
-  //   }
-  //   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEGH_MHM1, mime, strlen(mime))) {
-  //     return CodecId::AVE_CODEC_ID_MPEGH_MHM1;
-  //   }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_EAC3_JOC, mime, strlen(mime))) {
+  //   return ?;
+  // }
+  if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_AC4, mime, strlen(mime))) {
+    return CodecId::AVE_CODEC_ID_AC4;
+  }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEGH_MHA1, mime, strlen(mime))) {
+  //   return ?;
+  // }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEGH_MHM1, mime, strlen(mime))) {
+  //   return ?;
+  // }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEGH_BL_L3, mime, strlen(mime))) {
+  //   return CodecId::AVE_CODEC_ID_AC4;
+  // }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEGH_BL_L4, mime, strlen(mime))) {
+  //   return CodecId::AVE_CODEC_ID_AC4;
+  // }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEGH_LC_L3, mime, strlen(mime))) {
+  //   return CodecId::AVE_CODEC_ID_AC4;
+  // }
+  // if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MPEGH_LC_L4, mime, strlen(mime))) {
+  //   return CodecId::AVE_CODEC_ID_AC4;
+  // }
+  if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_SCRAMBLED, mime, strlen(mime))) {
+    return CodecId::AVE_CODEC_ID_AC4;
+  }
   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_ALAC, mime, strlen(mime))) {
     return CodecId::AVE_CODEC_ID_ALAC;
   }
-  if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_WMA, mime, strlen(mime))) {
-    return CodecId::AVE_CODEC_ID_WMAV1;
-  }
+
   //   if (!strncasecmp(MEDIA_MIMETYPE_AUDIO_MS_ADPCM, mime, strlen(mime))) {
   //     return CodecId::AVE_CODEC_ID_MSADPCM;
   //   }
@@ -147,12 +178,15 @@ CodecId MimeToCodecId(const char* mime) {
 
 const char* CodecIdToMime(CodecId codec_id) {
   switch (codec_id) {
+    /* video */
     case CodecId::AVE_CODEC_ID_VP8:
       return MEDIA_MIMETYPE_VIDEO_VP8;
     case CodecId::AVE_CODEC_ID_VP9:
       return MEDIA_MIMETYPE_VIDEO_VP9;
     case CodecId::AVE_CODEC_ID_AV1:
       return MEDIA_MIMETYPE_VIDEO_AV1;
+    case CodecId::AVE_CODEC_ID_APV:
+      return MEDIA_MIMETYPE_VIDEO_APV;
     case CodecId::AVE_CODEC_ID_H264:
       return MEDIA_MIMETYPE_VIDEO_AVC;
     case CodecId::AVE_CODEC_ID_HEVC:
@@ -167,6 +201,8 @@ const char* CodecIdToMime(CodecId codec_id) {
       return MEDIA_MIMETYPE_VIDEO_RAW;
     case CodecId::AVE_CODEC_ID_MJPEG:
       return MEDIA_MIMETYPE_VIDEO_MJPEG;
+
+    /* audio */
     case CodecId::AVE_CODEC_ID_AMR_NB:
       return MEDIA_MIMETYPE_AUDIO_AMR_NB;
     case CodecId::AVE_CODEC_ID_AMR_WB:
@@ -200,7 +236,7 @@ const char* CodecIdToMime(CodecId codec_id) {
     case CodecId::AVE_CODEC_ID_WMAV1:
       return MEDIA_MIMETYPE_AUDIO_WMA;
     default:
-      return "";
+      return "unspecified/unspecified";
   }
 }
 
