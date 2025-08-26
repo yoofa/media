@@ -367,8 +367,8 @@ std::shared_ptr<MediaFrame> CreateMediaFrameFromAVPacket(
     return nullptr;
   }
 
-  auto packet = MediaFrame::CreateShared(av_packet->size);
-  packet->SetData(av_packet->data, av_packet->size);
+  auto packet =
+      MediaFrame::CreateSharedAsCopy(av_packet->data, av_packet->size);
 
   // packet->SetStreamIndex(av_packet->stream_index);
   packet->meta()->SetPts(base::Timestamp::Micros(
