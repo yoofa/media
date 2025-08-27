@@ -1,0 +1,26 @@
+import("//base/build/ave.gni")
+
+ave_library("sdp") {
+  sources = [
+    "sdp.cc",
+    "sdp.h",
+  ]
+}
+
+ave_source_set("sdp_unittests") {
+  testonly = true
+  sources = [ "sdp_unittest.cc" ]
+  deps = [
+    ":sdp",
+    "//test:test_support",
+  ]
+}
+
+ave_executable("sdp_unittests_bin") {
+  testonly = true
+  deps = [
+    ":sdp_unittests",
+    "//test:test_main",
+    "//test:test_support",
+  ]
+}
