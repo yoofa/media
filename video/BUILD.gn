@@ -1,10 +1,7 @@
-
 import("//base/build/ave.gni")
 
 ave_library("video_render") {
   sources = [ "video_render.h" ]
-  deps = [
-    "../foundation:media_source_sink",
-    "../foundation:message_object",
-  ]
+  deps = [ "../foundation:media_source_sink" ]
+  public_deps = [ "../foundation:message_object" ]
 }

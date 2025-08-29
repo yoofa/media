@@ -32,6 +32,7 @@ ave_library("media_frame") {
     ":media_buffer",
     ":media_meta",
   ]
+  public_deps = [ ":message_object" ]
 }
 
 ave_library("media_source_sink") {
@@ -41,7 +42,7 @@ ave_library("media_source_sink") {
     "media_source_base.h",
     "media_source_sink_interface.h",
   ]
-  deps = [ ":message_object" ]
+  public_deps = [ ":message_object" ]
 }
 
 ave_library("handler") {
@@ -80,7 +81,7 @@ ave_library("media_meta") {
     "media_meta.cc",
     "media_meta.h",
   ]
-  deps = [ ":message_object" ]
+  public_deps = [ ":message_object" ]
 }
 
 ave_library("media_source") {
@@ -93,6 +94,7 @@ ave_library("media_source") {
     ":media_source_sink",
     ":message_object",
   ]
+  public_deps = [ ":message_object" ]
 }
 
 ave_library("media_mimes") {
