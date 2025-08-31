@@ -108,7 +108,23 @@ status_t AlsaAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
 }
 
 int64_t AlsaAudioTrack::GetPlayedOutDurationUs(int64_t nowUs) const {
-  return nowUs;
+  if (!ready_) {
+    return -EINVAL;
+  }
+
+  snd_pcm_sframes_t delay_frames{};
+  if (LATE(snd_pcm_delay)(handle_, &delay_frames) < 0) {
+    return -EINVAL;
+  }
+
+  snd_pcm_sframes_t played_frames = frames_written_ - delay_frames;
+  if (played_frames < 0) {
+    played_frames = 0;
+  }
+
+  long long played_us = (played_frames * 1000000LL) / config_.sample_rate;
+
+  return played_us;
 }
 
 int64_t AlsaAudioTrack::GetBufferDurationInUs() const {
@@ -321,6 +337,7 @@ ssize_t AlsaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
     frames -= ret;
     data += ret * frameSize();
     written += ret;
+    frames_written_ += ret;
   }
 
   return written * frameSize();
