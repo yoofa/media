@@ -123,7 +123,7 @@ void Message::setObject(const char* name, const std::any& obj) {
     setObject(name, value);                                              \
   }                                                                      \
   bool Message::find##NAME(const char* name, __VA_ARGS__* value) const { \
-    return findObject(name, value);                                      \
+    return findObject(name, *value);                                     \
   }
 
 BASIC_TYPE(Int32, int32_t)

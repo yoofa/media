@@ -16,6 +16,15 @@ executable("looper_test") {
   ]
 }
 
+ave_source_set("message_test") {
+  testonly = true
+  sources = [ "message_unittest.cc" ]
+  deps = [
+    "..:handler",
+    "//test:test_support",
+  ]
+}
+
 ave_source_set("media_utils_test") {
   testonly = true
   sources = [ "media_utils_unittest.cc" ]

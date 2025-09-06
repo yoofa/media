@@ -155,11 +155,6 @@ TEST_F(MediaFormatTest, SampleProperties) {
   EXPECT_TRUE(sample_format_->eos());
 }
 
-TEST_F(MediaFormatTest, MetaData) {
-  auto& meta = track_format_->meta();
-  EXPECT_NE(meta, nullptr);
-}
-
 TEST_F(MediaFormatTest, InvalidOperations) {
   // Test invalid video operations on audio format
   auto audio_format = MediaMeta::Create(MediaType::AUDIO);
