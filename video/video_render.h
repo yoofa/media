@@ -11,12 +11,11 @@
 #include <memory>
 
 #include "media/foundation/media_sink_base.h"
-#include "media/foundation/message_object.h"
 
 namespace ave {
 namespace media {
 
-class VideoRender : public MediaFrameSink, public MessageObject {
+class VideoRender : public MediaFrameSink {
  public:
   VideoRender() = default;
   ~VideoRender() override = default;

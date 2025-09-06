@@ -16,7 +16,6 @@
 #include "base/errors.h"
 
 #include "looper.h"
-#include "message_object.h"
 
 namespace ave {
 namespace media {
@@ -24,11 +23,11 @@ namespace media {
 class Handler;
 class Buffer;
 
-class ReplyToken : public MessageObject {
+class ReplyToken {
  public:
   explicit ReplyToken(const std::shared_ptr<Looper>& looper)
       : looper_(looper), replied_(false) {}
-  ~ReplyToken() override = default;
+  virtual ~ReplyToken() = default;
 
  private:
   friend class Message;

@@ -32,7 +32,6 @@ ave_library("media_frame") {
     ":media_buffer",
     ":media_meta",
   ]
-  public_deps = [ ":message_object" ]
 }
 
 ave_library("media_source_sink") {
@@ -42,7 +41,6 @@ ave_library("media_source_sink") {
     "media_source_base.h",
     "media_source_sink_interface.h",
   ]
-  public_deps = [ ":message_object" ]
 }
 
 ave_library("handler") {
@@ -56,10 +54,7 @@ ave_library("handler") {
     "message.cc",
     "message.h",
   ]
-  deps = [
-    ":message_object",
-    "//base:count_down_latch",
-  ]
+  deps = [ "//base:count_down_latch" ]
 }
 
 ave_library("avc_util") {
@@ -81,7 +76,6 @@ ave_library("media_meta") {
     "media_meta.cc",
     "media_meta.h",
   ]
-  public_deps = [ ":message_object" ]
 }
 
 ave_library("media_source") {
@@ -92,9 +86,7 @@ ave_library("media_source") {
   deps = [
     ":media_meta",
     ":media_source_sink",
-    ":message_object",
   ]
-  public_deps = [ ":message_object" ]
 }
 
 ave_library("media_mimes") {
@@ -114,7 +106,6 @@ ave_library("media_defs") {
 
 ave_library("media_utils") {
   sources = [ "media_utils.cc" ]
-  deps = [ ":message_object" ]
 }
 
 ave_library("esds") {

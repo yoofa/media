@@ -15,7 +15,6 @@
 #include "../codec/codec_id.h"
 #include "base/units/time_delta.h"
 #include "base/units/timestamp.h"
-#include "media/foundation/message_object.h"
 #include "media_utils.h"
 #include "message.h"
 
@@ -23,7 +22,7 @@ namespace ave {
 namespace media {
 
 // Both used for track and sample
-class MediaMeta : public MessageObject {
+class MediaMeta {
  public:
   enum class FormatType {
     kTrack,
@@ -39,7 +38,7 @@ class MediaMeta : public MessageObject {
 
   explicit MediaMeta(MediaType stream_type = MediaType::AUDIO,
                      FormatType format_type = FormatType::kSample);
-  ~MediaMeta() override = default;
+  virtual ~MediaMeta() = default;
 
   MediaTrackInfo* track_info();
   MediaSampleInfo* sample_info();
