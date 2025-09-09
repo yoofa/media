@@ -67,9 +67,7 @@ std::vector<CodecInfo> FFmpegCodecFactory::GetSupportedCodecs() {
   while ((codec = av_codec_iterate(&iter))) {
     CodecInfo info;
     info.name = codec->name;
-    // FIXME:
-    // FFmpeg doesn't have a direct MIME type, using long_name instead
-    info.mime = codec->long_name;  // Note:
+    info.mime = ffmpeg_utils::AVCodecId2Mime(codec->id);
 
     // Determine media type
     if (codec->type == AVMEDIA_TYPE_VIDEO) {
