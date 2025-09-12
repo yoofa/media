@@ -86,11 +86,13 @@ class Codec {
 
   /*
    * get input buffers refs from codec, can be used after Configure
+   * size maybe changed when running
    */
   virtual std::vector<std::shared_ptr<CodecBuffer>> InputBuffers() = 0;
 
   /*
    * get output buffers refs from codec, can be used after Configure
+   * size maybe changed when running
    */
   virtual std::vector<std::shared_ptr<CodecBuffer>> OutputBuffers() = 0;
 
@@ -107,28 +109,34 @@ class Codec {
   virtual status_t GetOutputBuffer(size_t index,
                                    std::shared_ptr<CodecBuffer>& buffer) = 0;
 
-  virtual std::shared_ptr<CodecBuffer> DequeueInputBuffer(
-      int32_t index,
-      int64_t timeout_ms) = 0;
+  /*
+   * get input buffer from codec, will wait until timeout_ms
+   * return index or status_t::E_AGAIN if no input buffer available
+   */
+  virtual ssize_t DequeueInputBuffer(int64_t timeout_ms) = 0;
 
   /* queueInputBuffer to codec, will copy the data to codec internal buffer
-   * return -EAGAIN if the codec is not ready or input queue in full
+   * index: input buffer index, can be got from DequeueInputBuffer or callback
+   * OnInputBufferAvailable
+   * return status_t::E_AGAIN if the codec is not ready or input queue in full
    */
-  status_t QueueInputBuffer(std::shared_ptr<CodecBuffer>& buffer) {
-    return QueueInputBuffer(buffer, -1);
+  status_t QueueInputBuffer(size_t index) {
+    return QueueInputBuffer(index, -1);
   }
-  virtual status_t QueueInputBuffer(std::shared_ptr<CodecBuffer>& buffer,
-                                    int64_t timeout_ms) = 0;
+  virtual status_t QueueInputBuffer(size_t index, int64_t timeout_ms) = 0;
 
-  virtual std::shared_ptr<CodecBuffer> DequeueOutputBuffer(
-      int32_t index,
-      int64_t timeout_ms) = 0;
+  /*
+   * get output buffer from codec, will wait until timeout_ms
+   * return index or status_t::E_AGAIN if no output buffer available
+   */
+  virtual ssize_t DequeueOutputBuffer(int64_t timeout_ms) = 0;
 
   /* release the output buffer
+   * index: output buffer index, can be got from DequeueOutputBuffer or
+   * callback OnOutputBufferAvailable
    * render: true - render the buffer, false - only release the buffer
    */
-  virtual status_t ReleaseOutputBuffer(std::shared_ptr<CodecBuffer>& buffer,
-                                       bool render) = 0;
+  virtual status_t ReleaseOutputBuffer(size_t index, bool render) = 0;
 };
 
 }  // namespace media
