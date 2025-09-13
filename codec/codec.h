@@ -85,18 +85,6 @@ class Codec {
   virtual status_t Release() = 0;
 
   /*
-   * get input buffers refs from codec, can be used after Configure
-   * size maybe changed when running
-   */
-  virtual std::vector<std::shared_ptr<CodecBuffer>> InputBuffers() = 0;
-
-  /*
-   * get output buffers refs from codec, can be used after Configure
-   * size maybe changed when running
-   */
-  virtual std::vector<std::shared_ptr<CodecBuffer>> OutputBuffers() = 0;
-
-  /*
    * get input buffer from codec, can be used after DequeueInputBuffer
    * can be used to fill the buffer
    */
@@ -120,10 +108,7 @@ class Codec {
    * OnInputBufferAvailable
    * return status_t::E_AGAIN if the codec is not ready or input queue in full
    */
-  status_t QueueInputBuffer(size_t index) {
-    return QueueInputBuffer(index, -1);
-  }
-  virtual status_t QueueInputBuffer(size_t index, int64_t timeout_ms) = 0;
+  virtual status_t QueueInputBuffer(size_t index) = 0;
 
   /*
    * get output buffer from codec, will wait until timeout_ms
