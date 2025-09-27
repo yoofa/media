@@ -11,15 +11,19 @@ namespace ave {
 
 namespace media {
 
-CodecBuffer::CodecBuffer() : CodecBuffer(0) {}
-
-CodecBuffer::CodecBuffer(size_t capacity)
-    : buffer_(std::make_shared<Buffer>(capacity)),
-      buffer_index_(-1),
+CodecBuffer::CodecBuffer(void* data, size_t size)
+    : buffer_(std::make_shared<media::Buffer>(data, size)),
       texture_id_(-1),
       native_handle_(nullptr),
       buffer_type_(BufferType::kTypeNormal),
-      format_(std::make_shared<MediaMeta>()) {}
+      format_(MediaMeta::CreatePtr()) {}
+
+CodecBuffer::CodecBuffer(size_t capacity)
+    : buffer_(std::make_shared<media::Buffer>(capacity)),
+      texture_id_(-1),
+      native_handle_(nullptr),
+      buffer_type_(BufferType::kTypeNormal),
+      format_(MediaMeta::CreatePtr()) {}
 
 CodecBuffer::~CodecBuffer() = default;
 
@@ -43,16 +47,19 @@ size_t CodecBuffer::offset() {
   return buffer_->offset();
 }
 
-void CodecBuffer::SetRange(size_t offset, size_t size) {
+status_t CodecBuffer::SetRange(size_t offset, size_t size) {
   buffer_->setRange(offset, size);
+  return OK;
 }
 
-void CodecBuffer::EnsureCapacity(size_t capacity, bool copy) {
+status_t CodecBuffer::EnsureCapacity(size_t capacity, bool copy) {
   buffer_->ensureCapacity(capacity, copy);
+  return OK;
 }
 
-void CodecBuffer::ResetBuffer(std::shared_ptr<Buffer>& buffer) {
+status_t CodecBuffer::ResetBuffer(std::shared_ptr<media::Buffer>& buffer) {
   buffer_ = buffer;
+  return OK;
 }
 
 }  // namespace media

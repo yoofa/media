@@ -23,25 +23,21 @@ class CodecBuffer {
                         // special sink can resolve real data
   };
 
-  CodecBuffer();
+  CodecBuffer(void* data, size_t size);
   CodecBuffer(size_t capacity);
-  ~CodecBuffer();
+  virtual ~CodecBuffer();
 
   // buffer operation
-  uint8_t* base();
-  uint8_t* data();
-  size_t capacity();
-  size_t size();
-  size_t offset();
-  void SetRange(size_t offset, size_t size);
-  void EnsureCapacity(size_t capacity, bool copy = false);
-  void ResetBuffer(std::shared_ptr<Buffer>& buffer);
+  virtual uint8_t* base();
+  virtual uint8_t* data();
+  virtual size_t capacity();
+  virtual size_t size();
+  virtual size_t offset();
 
-  void SetIndex(int32_t index) {
-    buffer_index_ = index;
-    buffer_type_ = BufferType::kTypeNormal;
-  }
-  int32_t index() const { return buffer_index_; }
+  virtual status_t SetRange(size_t offset, size_t size);
+  virtual status_t EnsureCapacity(size_t capacity, bool copy);
+
+  virtual status_t ResetBuffer(std::shared_ptr<media::Buffer>& buffer);
 
   void SetTextureId(int32_t texture_id) {
     texture_id_ = texture_id;
@@ -60,8 +56,7 @@ class CodecBuffer {
   std::shared_ptr<MediaMeta>& format() { return format_; }
 
  private:
-  std::shared_ptr<Buffer> buffer_;
-  int32_t buffer_index_;
+  std::shared_ptr<media::Buffer> buffer_;
   int32_t texture_id_;
   void* native_handle_;
   BufferType buffer_type_;
