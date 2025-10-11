@@ -60,10 +60,10 @@ int main(int argc, char** argv) {
 
     // Periodically check for available data
     if (packet_count % 100 == 0) {
-      // Check for video
+          // Check for video
       auto video_source = parser->GetSource(TSParser::VIDEO);
       if (video_source) {
-        std::shared_ptr<ave::media::MediaFrame> frame;
+        std::shared_ptr<MediaFrame> frame;
         while (video_source->Read(frame, nullptr) == OK) {
           ++video_frames;
           LOG(VERBOSE) << "Got video frame: size=" << frame->size()
@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
       // Check for audio
       auto audio_source = parser->GetSource(TSParser::AUDIO);
       if (audio_source) {
-        std::shared_ptr<ave::media::MediaFrame> frame;
+        std::shared_ptr<MediaFrame> frame;
         while (audio_source->Read(frame, nullptr) == OK) {
           ++audio_frames;
           LOG(VERBOSE) << "Got audio frame: size=" << frame->size()
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
   // Read remaining frames
   auto video_source = parser->GetSource(TSParser::VIDEO);
   if (video_source) {
-    std::shared_ptr<ave::media::MediaFrame> frame;
+    std::shared_ptr<MediaFrame> frame;
     while (video_source->Read(frame, nullptr) == OK) {
       ++video_frames;
     }
@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
 
   auto audio_source = parser->GetSource(TSParser::AUDIO);
   if (audio_source) {
-    std::shared_ptr<ave::media::MediaFrame> frame;
+    std::shared_ptr<MediaFrame> frame;
     while (audio_source->Read(frame, nullptr) == OK) {
       ++audio_frames;
     }

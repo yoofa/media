@@ -12,11 +12,12 @@
 
 #include <cstring>
 
+#include "base/bit_reader.h"
 #include "base/logging.h"
 #include "es_queue.h"
-#include "foundation/bit_reader.h"
 #include "foundation/buffer.h"
 #include "foundation/media_defs.h"
+#include "foundation/media_frame.h"
 #include "foundation/media_meta.h"
 #include "foundation/message.h"
 #include "packet_source.h"
@@ -157,8 +158,8 @@ class TSParser::Stream {
 
   status_t Parse(unsigned continuity_counter,
                  unsigned payload_unit_start_indicator,
-                 BitReader* br,
-                 TSParser::SyncEvent* event) {
+    base::BitReader* br,
+    TSParser::SyncEvent* event) {
     if (expected_continuity_counter_ >= 0 &&
         (unsigned)expected_continuity_counter_ != continuity_counter) {
       LOG(WARNING) << "Discontinuity on stream PID " << elementary_pid_;
@@ -231,7 +232,7 @@ class TSParser::Stream {
   uint64_t prev_pts_;
   std::unique_ptr<ESQueue> queue_;
 
-  status_t ParsePES(BitReader* br, TSParser::SyncEvent* event) {
+  status_t ParsePES(base::BitReader* br, TSParser::SyncEvent* event) {
     if (br->numBitsLeft() < 3 * 8) {
       return ERROR_MALFORMED;
     }
@@ -339,13 +340,12 @@ class TSParser::Stream {
         source_->QueueAccessUnit(access_unit);
 
         // Check if this is a sync frame
-        int64_t au_time_us;
-        if (access_unit->meta()->findInt64("timeUs", &au_time_us) && event &&
-            !event->HasReturnedData()) {
-          // This is a simplified check - in reality we'd need to parse the NAL
-          // units
-          event->Init(0, source_, au_time_us,
-                      IsVideo() ? SourceType::VIDEO : SourceType::AUDIO);
+        if (event && !event->HasReturnedData()) {
+          int64_t au_time_us = access_unit->pts().us();
+          if (au_time_us >= 0) {
+            event->Init(0, source_, au_time_us,
+                        IsVideo() ? SourceType::VIDEO : SourceType::AUDIO);
+          }
         }
 
         access_unit = queue_->DequeueAccessUnit();
@@ -378,7 +378,7 @@ class TSParser::Program {
         first_pts_valid_(false),
         first_pts_(0) {}
 
-  bool ParsePSISection(unsigned pid, BitReader* br, status_t* err) {
+  bool ParsePSISection(unsigned pid, base::BitReader* br, status_t* err) {
     *err = OK;
 
     if (pid == program_map_pid_) {
@@ -394,7 +394,7 @@ class TSParser::Program {
                 unsigned payload_unit_start_indicator,
                 unsigned transport_scrambling_control,
                 unsigned random_access_indicator,
-                BitReader* br,
+                base::BitReader* br,
                 status_t* err,
                 TSParser::SyncEvent* event) {
     *err = OK;
@@ -452,7 +452,7 @@ class TSParser::Program {
   bool first_pts_valid_;
   uint64_t first_pts_;
 
-  status_t ParseProgramMap(BitReader* br) {
+  status_t ParseProgramMap(base::BitReader* br) {
     // Simplified PMT parsing
     if (br->numBitsLeft() < 8 * 8) {
       return ERROR_MALFORMED;
@@ -557,11 +557,11 @@ status_t TSParser::FeedTSPacket(const void* data,
     return ERROR_MALFORMED;
   }
 
-  BitReader br(static_cast<const uint8_t*>(data), kTSPacketSize);
+  base::BitReader br(static_cast<const uint8_t*>(data), kTSPacketSize);
   return ParseTS(&br, event);
 }
 
-status_t TSParser::ParseTS(BitReader* br, SyncEvent* event) {
+status_t TSParser::ParseTS(base::BitReader* br, SyncEvent* event) {
   if (br->getBits(8) != 0x47) {
     LOG(ERROR) << "TS sync byte not found";
     return ERROR_MALFORMED;
@@ -602,7 +602,7 @@ status_t TSParser::ParseTS(BitReader* br, SyncEvent* event) {
   return err;
 }
 
-status_t TSParser::ParsePID(BitReader* br,
+status_t TSParser::ParsePID(base::BitReader* br,
                             unsigned pid,
                             unsigned continuity_counter,
                             unsigned payload_unit_start_indicator,
@@ -637,7 +637,7 @@ status_t TSParser::ParsePID(BitReader* br,
   return OK;
 }
 
-void TSParser::ParseProgramAssociationTable(BitReader* br) {
+void TSParser::ParseProgramAssociationTable(base::BitReader* br) {
   if (br->numBitsLeft() < 8 * 8) {
     return;
   }
@@ -687,7 +687,7 @@ void TSParser::ParseProgramAssociationTable(BitReader* br) {
   }
 }
 
-status_t TSParser::ParseAdaptationField(BitReader* br,
+status_t TSParser::ParseAdaptationField(base::BitReader* br,
                                         unsigned pid,
                                         unsigned* random_access_indicator) {
   *random_access_indicator = 0;

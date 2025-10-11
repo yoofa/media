@@ -22,8 +22,8 @@
 namespace ave {
 namespace media {
 
-class Buffer;
 class MediaMeta;
+class MediaFrame;
 
 namespace mpeg2ts {
 
@@ -66,7 +66,7 @@ class ESQueue {
   void SignalEOS();
   void Clear(bool clear_format);
 
-  std::shared_ptr<Buffer> DequeueAccessUnit();
+  std::shared_ptr<MediaFrame> DequeueAccessUnit();
 
   std::shared_ptr<MediaMeta> GetFormat();
 
@@ -100,17 +100,17 @@ class ESQueue {
     return (flags_ & kFlag_SampleEncryptedData) != 0;
   }
 
-  std::shared_ptr<Buffer> DequeueAccessUnitH264();
-  std::shared_ptr<Buffer> DequeueAccessUnitHEVC();
-  std::shared_ptr<Buffer> DequeueAccessUnitAAC();
-  std::shared_ptr<Buffer> DequeueAccessUnitEAC3();
-  std::shared_ptr<Buffer> DequeueAccessUnitAC3();
-  std::shared_ptr<Buffer> DequeueAccessUnitAC4();
-  std::shared_ptr<Buffer> DequeueAccessUnitMPEGAudio();
-  std::shared_ptr<Buffer> DequeueAccessUnitMPEGVideo();
-  std::shared_ptr<Buffer> DequeueAccessUnitMPEG4Video();
-  std::shared_ptr<Buffer> DequeueAccessUnitPCMAudio();
-  std::shared_ptr<Buffer> DequeueAccessUnitMetadata();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitH264();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitHEVC();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitAAC();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitEAC3();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitAC3();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitAC4();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitMPEGAudio();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitMPEGVideo();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitMPEG4Video();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitPCMAudio();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitMetadata();
 
   // consume a logical (compressed) access unit of size "size",
   // returns its timestamp in us (or -1 if no time information).

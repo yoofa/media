@@ -28,9 +28,32 @@ adapted to fit the coding style and architecture of this media library.
    - HLS Sample Decryptor - Android-specific DRM feature
    - Some advanced descrambling features
 
-## Components
+## Architecture
 
-### TSParser
+### Data Flow
+
+```
+TS Packets (188 bytes, raw Buffer)
+    ↓
+TSParser (parses PAT/PMT/PES)
+    ↓
+ESQueue (assembles elementary streams)
+    ↓
+MediaFrame (parsed access units with meta)
+    ↓
+PacketSource (buffered frames)
+    ↓
+MediaSource interface
+```
+
+**Key Design:**
+- **Buffer**: Used for raw TS packet data and intermediate ES data
+- **MediaFrame**: Used for parsed access units with metadata
+- **MediaMeta**: Embedded in MediaFrame for format information
+
+### Components
+
+#### TSParser
 
 Main MPEG2-TS parser class. Responsible for:
 - Parsing TS packets (188 bytes each)
@@ -38,29 +61,33 @@ Main MPEG2-TS parser class. Responsible for:
 - Extracting Program Map Table (PMT)
 - Managing elementary stream parsers
 - Handling PES (Packetized Elementary Stream) packets
+- Uses `base::BitReader` for bitstream parsing
 
-### ESQueue
+#### ESQueue
 
 Elementary Stream Queue. Responsible for:
-- Buffering elementary stream data
+- Buffering raw elementary stream data in `Buffer`
 - Assembling access units from ES data
+- Creating `MediaFrame` objects with metadata
 - Supporting multiple codec types:
   - Video: H.264/AVC, H.265/HEVC, MPEG-2, MPEG-4
   - Audio: AAC (ADTS), AC3, E-AC3, AC4, MPEG Audio
 
-### PacketSource
+#### PacketSource
 
 Packet source buffer. Responsible for:
-- Buffering decoded access units
+- Buffering `MediaFrame` objects (not raw buffers)
 - Managing discontinuities
 - Providing MediaSource interface
-- Thread-safe buffer management
+- Thread-safe frame management
+- Stores metadata in `MediaMeta` (not Message)
 
 ## Usage Example
 
 ```cpp
 #include "modules/mpeg2ts/ts_parser.h"
 
+using namespace ave::media;
 using namespace ave::media::mpeg2ts;
 
 // Create parser
@@ -78,20 +105,35 @@ for (size_t i = 0; i < packet_count; ++i) {
     }
 }
 
-// Get video source
+// Get video source (returns MediaSource with MediaFrame output)
 auto video_source = parser->GetSource(TSParser::VIDEO);
 if (video_source) {
-    // Read video frames
+    // Read video frames as MediaFrame
     std::shared_ptr<MediaFrame> frame;
     status_t err = video_source->Read(frame, nullptr);
-    // Process frame...
+    if (err == OK) {
+        // Frame metadata is in MediaMeta (part of MediaFrame)
+        int64_t pts_us = frame->pts().us();
+        uint32_t width = frame->width();
+        uint32_t height = frame->height();
+        const char* mime = frame->mime();
+        // Process frame data...
+        uint8_t* data = frame->data();
+        size_t size = frame->size();
+    }
 }
 
 // Get audio source
 auto audio_source = parser->GetSource(TSParser::AUDIO);
 if (audio_source) {
-    // Read audio samples
-    // ...
+    std::shared_ptr<MediaFrame> frame;
+    status_t err = audio_source->Read(frame, nullptr);
+    if (err == OK) {
+        int64_t pts_us = frame->pts().us();
+        uint32_t sample_rate = frame->sample_rate();
+        ChannelLayout channels = frame->channel_layout();
+        // Process audio data...
+    }
 }
 ```
 

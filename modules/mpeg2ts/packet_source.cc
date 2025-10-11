@@ -11,7 +11,6 @@
 #include "packet_source.h"
 
 #include "base/logging.h"
-#include "foundation/buffer.h"
 #include "foundation/media_defs.h"
 #include "foundation/media_frame.h"
 #include "foundation/media_meta.h"
@@ -72,38 +71,43 @@ std::shared_ptr<MediaMeta> PacketSource::GetFormat() {
     return format_;
   }
 
-  // Search for format in buffered access units
-  for (auto& buffer : buffers_) {
-    std::shared_ptr<Message> meta;
+  // Search for format in buffered frames
+  for (auto& frame : frames_) {
     // Check if this is not a discontinuity marker
-    if (!buffer->meta()->findMessage("discontinuity", meta)) {
-      std::shared_ptr<MediaMeta> format;
-      if (buffer->meta()->findObject("format", format)) {
-        SetFormat(format);
-        return format_;
-      }
+    if (frame->size() > 0) {
+      // Frames with data should have format information
+      SetFormat(std::make_shared<MediaMeta>(*frame));
+      return format_;
     }
   }
   return nullptr;
 }
 
-status_t PacketSource::DequeueAccessUnit(std::shared_ptr<Buffer>& buffer) {
-  buffer = nullptr;
+status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& frame) {
+  frame = nullptr;
 
   std::unique_lock<std::mutex> lock(lock_);
-  while (eos_result_ == OK && buffers_.empty()) {
+  while (eos_result_ == OK && frames_.empty()) {
     condition_.wait(lock);
   }
 
-  if (!buffers_.empty()) {
-    buffer = buffers_.front();
-    buffers_.pop_front();
+  if (!frames_.empty()) {
+    frame = frames_.front();
+    frames_.pop_front();
 
-    std::shared_ptr<Message> disc_msg;
-    int32_t discontinuity;
-    if (buffer->meta()->findMessage("discontinuity", disc_msg) &&
-        disc_msg->findInt32("type", &discontinuity)) {
-      if (WasFormatChange(discontinuity)) {
+    // Check if this is a discontinuity marker (empty frame with discontinuity flag)
+    int32_t discontinuity_type = 0;
+    bool is_discontinuity = false;
+    
+    // Use frame's built-in meta to check discontinuity
+    if (frame->size() == 0) {
+      // This might be a discontinuity marker
+      is_discontinuity = true;
+      discontinuity_type = static_cast<int32_t>(DiscontinuityType::TIME);
+    }
+
+    if (is_discontinuity) {
+      if (WasFormatChange(discontinuity_type)) {
         format_ = nullptr;
       }
 
@@ -113,17 +117,10 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<Buffer>& buffer) {
 
     DiscontinuitySegment& seg = discontinuity_segments_.front();
 
-    int64_t time_us;
-    latest_dequeued_meta_ = buffer->meta()->dup();
-    if (latest_dequeued_meta_->findInt64("timeUs", &time_us)) {
-      if (time_us > seg.max_deque_time_us_) {
-        seg.max_deque_time_us_ = time_us;
-      }
-    }
-
-    std::shared_ptr<MediaMeta> format;
-    if (buffer->meta()->findObject("format", format)) {
-      SetFormat(format);
+    int64_t time_us = frame->pts().us();
+    latest_dequeued_meta_ = std::make_shared<MediaMeta>(*frame);
+    if (time_us > seg.max_deque_time_us_) {
+      seg.max_deque_time_us_ = time_us;
     }
 
     return OK;
@@ -134,56 +131,7 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<Buffer>& buffer) {
 
 status_t PacketSource::Read(std::shared_ptr<MediaFrame>& frame,
                             const ReadOptions* /* options */) {
-  frame = nullptr;
-
-  std::unique_lock<std::mutex> lock(lock_);
-  while (eos_result_ == OK && buffers_.empty()) {
-    condition_.wait(lock);
-  }
-
-  if (!buffers_.empty()) {
-    std::shared_ptr<Buffer> buffer = buffers_.front();
-    buffers_.pop_front();
-
-    std::shared_ptr<Message> disc_msg;
-    int32_t discontinuity;
-    if (buffer->meta()->findMessage("discontinuity", disc_msg) &&
-        disc_msg->findInt32("type", &discontinuity)) {
-      if (WasFormatChange(discontinuity)) {
-        format_ = nullptr;
-      }
-
-      discontinuity_segments_.pop_front();
-      return INFO_DISCONTINUITY;
-    }
-
-    latest_dequeued_meta_ = buffer->meta()->dup();
-
-    std::shared_ptr<MediaMeta> format;
-    if (buffer->meta()->findObject("format", format)) {
-      SetFormat(format);
-    }
-
-    int64_t time_us;
-    if (buffer->meta()->findInt64("timeUs", &time_us)) {
-      DiscontinuitySegment& seg = discontinuity_segments_.front();
-      if (time_us > seg.max_deque_time_us_) {
-        seg.max_deque_time_us_ = time_us;
-      }
-    }
-
-    // Create MediaFrame from Buffer
-    frame = MediaFrame::CreateSharedAsCopy(buffer->data(), buffer->size(),
-                                           is_video_ ? MediaType::VIDEO
-                                                     : MediaType::AUDIO);
-    if (buffer->meta()->findInt64("timeUs", &time_us)) {
-      frame->SetPts(base::Timestamp::Micros(time_us));
-    }
-
-    return OK;
-  }
-
-  return eos_result_;
+  return DequeueAccessUnit(frame);
 }
 
 bool PacketSource::WasFormatChange(int32_t discontinuity_type) const {
@@ -200,18 +148,17 @@ bool PacketSource::WasFormatChange(int32_t discontinuity_type) const {
   return false;
 }
 
-void PacketSource::QueueAccessUnit(std::shared_ptr<Buffer> buffer) {
-  int32_t damaged;
-  if (buffer->meta()->findInt32("damaged", &damaged) && damaged) {
-    return;  // Discard damaged AU
+void PacketSource::QueueAccessUnit(std::shared_ptr<MediaFrame> frame) {
+  if (!frame) {
+    return;
   }
 
   std::lock_guard<std::mutex> lock(lock_);
-  buffers_.push_back(buffer);
+  frames_.push_back(frame);
   condition_.notify_one();
 
-  std::shared_ptr<Message> disc_msg;
-  if (buffer->meta()->findMessage("discontinuity", disc_msg)) {
+  // Check if this is a discontinuity marker
+  if (frame->size() == 0) {
     LOG(INFO) << "Queueing a discontinuity";
 
     last_queued_time_us_ = 0;
@@ -222,8 +169,8 @@ void PacketSource::QueueAccessUnit(std::shared_ptr<Buffer> buffer) {
     return;
   }
 
-  int64_t last_queued_time_us;
-  if (buffer->meta()->findInt64("timeUs", &last_queued_time_us)) {
+  int64_t last_queued_time_us = frame->pts().us();
+  if (last_queued_time_us >= 0) {
     last_queued_time_us_ = last_queued_time_us;
 
     DiscontinuitySegment& tail_seg = discontinuity_segments_.back();
@@ -235,7 +182,7 @@ void PacketSource::QueueAccessUnit(std::shared_ptr<Buffer> buffer) {
     }
   }
 
-  latest_enqueued_meta_ = buffer->meta()->dup();
+  latest_enqueued_meta_ = std::make_shared<MediaMeta>(*frame);
 }
 
 void PacketSource::QueueDiscontinuity(DiscontinuityType type,
@@ -244,16 +191,8 @@ void PacketSource::QueueDiscontinuity(DiscontinuityType type,
   std::lock_guard<std::mutex> lock(lock_);
 
   if (discard) {
-    // Leave only discontinuities in the queue
-    auto it = buffers_.begin();
-    while (it != buffers_.end()) {
-      std::shared_ptr<Message> disc_msg;
-      if (!(*it)->meta()->findMessage("discontinuity", disc_msg)) {
-        it = buffers_.erase(it);
-        continue;
-      }
-      ++it;
-    }
+    // Clear all frames
+    frames_.clear();
 
     for (auto& seg : discontinuity_segments_) {
       seg.Clear();
@@ -270,15 +209,11 @@ void PacketSource::QueueDiscontinuity(DiscontinuityType type,
 
   discontinuity_segments_.push_back(DiscontinuitySegment());
 
-  auto buffer = std::make_shared<Buffer>(0);
-  auto disc_msg = std::make_shared<Message>();
-  disc_msg->setInt32("type", static_cast<int32_t>(type));
-  if (extra) {
-    disc_msg->setMessage("extra", extra);
-  }
-  buffer->meta()->setMessage("discontinuity", disc_msg);
+  // Create a discontinuity marker (empty frame)
+  auto frame = MediaFrame::CreateShared(
+      0, is_video_ ? MediaType::VIDEO : MediaType::AUDIO);
 
-  buffers_.push_back(buffer);
+  frames_.push_back(frame);
   condition_.notify_one();
 }
 
@@ -299,7 +234,7 @@ bool PacketSource::HasBufferAvailable(status_t* final_result) {
   if (!enabled_) {
     return false;
   }
-  if (!buffers_.empty()) {
+  if (!frames_.empty()) {
     return true;
   }
 
@@ -314,9 +249,8 @@ bool PacketSource::HasDataBufferAvailable(status_t* final_result) {
     return false;
   }
 
-  for (const auto& buffer : buffers_) {
-    std::shared_ptr<Message> disc_msg;
-    if (!buffer->meta()->findMessage("discontinuity", disc_msg)) {
+  for (const auto& frame : frames_) {
+    if (frame->size() > 0) {
       return true;
     }
   }
@@ -332,8 +266,8 @@ size_t PacketSource::GetAvailableBufferCount(status_t* final_result) {
   if (!enabled_) {
     return 0;
   }
-  if (!buffers_.empty()) {
-    return buffers_.size();
+  if (!frames_.empty()) {
+    return frames_.size();
   }
   *final_result = eos_result_;
   return 0;
@@ -356,14 +290,12 @@ status_t PacketSource::NextBufferTime(int64_t* time_us) {
 
   std::lock_guard<std::mutex> lock(lock_);
 
-  if (buffers_.empty()) {
+  if (frames_.empty()) {
     return eos_result_ != OK ? eos_result_ : ERROR_IO;
   }
 
-  std::shared_ptr<Buffer> buffer = buffers_.front();
-  if (!buffer->meta()->findInt64("timeUs", time_us)) {
-    return ERROR_MALFORMED;
-  }
+  std::shared_ptr<MediaFrame> frame = frames_.front();
+  *time_us = frame->pts().us();
 
   return OK;
 }
@@ -380,12 +312,12 @@ bool PacketSource::IsFinished(int64_t duration) const {
   return (eos_result_ != OK);
 }
 
-std::shared_ptr<Message> PacketSource::GetLatestEnqueuedMeta() {
+std::shared_ptr<MediaMeta> PacketSource::GetLatestEnqueuedMeta() {
   std::lock_guard<std::mutex> lock(lock_);
   return latest_enqueued_meta_;
 }
 
-std::shared_ptr<Message> PacketSource::GetLatestDequeuedMeta() {
+std::shared_ptr<MediaMeta> PacketSource::GetLatestDequeuedMeta() {
   std::lock_guard<std::mutex> lock(lock_);
   return latest_dequeued_meta_;
 }
@@ -397,7 +329,7 @@ void PacketSource::Enable(bool enable) {
 
 void PacketSource::Clear() {
   std::lock_guard<std::mutex> lock(lock_);
-  buffers_.clear();
+  frames_.clear();
   format_ = nullptr;
   last_queued_time_us_ = 0;
   eos_result_ = OK;

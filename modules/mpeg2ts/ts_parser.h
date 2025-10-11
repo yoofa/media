@@ -23,8 +23,6 @@
 namespace ave {
 namespace media {
 
-class BitReader;
-class Buffer;
 class Message;
 
 namespace mpeg2ts {
@@ -146,11 +144,11 @@ class TSParser {
 
   size_t num_ts_packets_parsed_;
 
-  void ParseProgramAssociationTable(BitReader* br);
-  void ParseProgramMap(BitReader* br);
-  void ParsePES(BitReader* br, SyncEvent* event);
+  void ParseProgramAssociationTable(base::BitReader* br);
+  void ParseProgramMap(base::BitReader* br);
+  void ParsePES(base::BitReader* br, SyncEvent* event);
 
-  status_t ParsePID(BitReader* br,
+  status_t ParsePID(base::BitReader* br,
                     unsigned pid,
                     unsigned continuity_counter,
                     unsigned payload_unit_start_indicator,
@@ -158,11 +156,11 @@ class TSParser {
                     unsigned random_access_indicator,
                     SyncEvent* event);
 
-  status_t ParseAdaptationField(BitReader* br,
+  status_t ParseAdaptationField(base::BitReader* br,
                                 unsigned pid,
                                 unsigned* random_access_indicator);
 
-  status_t ParseTS(BitReader* br, SyncEvent* event);
+  status_t ParseTS(base::BitReader* br, SyncEvent* event);
 
   void UpdatePCR(unsigned pid, uint64_t pcr, uint64_t byte_offset_from_start);
 

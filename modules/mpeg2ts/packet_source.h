@@ -23,8 +23,8 @@
 namespace ave {
 namespace media {
 
-class Buffer;
 class MediaMeta;
+class MediaFrame;
 
 namespace mpeg2ts {
 
@@ -72,7 +72,7 @@ class PacketSource : public MediaSource {
 
   status_t NextBufferTime(int64_t* time_us);
 
-  void QueueAccessUnit(std::shared_ptr<Buffer> buffer);
+  void QueueAccessUnit(std::shared_ptr<MediaFrame> frame);
 
   void QueueDiscontinuity(DiscontinuityType type,
                           std::shared_ptr<Message> extra,
@@ -80,14 +80,14 @@ class PacketSource : public MediaSource {
 
   void SignalEOS(status_t result);
 
-  status_t DequeueAccessUnit(std::shared_ptr<Buffer>& buffer);
+  status_t DequeueAccessUnit(std::shared_ptr<MediaFrame>& frame);
 
   bool IsFinished(int64_t duration) const;
 
   void Enable(bool enable);
 
-  std::shared_ptr<Message> GetLatestEnqueuedMeta();
-  std::shared_ptr<Message> GetLatestDequeuedMeta();
+  std::shared_ptr<MediaMeta> GetLatestEnqueuedMeta();
+  std::shared_ptr<MediaMeta> GetLatestDequeuedMeta();
 
  private:
   struct DiscontinuitySegment {
@@ -108,10 +108,10 @@ class PacketSource : public MediaSource {
   bool enabled_;
   std::shared_ptr<MediaMeta> format_;
   int64_t last_queued_time_us_;
-  std::list<std::shared_ptr<Buffer>> buffers_;
+  std::list<std::shared_ptr<MediaFrame>> frames_;
   status_t eos_result_;
-  std::shared_ptr<Message> latest_enqueued_meta_;
-  std::shared_ptr<Message> latest_dequeued_meta_;
+  std::shared_ptr<MediaMeta> latest_enqueued_meta_;
+  std::shared_ptr<MediaMeta> latest_dequeued_meta_;
 
   std::list<DiscontinuitySegment> discontinuity_segments_;
 

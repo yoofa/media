@@ -32,6 +32,19 @@ modules/mpeg2ts/
 
 ## Key Changes
 
+### 0. Dependencies
+
+**Base Repository Integration:**
+- Uses `base::BitReader` from https://github.com/yoofa/base for bitstream parsing
+- Uses `base::logging.h` for LOG() macros
+- Removed local copies of BitReader and logging utilities
+
+**Buffer vs MediaFrame:**
+- `Buffer`: Used for raw TS data and intermediate elementary stream buffers
+- `MediaFrame`: Used for parsed access units with embedded metadata
+- `MediaMeta`: Replaces Message/AMessage for metadata storage
+- **Design Principle**: Raw data → Buffer, Parsed frame → MediaFrame
+
 ### 1. Naming Conventions
 
 | Android | AVE Media |
@@ -43,6 +56,7 @@ modules/mpeg2ts/
 | `ABuffer` | `Buffer` |
 | `AMessage` | `Message` |
 | `MetaData` | `MediaMeta` |
+| `ABitReader` | `base::BitReader` |
 
 ### 2. Namespace Changes
 
@@ -91,6 +105,36 @@ modules/mpeg2ts/
 - Replaced `KeyedVector<K,V>` with `std::map<K,V>`
 - Used range-based for loops
 - Used `nullptr` instead of `NULL`
+
+### 7. Metadata Architecture
+
+**Original Android:**
+```cpp
+sp<ABuffer> buffer = new ABuffer(size);
+sp<AMessage> meta = buffer->meta();
+meta->setInt64("timeUs", time_us);
+meta->setObject("format", format);
+```
+
+**AVE Media:**
+```cpp
+// For parsed frames (access units)
+auto frame = MediaFrame::CreateShared(size, MediaType::VIDEO);
+frame->SetPts(base::Timestamp::Micros(time_us));
+frame->SetMime(MEDIA_MIMETYPE_VIDEO_AVC);
+frame->SetWidth(width);
+// Meta is part of MediaFrame itself
+
+// For raw buffers (unparsed TS/ES data)
+auto buffer = std::make_shared<Buffer>(size);
+// No meta needed for raw data
+```
+
+**Rationale:**
+- `MediaFrame` combines data and metadata, cleaner API
+- No need for separate meta() call and Message/AMessage
+- Type-safe setters/getters for common fields
+- Follows existing foundation/media_frame design
 
 ## API Changes
 

@@ -13,10 +13,10 @@
 #include <cstring>
 
 #include "base/logging.h"
+#include "base/bit_reader.h"
 #include "foundation/avc_utils.h"
-#include "foundation/bit_reader.h"
-#include "foundation/buffer.h"
 #include "foundation/media_defs.h"
+#include "foundation/media_frame.h"
 #include "foundation/media_meta.h"
 
 namespace ave {
@@ -107,7 +107,7 @@ void ESQueue::SignalEOS() {
   eos_reached_ = true;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnit() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnit() {
   if ((flags_ & kFlag_AlignedData) != 0) {
     if (range_infos_.empty()) {
       return nullptr;
@@ -116,18 +116,23 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnit() {
     RangeInfo info = range_infos_.front();
     range_infos_.pop_front();
 
-    auto access_unit = std::make_shared<Buffer>(info.length_);
-    memcpy(access_unit->data(), buffer_->data(), info.length_);
-    access_unit->setRange(0, info.length_);
+    // Create MediaFrame
+    auto access_unit = MediaFrame::CreateSharedAsCopy(
+        buffer_->data(), info.length_,
+        (mode_ == Mode::H264 || mode_ == Mode::HEVC || 
+         mode_ == Mode::MPEG_VIDEO || mode_ == Mode::MPEG4_VIDEO)
+            ? MediaType::VIDEO
+            : MediaType::AUDIO);
+
+    // Set timestamp
+    if (info.timestamp_us_ >= 0) {
+      access_unit->SetPts(base::Timestamp::Micros(info.timestamp_us_));
+    }
 
     // Remove consumed data from buffer
     memmove(buffer_->data(), buffer_->data() + info.length_,
             buffer_->size() - info.length_);
     buffer_->setRange(0, buffer_->size() - info.length_);
-
-    if (info.timestamp_us_ >= 0) {
-      access_unit->meta()->setInt64("timeUs", info.timestamp_us_);
-    }
 
     return access_unit;
   }
@@ -197,7 +202,7 @@ int64_t ESQueue::FetchTimestamp(size_t size,
   return time_us;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitH264() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitH264() {
   if (buffer_ == nullptr || buffer_->size() == 0) {
     return nullptr;
   }
@@ -227,12 +232,11 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitH264() {
   if (!found_start) {
     if (eos_reached_) {
       // Return whatever we have
-      auto access_unit = std::make_shared<Buffer>(size);
-      memcpy(access_unit->data(), data, size);
-      access_unit->setRange(0, size);
+      auto access_unit =
+          MediaFrame::CreateSharedAsCopy(data, size, MediaType::VIDEO);
       int64_t time_us = FetchTimestamp(size);
       if (time_us >= 0) {
-        access_unit->meta()->setInt64("timeUs", time_us);
+        access_unit->SetPts(base::Timestamp::Micros(time_us));
       }
       buffer_->setRange(0, 0);
       return access_unit;
@@ -261,13 +265,12 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitH264() {
 
   // Extract the access unit
   size_t au_size = nal_end;
-  auto access_unit = std::make_shared<Buffer>(au_size);
-  memcpy(access_unit->data(), data, au_size);
-  access_unit->setRange(0, au_size);
+  auto access_unit =
+      MediaFrame::CreateSharedAsCopy(data, au_size, MediaType::VIDEO);
 
   int64_t time_us = FetchTimestamp(au_size);
   if (time_us >= 0) {
-    access_unit->meta()->setInt64("timeUs", time_us);
+    access_unit->SetPts(base::Timestamp::Micros(time_us));
   }
 
   // Remove consumed data
@@ -276,20 +279,22 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitH264() {
 
   // Initialize format if not set
   if (!format_) {
-    format_ = MediaMeta::CreatePtr(MediaType::VIDEO, MediaMeta::FormatType::kTrack);
+    format_ = MediaMeta::CreatePtr(MediaType::VIDEO,
+                                   MediaMeta::FormatType::kTrack);
     format_->SetMime(MEDIA_MIMETYPE_VIDEO_AVC);
+    access_unit->SetMime(MEDIA_MIMETYPE_VIDEO_AVC);
   }
 
   return access_unit;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitHEVC() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitHEVC() {
   // Similar to H264, but with HEVC NAL units
   // Simplified implementation
   return DequeueAccessUnitH264();  // Use H264 logic as placeholder
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitAAC() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitAAC() {
   if (buffer_ == nullptr || buffer_->size() < 7) {
     return nullptr;
   }
@@ -315,13 +320,12 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitAAC() {
       }
 
       // Extract the frame
-      auto access_unit = std::make_shared<Buffer>(frame_length);
-      memcpy(access_unit->data(), data + offset, frame_length);
-      access_unit->setRange(0, frame_length);
+      auto access_unit = MediaFrame::CreateSharedAsCopy(
+          data + offset, frame_length, MediaType::AUDIO);
 
       int64_t time_us = FetchTimestamp(frame_length + offset);
       if (time_us >= 0) {
-        access_unit->meta()->setInt64("timeUs", time_us);
+        access_unit->SetPts(base::Timestamp::Micros(time_us));
       }
 
       // Remove consumed data
@@ -331,12 +335,15 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitAAC() {
 
       // Initialize format if not set
       if (!format_) {
-        format_ = MediaMeta::CreatePtr(MediaType::AUDIO, MediaMeta::FormatType::kTrack);
+        format_ = MediaMeta::CreatePtr(MediaType::AUDIO,
+                                       MediaMeta::FormatType::kTrack);
         format_->SetMime(MEDIA_MIMETYPE_AUDIO_AAC);
+
         // Parse sample rate and channels from ADTS header
         uint8_t sampling_frequency_index = (data[offset + 2] & 0x3C) >> 2;
         uint8_t channel_configuration =
-            ((data[offset + 2] & 0x01) << 2) | ((data[offset + 3] & 0xC0) >> 6);
+            ((data[offset + 2] & 0x01) << 2) |
+            ((data[offset + 3] & 0xC0) >> 6);
 
         static const uint32_t kSamplingFrequencyTable[] = {
             96000, 88200, 64000, 48000, 44100, 32000, 24000,
@@ -344,14 +351,20 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitAAC() {
         };
 
         if (sampling_frequency_index < 13) {
-          format_->SetSampleRate(
-              kSamplingFrequencyTable[sampling_frequency_index]);
+          uint32_t sample_rate =
+              kSamplingFrequencyTable[sampling_frequency_index];
+          format_->SetSampleRate(sample_rate);
+          access_unit->SetSampleRate(sample_rate);
         }
 
         if (channel_configuration > 0 && channel_configuration <= 7) {
-          format_->SetChannelLayout(
-              static_cast<ChannelLayout>(channel_configuration));
+          ChannelLayout layout =
+              static_cast<ChannelLayout>(channel_configuration);
+          format_->SetChannelLayout(layout);
+          access_unit->SetChannelLayout(layout);
         }
+
+        access_unit->SetMime(MEDIA_MIMETYPE_AUDIO_AAC);
       }
 
       return access_unit;
@@ -361,12 +374,11 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitAAC() {
 
   if (eos_reached_ && size > 0) {
     // Return whatever we have
-    auto access_unit = std::make_shared<Buffer>(size);
-    memcpy(access_unit->data(), data, size);
-    access_unit->setRange(0, size);
+    auto access_unit =
+        MediaFrame::CreateSharedAsCopy(data, size, MediaType::AUDIO);
     int64_t time_us = FetchTimestamp(size);
     if (time_us >= 0) {
-      access_unit->meta()->setInt64("timeUs", time_us);
+      access_unit->SetPts(base::Timestamp::Micros(time_us));
     }
     buffer_->setRange(0, 0);
     return access_unit;
@@ -376,42 +388,42 @@ std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitAAC() {
 }
 
 // Placeholder implementations for other formats
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitAC3() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitAC3() {
   LOG(WARNING) << "AC3 dequeue not fully implemented";
   return nullptr;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitEAC3() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitEAC3() {
   LOG(WARNING) << "EAC3 dequeue not fully implemented";
   return nullptr;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitAC4() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitAC4() {
   LOG(WARNING) << "AC4 dequeue not fully implemented";
   return nullptr;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitMPEGAudio() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitMPEGAudio() {
   LOG(WARNING) << "MPEG Audio dequeue not fully implemented";
   return nullptr;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitMPEGVideo() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitMPEGVideo() {
   LOG(WARNING) << "MPEG Video dequeue not fully implemented";
   return nullptr;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitMPEG4Video() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitMPEG4Video() {
   LOG(WARNING) << "MPEG4 Video dequeue not fully implemented";
   return nullptr;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitPCMAudio() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitPCMAudio() {
   LOG(WARNING) << "PCM Audio dequeue not fully implemented";
   return nullptr;
 }
 
-std::shared_ptr<Buffer> ESQueue::DequeueAccessUnitMetadata() {
+std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitMetadata() {
   LOG(WARNING) << "Metadata dequeue not fully implemented";
   return nullptr;
 }
