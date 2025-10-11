@@ -39,6 +39,14 @@ class Buffer {
   void setInt32Data(int32_t data) { int32_data_ = data; }
   int32_t int32Data() const { return int32_data_; }
 
+  // Meta data support
+  std::shared_ptr<Message> meta() {
+    if (!meta_) {
+      meta_ = std::make_shared<Message>();
+    }
+    return meta_;
+  }
+
  private:
   std::unique_ptr<base::Buffer> buffer_;
 
@@ -49,6 +57,8 @@ class Buffer {
 
   int32_t int32_data_;
   bool owns_data_;
+
+  std::shared_ptr<Message> meta_;
 
   AVE_DISALLOW_COPY_AND_ASSIGN(Buffer);
 };
