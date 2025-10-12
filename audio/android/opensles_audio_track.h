@@ -4,6 +4,9 @@
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
 
+#include <memory>
+#include <vector>
+
 #include "media/audio/audio_track.h"
 
 namespace ave {
@@ -43,6 +46,7 @@ class OpenSLESAudioTrack : public AudioTrack {
                                   void* context);
   status_t CreatePlayer(const AudioConfig& config);
   void DestroyPlayer();
+  void OnBufferComplete();
 
   SLEngineItf engine_engine_;
   SLObjectItf output_mix_object_;
@@ -53,7 +57,15 @@ class OpenSLESAudioTrack : public AudioTrack {
   SLAndroidSimpleBufferQueueItf player_buffer_queue_ = nullptr;
 
   AudioConfig config_;
+  AudioCallback callback_ = nullptr;
+  void* cookie_ = nullptr;
   bool is_playing_ = false;
+
+  // Callback mode support
+  static constexpr size_t kNumBuffers = 2;
+  std::vector<std::unique_ptr<uint8_t[]>> callback_buffers_;
+  size_t buffer_size_ = 0;
+  size_t current_buffer_index_ = 0;
 };
 
 }  // namespace android

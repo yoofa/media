@@ -107,7 +107,30 @@ status_t OpenSLESAudioTrack::Open(audio_config_t config,
                                   AudioCallback cb,
                                   void* cookie) {
   config_ = config;
-  return CreatePlayer(config);
+  callback_ = cb;
+  cookie_ = cookie;
+
+  status_t result = CreatePlayer(config);
+  if (result != OK) {
+    return result;
+  }
+
+  // Initialize callback buffers if callback mode is enabled
+  if (callback_) {
+    // Calculate buffer size: 10ms of audio data
+    auto channel_count = ChannelLayoutToChannelCount(config.channel_layout);
+    size_t bytes_per_sample = 2;  // Assuming 16-bit PCM
+    buffer_size_ =
+        (config.sample_rate / 100) * channel_count * bytes_per_sample;
+
+    callback_buffers_.resize(kNumBuffers);
+    for (size_t i = 0; i < kNumBuffers; ++i) {
+      callback_buffers_[i].reset(new uint8_t[buffer_size_]);
+    }
+    current_buffer_index_ = 0;
+  }
+
+  return OK;
 }
 
 status_t OpenSLESAudioTrack::CreatePlayer(const AudioConfig& config) {
@@ -200,6 +223,14 @@ status_t OpenSLESAudioTrack::Start() {
   }
 
   is_playing_ = true;
+
+  // Prime the buffer queue in callback mode
+  if (callback_ && callback_buffers_.size() > 0) {
+    for (size_t i = 0; i < kNumBuffers; ++i) {
+      OnBufferComplete();
+    }
+  }
+
   return OK;
 }
 
@@ -239,6 +270,13 @@ void OpenSLESAudioTrack::Close() {
   }
 
   DestroyPlayer();
+
+  // Clean up callback buffers
+  callback_buffers_.clear();
+  buffer_size_ = 0;
+  current_buffer_index_ = 0;
+  callback_ = nullptr;
+  cookie_ = nullptr;
 }
 
 void OpenSLESAudioTrack::Flush() {
@@ -275,7 +313,34 @@ void OpenSLESAudioTrack::BufferQueueCallback(
     SLAndroidSimpleBufferQueueItf caller,
     void* context) {
   // This callback is called when a buffer has finished playing
-  // We could implement buffer recycling here if needed
+  OpenSLESAudioTrack* track = static_cast<OpenSLESAudioTrack*>(context);
+  if (track && track->callback_) {
+    track->OnBufferComplete();
+  }
+}
+
+void OpenSLESAudioTrack::OnBufferComplete() {
+  if (!callback_ || !is_playing_ || callback_buffers_.empty()) {
+    return;
+  }
+
+  // Get the next buffer
+  uint8_t* buffer = callback_buffers_[current_buffer_index_].get();
+
+  // Request data from callback
+  callback_(this, buffer, buffer_size_, cookie_, CB_EVENT_FILL_BUFFER);
+
+  // Enqueue the filled buffer
+  SLresult result = (*player_buffer_queue_)
+                        ->Enqueue(player_buffer_queue_, buffer, buffer_size_);
+  if (result != SL_RESULT_SUCCESS) {
+    AVE_LOG(LS_WARNING) << "Failed to enqueue buffer in callback mode: "
+                        << result;
+    return;
+  }
+
+  // Move to next buffer
+  current_buffer_index_ = (current_buffer_index_ + 1) % kNumBuffers;
 }
 
 }  // namespace android
