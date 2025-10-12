@@ -10,7 +10,9 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <cstring>
 #include <memory>
+#include <string>
 
 #include "base/task_util/repeating_task.h"
 #include "base/task_util/task_runner.h"
@@ -50,14 +52,16 @@ AudioDevice::PlatformType DetectPlatform() {
 }
 
 void PrintUsage(const char* program) {
-  fprintf(stderr,
-          "Usage: %s [options] <input_file>\n"
-          "Options:\n"
-          "  -f <format>      Audio format in hex (e.g. 0x1 for PCM16bit)\n"
-          "  -s <sample_rate> Sample rate in Hz\n"
-          "  -c <channels>    Number of channels\n"
-          "  -p <platform>    Platform type (default: auto detect)\n",
-          program);
+  fprintf(
+      stderr,
+      "Usage: %s [options] <input_file>\n"
+      "Options:\n"
+      "  -f <format>      Audio format in hex (e.g. 0x1 for PCM16bit)\n"
+      "  -s <sample_rate> Sample rate in Hz\n"
+      "  -c <channels>    Number of channels\n"
+      "  -p <platform>    Platform type (default: auto detect)\n"
+      "  -m <mode>        Playback mode: sink or callback (default: sink)\n",
+      program);
 }
 }  // namespace
 
@@ -157,14 +161,82 @@ class SinkPlayer {
   std::atomic<bool> started_{false};
 };
 
+class CallbackPlayer {
+ public:
+  CallbackPlayer(std::shared_ptr<AudioTrack> track,
+                 FILE* file,
+                 const AudioConfig& config,
+                 size_t io_buffer_size)
+      : track_(std::move(track)), file_(file), config_(config) {
+    (void)io_buffer_size;  // Unused in callback mode
+  }
+
+  ~CallbackPlayer() { Stop(); }
+
+  ave::status_t Start() {
+    if (started_.exchange(true)) {
+      return ave::ALREADY_EXISTS;
+    }
+
+    auto callback = [this](AudioTrack* audio_track, void* buffer, size_t size,
+                           void* cookie, AudioTrack::cb_event_t event) {
+      this->OnAudioCallback(audio_track, buffer, size, cookie, event);
+    };
+
+    if (track_->Open(config_, callback, this) != ave::OK) {
+      return ave::INVALID_OPERATION;
+    }
+    if (track_->Start() != ave::OK) {
+      return ave::INVALID_OPERATION;
+    }
+
+    return ave::OK;
+  }
+
+  void Stop() {
+    if (!started_.load()) {
+      return;
+    }
+    track_->Stop();
+    track_->Close();
+    started_.store(false);
+  }
+
+ private:
+  void OnAudioCallback(AudioTrack* audio_track,
+                       void* buffer,
+                       size_t size,
+                       void* cookie,
+                       AudioTrack::cb_event_t event) {
+    if (event == AudioTrack::CB_EVENT_FILL_BUFFER) {
+      size_t bytes_read = fread(buffer, 1, size, file_);
+      if (bytes_read < size) {
+        // Pad with silence if reached end of file
+        memset(static_cast<uint8_t*>(buffer) + bytes_read, 0,
+               size - bytes_read);
+      }
+    } else if (event == AudioTrack::CB_EVENT_STREAM_END) {
+      AVE_LOG(LS_INFO) << "Stream end event received";
+    } else if (event == AudioTrack::CB_EVENT_TEAR_DOWN) {
+      AVE_LOG(LS_INFO) << "Tear down event received";
+    }
+  }
+
+  std::shared_ptr<AudioTrack> track_;
+  FILE* file_;
+  AudioConfig config_{};
+  std::atomic<bool> started_{false};
+};
+
 int main(int argc, char* argv[]) {
   int opt = 0;
   uint32_t format = 0;
   int sample_rate = 0;
   int channels = 0;
   auto platform = AudioDevice::PlatformType::kDefault;
+  std::string mode = "sink";
 
-  while ((opt = getopt(argc, argv, "f:s:c:p:h")) != -1) {
+  while ((opt = getopt(argc, argv, "f:s:c:p:m:h")) != -1) {
     switch (opt) {
       case 'f':
         format = strtol(optarg, nullptr, 16);
@@ -191,6 +263,14 @@ int main(int argc, char* argv[]) {
         }
         break;
       }
+      case 'm':
+        mode = optarg;
+        if (mode != "sink" && mode != "callback") {
+          fprintf(stderr, "Unknown mode: %s\n", optarg);
+          PrintUsage(argv[0]);
+          return 1;
+        }
+        break;
       case 'h':
       default:
         PrintUsage(argv[0]);
@@ -249,18 +329,35 @@ int main(int argc, char* argv[]) {
   }
 
   const size_t buffer_size = 4096;
-  SinkPlayer player(audio_track, fp, config, buffer_size);
-  if (player.Start() != ave::OK) {
-    fprintf(stderr, "Error: Failed to start sink player\n");
-    fclose(fp);
-    return 1;
+
+  if (mode == "sink") {
+    SinkPlayer player(audio_track, fp, config, buffer_size);
+    if (player.Start() != ave::OK) {
+      fprintf(stderr, "Error: Failed to start sink player\n");
+      fclose(fp);
+      return 1;
+    }
+
+    while (g_running) {
+      usleep(1000 * 100);
+    }
+
+    player.Stop();
+  } else {  // callback mode
+    CallbackPlayer player(audio_track, fp, config, buffer_size);
+    if (player.Start() != ave::OK) {
+      fprintf(stderr, "Error: Failed to start callback player\n");
+      fclose(fp);
+      return 1;
+    }
+
+    while (g_running) {
+      usleep(1000 * 100);
+    }
+
+    player.Stop();
   }
 
-  while (g_running) {
-    usleep(1000 * 100);
-  }
-
-  player.Stop();
   fclose(fp);
 
   return 0;
