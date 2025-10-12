@@ -12,8 +12,11 @@
 #include <sys/ioctl.h>
 #include <sys/soundcard.h>
 
+#include <atomic>
 #include <memory>
 
+#include "base/task_util/repeating_task.h"
+#include "base/task_util/task_runner.h"
 #include "base/types.h"
 #include "media/audio/audio.h"
 #include "media/audio/audio_track.h"
@@ -56,6 +59,7 @@ class AlsaAudioTrack : public AudioTrack {
   status_t SetHWParams();
   status_t SetSWParams();
   status_t RecoverIfNeeded(int error);
+  uint64_t CallbackThreadFunc();
 
   AlsaSymbolTable* symbol_table_;
   snd_pcm_t* handle_;
@@ -69,6 +73,12 @@ class AlsaAudioTrack : public AudioTrack {
   snd_pcm_uframes_t period_size_;
   snd_pcm_uframes_t buffer_size_;
   uint64_t frames_written_;
+
+  // Callback mode support
+  std::unique_ptr<uint8_t[]> callback_buffer_;
+  std::unique_ptr<base::TaskRunner> task_runner_;
+  base::RepeatingTaskHandle repeating_task_;
+  std::atomic<bool> callback_running_;
 };
 
 }  // namespace linux_audio

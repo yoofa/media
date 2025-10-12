@@ -10,6 +10,9 @@
 #include <algorithm>
 
 #include "base/logging.h"
+#include "base/task_util/repeating_task.h"
+#include "base/task_util/task_runner.h"
+#include "base/task_util/task_runner_stdlib.h"
 #include "media/audio/linux/alsa_symbol_table.h"
 
 #define LATE(sym) LATESYM_GET(AlsaSymbolTable, symbol_table_, sym)
@@ -34,7 +37,9 @@ AlsaAudioTrack::AlsaAudioTrack(AlsaSymbolTable* symbol_table)
       playing_(false),
       period_size_(0),
       buffer_size_(0),
-      frames_written_(0) {}
+      frames_written_(0),
+      callback_buffer_(nullptr),
+      callback_running_(false) {}
 
 AlsaAudioTrack::~AlsaAudioTrack() {
   Close();
@@ -163,6 +168,16 @@ status_t AlsaAudioTrack::Open(audio_config_t config,
   if (err < 0) {
     Close();
     return err;
+  }
+
+  // Initialize callback mode if callback is provided
+  if (callback_) {
+    size_t buffer_bytes = period_size_ * frameSize();
+    callback_buffer_.reset(new uint8_t[buffer_bytes]);
+
+    task_runner_ = std::make_unique<base::TaskRunner>(
+        base::CreateTaskRunnerStdlibFactory()->CreateTaskRunner(
+            "alsa_callback", base::TaskRunnerFactory::Priority::HIGH));
   }
 
   ready_ = true;
@@ -357,10 +372,17 @@ status_t AlsaAudioTrack::Start() {
     return err;
   }
 
-  err = LATE(snd_pcm_start)(handle_);
-  if (err < 0) {
-    AVE_LOG(LS_ERROR) << "Cannot start audio: " << LATE(snd_strerror)(err);
-    return err;
+  // Start callback thread if callback mode
+  if (callback_) {
+    callback_running_.store(true);
+    repeating_task_ = base::RepeatingTaskHandle::Start(
+        task_runner_->Get(), [this]() { return CallbackThreadFunc(); });
+  } else {
+    err = LATE(snd_pcm_start)(handle_);
+    if (err < 0) {
+      AVE_LOG(LS_ERROR) << "Cannot start audio: " << LATE(snd_strerror)(err);
+      return err;
+    }
   }
 
   playing_ = true;
@@ -374,6 +396,12 @@ void AlsaAudioTrack::Stop() {
 
   if (!playing_) {
     return;
+  }
+
+  // Stop callback thread first
+  if (callback_) {
+    callback_running_.store(false);
+    repeating_task_.Stop();
   }
 
   LATE(snd_pcm_drop)(handle_);
@@ -402,8 +430,77 @@ void AlsaAudioTrack::Close() {
     LATE(snd_pcm_close)(handle_);
     handle_ = nullptr;
   }
+
+  callback_buffer_.reset();
+  task_runner_.reset();
+
   ready_ = false;
   playing_ = false;
+}
+
+uint64_t AlsaAudioTrack::CallbackThreadFunc() {
+  if (!callback_running_.load() || !playing_) {
+    return 0;
+  }
+
+  // Check available space in the buffer
+  snd_pcm_sframes_t avail = LATE(snd_pcm_avail_update)(handle_);
+  if (avail < 0) {
+    if (RecoverIfNeeded(avail) < 0) {
+      AVE_LOG(LS_ERROR) << "Cannot recover from error: "
+                        << LATE(snd_strerror)(avail);
+      return 1000;  // Retry after 1ms
+    }
+    return 0;
+  }
+
+  // If there's enough space for at least one period, request data via callback
+  if (avail >= static_cast<snd_pcm_sframes_t>(period_size_)) {
+    size_t buffer_bytes = period_size_ * frameSize();
+
+    // Request data from callback
+    callback_(this, callback_buffer_.get(), buffer_bytes, cookie_,
+              CB_EVENT_FILL_BUFFER);
+
+    // Write the filled buffer to ALSA
+    snd_pcm_uframes_t frames_to_write = period_size_;
+    const uint8_t* data = callback_buffer_.get();
+
+    while (frames_to_write > 0 && callback_running_.load()) {
+      snd_pcm_sframes_t ret =
+          LATE(snd_pcm_writei)(handle_, data, frames_to_write);
+
+      if (ret == -EAGAIN) {
+        LATE(snd_pcm_wait)(handle_, 10);
+        continue;
+      }
+
+      if (ret < 0) {
+        if (RecoverIfNeeded(ret) < 0) {
+          AVE_LOG(LS_ERROR) << "Write error: " << LATE(snd_strerror)(ret);
+          return 1000;
+        }
+        continue;
+      }
+
+      frames_to_write -= ret;
+      data += ret * frameSize();
+      frames_written_ += ret;
+    }
+
+    // Check PCM state and start if needed
+    snd_pcm_state_t state = LATE(snd_pcm_state)(handle_);
+    if (state == SND_PCM_STATE_PREPARED) {
+      int err = LATE(snd_pcm_start)(handle_);
+      if (err < 0) {
+        AVE_LOG(LS_ERROR) << "Cannot start PCM: " << LATE(snd_strerror)(err);
+      }
+    }
+
+    return 0;  // Continue immediately to check for more data
+  }
+
+  return 1000;  // Wait 1ms before checking again
 }
 
 }  // namespace linux_audio
