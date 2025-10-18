@@ -62,6 +62,29 @@ ave_library("avc_util") {
     "avc_utils.cc",
     "avc_utils.h",
   ]
+  deps = [
+    ":bit_reader",
+    ":media_buffer",
+  ]
+}
+
+ave_library("aac_util") {
+  sources = [
+    "aac_utils.cc",
+    "aac_utils.h",
+  ]
+}
+
+ave_library("framing_queue") {
+  sources = [
+    "framing_queue.cc",
+    "framing_queue.h",
+  ]
+  deps = [
+    ":aac_util",
+    ":avc_util",
+    ":media_frame",
+  ]
 }
 
 ave_library("hevc_util") {
