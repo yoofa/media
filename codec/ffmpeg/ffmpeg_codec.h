@@ -33,22 +33,15 @@ class FFmpegCodec : public Codec {
   status_t Flush() override;
   status_t Release() override;
 
-  std::vector<std::shared_ptr<CodecBuffer>> InputBuffers() override;
-  std::vector<std::shared_ptr<CodecBuffer>> OutputBuffers() override;
-
   status_t GetInputBuffer(size_t index,
                           std::shared_ptr<CodecBuffer>& buffer) override;
   status_t GetOutputBuffer(size_t index,
                            std::shared_ptr<CodecBuffer>& buffer) override;
 
-  std::shared_ptr<CodecBuffer> DequeueInputBuffer(int32_t index,
-                                                  int64_t timeout_ms) override;
-  status_t QueueInputBuffer(std::shared_ptr<CodecBuffer>& buffer,
-                            int64_t timeout_ms) override;
-  std::shared_ptr<CodecBuffer> DequeueOutputBuffer(int32_t index,
-                                                   int64_t timeout_ms) override;
-  status_t ReleaseOutputBuffer(std::shared_ptr<CodecBuffer>& buffer,
-                               bool render) override;
+  ssize_t DequeueInputBuffer(int64_t timeout_ms) override;
+  status_t QueueInputBuffer(size_t index) override;
+  ssize_t DequeueOutputBuffer(int64_t timeout_ms) override;
+  status_t ReleaseOutputBuffer(size_t index, bool render) override;
 
   bool IsEncoder() const { return is_encoder_; }
 

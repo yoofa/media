@@ -389,30 +389,41 @@ void ConfigureAudioCodec(MediaMeta* format, AVCodecContext* codec_context) {
   codec_context->codec_id = ConvertToFFmpegCodecId(format->codec());
 
   auto bits_per_sample = format->bits_per_sample();
-  switch (bits_per_sample) {
-    case 8: {
-      codec_context->sample_fmt = AV_SAMPLE_FMT_U8;
-      break;
+  if (bits_per_sample > 0) {
+    switch (bits_per_sample) {
+      case 8: {
+        codec_context->sample_fmt = AV_SAMPLE_FMT_U8;
+        break;
+      }
+      case 16: {
+        codec_context->sample_fmt = AV_SAMPLE_FMT_S16;
+        break;
+      }
+      case 32: {
+        codec_context->sample_fmt = AV_SAMPLE_FMT_S32;
+        break;
+      }
+      default: {
+        AVE_LOG(LS_WARNING)
+            << "Unsupported bits per sample: " << bits_per_sample;
+        codec_context->sample_fmt = AV_SAMPLE_FMT_NONE;
+      }
     }
-    case 16: {
-      codec_context->sample_fmt = AV_SAMPLE_FMT_S16;
-      break;
-    }
-    case 32: {
-      codec_context->sample_fmt = AV_SAMPLE_FMT_S32;
-      break;
-    }
-    default: {
-      AVE_LOG(LS_WARNING) << "Unsupported bits per sample: " << bits_per_sample;
-      codec_context->sample_fmt = AV_SAMPLE_FMT_NONE;
-    }
+  } else {
+    // For decoders, let FFmpeg determine the sample format from the bitstream
+    codec_context->sample_fmt = AV_SAMPLE_FMT_NONE;
   }
 
-  codec_context->sample_rate = static_cast<int>(format->sample_rate());
+  auto sample_rate = format->sample_rate();
+  if (sample_rate > 0) {
+    codec_context->sample_rate = static_cast<int>(sample_rate);
+  }
 
-  auto ch_count = ChannelLayoutToChannelCount(format->channel_layout());
-  // codec_context->channels = ch_count;
-  av_channel_layout_default(&codec_context->ch_layout, ch_count);
+  auto channel_layout = format->channel_layout();
+  if (channel_layout != CHANNEL_LAYOUT_NONE) {
+    auto ch_count = ChannelLayoutToChannelCount(channel_layout);
+    av_channel_layout_default(&codec_context->ch_layout, ch_count);
+  }
   // TODO: extra data
 }
 

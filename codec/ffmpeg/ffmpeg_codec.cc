@@ -13,6 +13,11 @@
 
 #include "../../modules/ffmpeg/ffmpeg_utils.h"
 
+extern "C" {
+#include <libavutil/imgutils.h>
+#include <libavutil/samplefmt.h>
+}
+
 namespace ave {
 namespace media {
 
@@ -61,12 +66,12 @@ status_t FFmpegCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
 
     // TODO: use buffer cnt in config
     input_buffers_ = std::vector<BufferEntry>(kMaxInputBuffers);
-    for (auto& entry : input_buffers_) {
-      entry.buffer = std::make_shared<CodecBuffer>(1);
+    for (size_t i = 0; i < input_buffers_.size(); ++i) {
+      input_buffers_[i].buffer = std::make_shared<CodecBuffer>(1);
     }
     output_buffers_ = std::vector<BufferEntry>(kMaxOutputBuffers);
-    for (auto& entry : output_buffers_) {
-      entry.buffer = std::make_shared<CodecBuffer>(1);
+    for (size_t i = 0; i < output_buffers_.size(); ++i) {
+      output_buffers_[i].buffer = std::make_shared<CodecBuffer>(1);
     }
 
     if (avcodec_open2(codec_ctx_, codec_, nullptr) < 0) {
@@ -87,23 +92,6 @@ status_t FFmpegCodec::SetCallback(CodecCallback* callback) {
     callback_ = callback;
   });
   return OK;
-}
-
-std::vector<std::shared_ptr<CodecBuffer>> FFmpegCodec::InputBuffers() {
-  std::vector<std::shared_ptr<CodecBuffer>> buffers;
-  std::lock_guard<std::mutex> lock(lock_);
-  for (auto& entry : input_buffers_) {
-    buffers.push_back(entry.buffer);
-  }
-  return buffers;
-}
-std::vector<std::shared_ptr<CodecBuffer>> FFmpegCodec::OutputBuffers() {
-  std::vector<std::shared_ptr<CodecBuffer>> buffers;
-  std::lock_guard<std::mutex> lock(lock_);
-  for (auto& entry : output_buffers_) {
-    buffers.push_back(entry.buffer);
-  }
-  return buffers;
 }
 
 status_t FFmpegCodec::GetInputBuffer(size_t index,
@@ -163,29 +151,21 @@ status_t FFmpegCodec::Release() {
   return OK;
 }
 
-std::shared_ptr<CodecBuffer> FFmpegCodec::DequeueInputBuffer(
-    int32_t index,
-    int64_t timeout_ms) {
-  auto dequeue_buffer = [this, index]() -> std::shared_ptr<CodecBuffer> {
+ssize_t FFmpegCodec::DequeueInputBuffer(int64_t timeout_ms) {
+  auto dequeue_index = [this]() -> ssize_t {
     std::lock_guard<std::mutex> lock(lock_);
-    if (index < 0) {
-      for (auto& entry : input_buffers_) {
-        if (!entry.in_use) {
-          entry.in_use = true;
-          return entry.buffer;
-        }
+    for (size_t i = 0; i < input_buffers_.size(); ++i) {
+      if (!input_buffers_[i].in_use) {
+        input_buffers_[i].in_use = true;
+        return static_cast<ssize_t>(i);
       }
-    } else if (static_cast<size_t>(index) < input_buffers_.size() &&
-               !input_buffers_[index].in_use) {
-      input_buffers_[index].in_use = true;
-      return input_buffers_[index].buffer;
     }
-    return nullptr;
+    return -1;
   };
 
-  auto buffer = dequeue_buffer();
-  if (buffer || timeout_ms == 0) {
-    return buffer;
+  ssize_t index = dequeue_index();
+  if (index >= 0 || timeout_ms == 0) {
+    return index;
   }
 
   std::unique_lock<std::mutex> lock(lock_);
@@ -197,55 +177,45 @@ std::shared_ptr<CodecBuffer> FFmpegCodec::DequeueInputBuffer(
   auto end =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
 
-  cv_.wait_until(lock, end, [&buffer, &dequeue_buffer]() {
-    buffer = dequeue_buffer();
-    return buffer != nullptr;
+  cv_.wait_until(lock, end, [&index, &dequeue_index]() {
+    index = dequeue_index();
+    return index >= 0;
   });
 
-  return buffer;
+  return index;
 }
 
-status_t FFmpegCodec::QueueInputBuffer(std::shared_ptr<CodecBuffer>& buffer,
-                                       int64_t timeout_ms AVE_MAYBE_UNUSED) {
-  status_t ret = OK;
-  task_runner_->PostTaskAndWait([this, &ret, &buffer]() {
+status_t FFmpegCodec::QueueInputBuffer(size_t index) {
+  std::lock_guard<std::mutex> lock(lock_);
+  if (index >= input_buffers_.size() || !input_buffers_[index].in_use) {
+    return INVALID_OPERATION;
+  }
+
+  input_queue_.push(index);
+
+  // Trigger processing on task runner
+  task_runner_->PostTask([this]() {
     AVE_DCHECK_RUN_ON(task_runner_.get());
-    std::lock_guard<std::mutex> lock(lock_);
-    size_t index = buffer->index();
-    if (index >= input_buffers_.size() ||
-        (index >= 0 && !input_buffers_[index].in_use)) {
-      ret = INVALID_OPERATION;
-      return;
-    }
-
-    // TODO: index = -1, buffer is not from input_buffers_ in this codec, copy
-    // it to an available input buffer
-
-    input_queue_.push(index);
     Process();
-    ret = OK;
   });
-  return ret;
+
+  return OK;
 }
 
-std::shared_ptr<CodecBuffer> FFmpegCodec::DequeueOutputBuffer(
-    int32_t index,
-    int64_t timeout_ms) {
-  auto dequeue_buffer = [this, index]() -> std::shared_ptr<CodecBuffer> {
+ssize_t FFmpegCodec::DequeueOutputBuffer(int64_t timeout_ms) {
+  auto dequeue_index = [this]() -> ssize_t {
     std::lock_guard<std::mutex> lock(lock_);
     if (!output_queue_.empty()) {
       size_t front_index = output_queue_.front();
-      if (index < 0 || static_cast<size_t>(index) == front_index) {
-        output_queue_.pop();
-        return output_buffers_[front_index].buffer;
-      }
+      output_queue_.pop();
+      return static_cast<ssize_t>(front_index);
     }
-    return nullptr;
+    return -1;
   };
 
-  auto buffer = dequeue_buffer();
-  if (buffer || timeout_ms == 0) {
-    return buffer;
+  ssize_t index = dequeue_index();
+  if (index >= 0 || timeout_ms == 0) {
+    return index;
   }
 
   std::unique_lock<std::mutex> lock(lock_);
@@ -257,21 +227,19 @@ std::shared_ptr<CodecBuffer> FFmpegCodec::DequeueOutputBuffer(
   auto end =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
 
-  cv_.wait_until(lock, end, [&buffer, &dequeue_buffer]() {
-    buffer = dequeue_buffer();
-    return buffer != nullptr;
+  cv_.wait_until(lock, end, [&index, &dequeue_index]() {
+    index = dequeue_index();
+    return index >= 0;
   });
 
-  return buffer;
+  return index;
 }
 
-status_t FFmpegCodec::ReleaseOutputBuffer(std::shared_ptr<CodecBuffer>& buffer,
-                                          bool render) {
+status_t FFmpegCodec::ReleaseOutputBuffer(size_t index, bool render) {
   status_t ret = OK;
-  task_runner_->PostTaskAndWait([this, &ret, &buffer, render]() {
+  task_runner_->PostTaskAndWait([this, &ret, index, render]() {
     AVE_DCHECK_RUN_ON(task_runner_.get());
     std::lock_guard<std::mutex> lock(lock_);
-    size_t index = buffer->index();
     if (index >= output_buffers_.size() || !output_buffers_[index].in_use) {
       ret = INVALID_OPERATION;
       return;
@@ -359,11 +327,54 @@ void FFmpegCodec::MaybeReceiveFrame() {
     return;
   }
 
-  // auto& buffer = output_buffers_[index].buffer;
-  //  TODO: Copy frame data to buffer
-  //  This will depend on the pixel format and other codec specifics
-  //  buffer->setSize(...);
-  //  buffer->setPresentationTimeUs(frame->pts);
+  // Copy frame data to buffer
+  auto& buffer = output_buffers_[index].buffer;
+
+  if (codec_ctx_->codec_type == AVMEDIA_TYPE_AUDIO) {
+    // Audio: copy PCM data
+    int data_size = av_samples_get_buffer_size(
+        nullptr, frame->ch_layout.nb_channels, frame->nb_samples,
+        static_cast<AVSampleFormat>(frame->format), 1);
+
+    if (data_size > 0) {
+      buffer->EnsureCapacity(data_size, false);
+
+      // For planar audio, need to interleave
+      if (av_sample_fmt_is_planar(static_cast<AVSampleFormat>(frame->format))) {
+        int channels = frame->ch_layout.nb_channels;
+        int samples = frame->nb_samples;
+        int bytes_per_sample =
+            av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format));
+
+        uint8_t* dst = buffer->data();
+        for (int sample = 0; sample < samples; sample++) {
+          for (int ch = 0; ch < channels; ch++) {
+            std::memcpy(dst, frame->data[ch] + sample * bytes_per_sample,
+                        bytes_per_sample);
+            dst += bytes_per_sample;
+          }
+        }
+      } else {
+        // Packed audio, direct copy
+        std::memcpy(buffer->data(), frame->data[0], data_size);
+      }
+      buffer->SetRange(0, data_size);
+    }
+  } else if (codec_ctx_->codec_type == AVMEDIA_TYPE_VIDEO) {
+    // Video: copy YUV data
+    int data_size =
+        av_image_get_buffer_size(static_cast<AVPixelFormat>(frame->format),
+                                 frame->width, frame->height, 1);
+
+    if (data_size > 0) {
+      buffer->EnsureCapacity(data_size, false);
+      av_image_copy_to_buffer(
+          buffer->data(), data_size, const_cast<const uint8_t**>(frame->data),
+          frame->linesize, static_cast<AVPixelFormat>(frame->format),
+          frame->width, frame->height, 1);
+      buffer->SetRange(0, data_size);
+    }
+  }
 
   output_buffers_[index].in_use = true;
   output_queue_.push(index);
@@ -376,15 +387,8 @@ void FFmpegCodec::Process() {
   MaybeSendPacket();
   MaybeReceiveFrame();
 
-  // run next process interval_ms later
-  // calculate delay_ms later
-  int delay_ms = 10;
-  task_runner_->PostDelayedTask(
-      [this]() {
-        AVE_DCHECK_RUN_ON(task_runner_.get());
-        Process();
-      },
-      delay_ms);
+  // Don't schedule next process here - let it be triggered by input/output
+  // events This avoids blocking PostTaskAndWait calls
 }
 
 void FFmpegCodec::OnInputBufferAvailable(size_t index) {
