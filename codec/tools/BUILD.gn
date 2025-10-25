@@ -1,0 +1,33 @@
+import("//base/build/ave.gni")
+
+ave_executable("ave_encode") {
+  sources = [ "ave_encode.cc" ]
+  deps = [
+    "//base:logging",
+    "//base:utils",
+    "//media/audio:audio_channel_layout",
+    "//media/codec:codec_buffer",
+    "//media/codec:codec_factory",
+    "//media/codec:codec_id",
+    "//media/codec:codec_interface",
+    "//media/codec/ffmpeg:ffmpeg_codec",
+    "//media/foundation:media_meta",
+  ]
+}
+
+ave_executable("ave_decode") {
+  sources = [ "ave_decode.cc" ]
+  deps = [
+    "//base:logging",
+    "//base:utils",
+    "//media/audio:audio_channel_layout",
+    "//media/codec:codec_buffer",
+    "//media/codec:codec_factory",
+    "//media/codec:codec_id",
+    "//media/codec:codec_interface",
+    "//media/codec/ffmpeg:ffmpeg_codec",
+    "//media/foundation:aac_util",
+    "//media/foundation:framing_queue",
+    "//media/foundation:media_meta",
+  ]
+}

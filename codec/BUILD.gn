@@ -1,7 +1,11 @@
 import("//base/build/ave.gni")
 
 group("codec") {
-  deps = [ "ffmpeg:ffmpeg_codec_example" ]
+  deps = [
+    "ffmpeg:ffmpeg_codec_example",
+    "tools:ave_decode",
+    "tools:ave_encode",
+  ]
 }
 
 ave_library("audio_codec_properity") {
@@ -31,5 +35,17 @@ ave_library("codec_interface") {
   sources = [
     "./codec.h",
     "./codec_factory.h",
+  ]
+}
+
+ave_library("codec_factory") {
+  sources = [
+    "codec_factory.cc",
+    "codec_factory.h",
+  ]
+  deps = [
+    ":codec_id",
+    ":codec_interface",
+    "//base:utils",
   ]
 }
