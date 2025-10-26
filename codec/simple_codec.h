@@ -39,9 +39,11 @@ class SimpleCodec : public Codec {
   status_t GetOutputBuffer(size_t index,
                            std::shared_ptr<CodecBuffer>& buffer) override;
 
-  ssize_t DequeueInputBuffer(int64_t timeout_ms) NO_THREAD_SAFETY_ANALYSIS override;
+  ssize_t DequeueInputBuffer(int64_t timeout_ms)
+      NO_THREAD_SAFETY_ANALYSIS override;
   status_t QueueInputBuffer(size_t index) override;
-  ssize_t DequeueOutputBuffer(int64_t timeout_ms) NO_THREAD_SAFETY_ANALYSIS override;
+  ssize_t DequeueOutputBuffer(int64_t timeout_ms)
+      NO_THREAD_SAFETY_ANALYSIS override;
   status_t ReleaseOutputBuffer(size_t index, bool render) override;
 
   bool IsEncoder() const { return is_encoder_; }
