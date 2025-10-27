@@ -49,3 +49,31 @@ ave_library("codec_factory") {
     "//base:utils",
   ]
 }
+
+ave_library("simple_codec") {
+  sources = [
+    "simple_codec.cc",
+    "simple_codec.h",
+  ]
+  deps = [
+    ":codec_buffer",
+    ":codec_interface",
+    "../foundation:media_meta",
+    "//base:task_util",
+    "//base:utils",
+  ]
+}
+
+ave_library("simple_passthrough_codec") {
+  sources = [
+    "simple_passthrough_codec.cc",
+    "simple_passthrough_codec.h",
+  ]
+  deps = [
+    ":codec_buffer",
+    ":simple_codec",
+    "../foundation:media_meta",
+    "//base:logging",
+    "//base:utils",
+  ]
+}

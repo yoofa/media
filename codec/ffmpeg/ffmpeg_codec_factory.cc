@@ -18,7 +18,11 @@ extern "C" {
 namespace ave {
 namespace media {
 
-FFmpegCodecFactory::FFmpegCodecFactory() = default;
+FFmpegCodecFactory::FFmpegCodecFactory() {}
+FFmpegCodecFactory::FFmpegCodecFactory(bool use_simple_codec) {
+  // Note: use_simple_codec parameter is now ignored since we only have one
+  // implementation
+}
 FFmpegCodecFactory::~FFmpegCodecFactory() = default;
 
 std::shared_ptr<Codec> FFmpegCodecFactory::CreateCodecByType(CodecId codec_id,
@@ -47,7 +51,8 @@ std::shared_ptr<Codec> FFmpegCodecFactory::CreateCodecByName(
     return nullptr;
   }
 
-  return std::make_shared<FFmpegCodec>(codec, av_codec_is_encoder(codec));
+  bool encoder = av_codec_is_encoder(codec);
+  return std::make_shared<FFmpegCodec>(codec, encoder);
 }
 
 std::shared_ptr<Codec> FFmpegCodecFactory::CreateCodecByMime(

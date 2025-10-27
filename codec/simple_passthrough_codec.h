@@ -15,13 +15,13 @@ namespace media {
 
 /**
  * SimplePassthroughCodec - A simple passthrough codec implementation
- * 
+ *
  * This codec does no actual encoding or decoding. Data goes in and comes out
  * unchanged. It's useful for:
  * - Testing the codec framework
  * - Benchmarking codec overhead
  * - Template for implementing other simple codecs
- * 
+ *
  * The workflow is simple:
  * Input buffer -> Copy to output buffer -> Done
  */

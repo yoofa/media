@@ -16,6 +16,9 @@ namespace media {
 class FFmpegCodecFactory : public CodecFactory {
  public:
   FFmpegCodecFactory();
+  // Note: use_simple_codec parameter is kept for backward compatibility but
+  // ignored
+  explicit FFmpegCodecFactory(bool use_simple_codec);
   ~FFmpegCodecFactory() override;
 
   std::vector<CodecInfo> GetSupportedCodecs() override;

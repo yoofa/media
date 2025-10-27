@@ -14,6 +14,7 @@ ave_library("ffmpeg_codec") {
     "//base:timeutils",
     "//media/codec:codec_buffer",
     "//media/codec:codec_interface",
+    "//media/codec:simple_codec",
     "//third_party/ffmpeg",
   ]
 }
