@@ -13,6 +13,16 @@ executable("looper_test") {
   deps = [
     "..:foundation",
     "//test:test_support",
+ave_source_set("message_test") {
+  testonly = true
+  sources = [ "message_unittest.cc" ]
+  deps = [
+    "..:handler",
+    "..:media_buffer",
+    "..:media_meta",
+    "//test:test_support",
+  ]
+}
   ]
 }
 

@@ -1,0 +1,43 @@
+import("//base/build/ave.gni")
+
+ave_source_set("es_queue_test") {
+  testonly = true
+  sources = [ "es_queue_unittest.cc" ]
+  deps = [
+    "..:mpeg2ts",
+    "//media/foundation:media_frame",
+    "//media/foundation:media_meta",
+    "//test:test_support",
+  ]
+}
+
+ave_source_set("packet_source_test") {
+  testonly = true
+  sources = [ "packet_source_unittest.cc" ]
+  deps = [
+    "..:mpeg2ts",
+    "//media/foundation:media_defs",
+    "//media/foundation:media_frame",
+    "//media/foundation:media_meta",
+    "//test:test_support",
+  ]
+}
+
+ave_source_set("ts_parser_test") {
+  testonly = true
+  sources = [ "ts_parser_unittest.cc" ]
+  deps = [
+    "..:mpeg2ts",
+    "//media/foundation:media_frame",
+    "//test:test_support",
+  ]
+}
+
+group("mpeg2ts_tests") {
+  testonly = true
+  deps = [
+    ":es_queue_test",
+    ":packet_source_test",
+    ":ts_parser_test",
+  ]
+}

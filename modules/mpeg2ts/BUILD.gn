@@ -24,3 +24,9 @@ source_set("mpeg2ts") {
     "//media/foundation",
   ]
 }
+
+# Tests
+ave_library("test_sources") {
+  testonly = true
+  deps = [ "test:mpeg2ts_tests" ]
+}
