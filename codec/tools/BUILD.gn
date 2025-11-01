@@ -10,6 +10,7 @@ ave_executable("ave_encode") {
     "//media/codec:codec_factory",
     "//media/codec:codec_id",
     "//media/codec:codec_interface",
+    "//media/codec:simple_passthrough_codec",
     "//media/codec/ffmpeg:ffmpeg_codec",
     "//media/foundation:media_meta",
   ]
@@ -25,9 +26,22 @@ ave_executable("ave_decode") {
     "//media/codec:codec_factory",
     "//media/codec:codec_id",
     "//media/codec:codec_interface",
+    "//media/codec:simple_passthrough_codec",
     "//media/codec/ffmpeg:ffmpeg_codec",
     "//media/foundation:aac_util",
     "//media/foundation:framing_queue",
+    "//media/foundation:media_meta",
+  ]
+}
+
+ave_executable("ave_passthrough") {
+  sources = [ "ave_passthrough.cc" ]
+  deps = [
+    "//base:logging",
+    "//base:utils",
+    "//media/codec:codec_buffer",
+    "//media/codec:codec_interface",
+    "//media/codec:simple_passthrough_codec",
     "//media/foundation:media_meta",
   ]
 }

@@ -20,6 +20,7 @@
 #include "media/codec/codec_factory.h"
 #include "media/codec/codec_id.h"
 #include "media/codec/ffmpeg/ffmpeg_codec_factory.h"
+#include "media/codec/simple_passthrough_codec.h"
 #include "media/foundation/media_meta.h"
 
 using namespace ave;
@@ -39,7 +40,8 @@ class EncoderCallback : public CodecCallback {
     output_available_indices_.push_back(index);
   }
 
-  void OnOutputFormatChanged(const std::shared_ptr<MediaMeta>& format) override {
+  void OnOutputFormatChanged(
+      const std::shared_ptr<MediaMeta>& format) override {
     AVE_LOG(LS_INFO) << "Output format changed";
   }
 
@@ -58,14 +60,26 @@ class EncoderCallback : public CodecCallback {
 };
 
 void PrintUsage(const char* program_name) {
-  std::cout << "Usage: " << program_name
-            << " --type <codec_type> <input_file> <output_file>\n";
-  std::cout << "Codec types:\n";
+  std::cout
+      << "Usage: " << program_name
+      << " --type <codec_type> [--passthrough] <input_file> <output_file>\n";
+  std::cout << "\nCodec types:\n";
   std::cout << "  Audio: aac, opus, mp3\n";
   std::cout << "  Video: h264, h265, vp8, vp9\n";
-  std::cout << "\nExample:\n";
+  std::cout << "\nOptions:\n";
+  std::cout
+      << "  --passthrough  Use SimplePassthroughCodec (no actual encoding)\n";
+  std::cout << "\nExamples:\n";
+  std::cout << "  # Normal encoding (FFmpeg)\n";
   std::cout << "  " << program_name << " --type aac input.pcm output.aac\n";
-  std::cout << "  " << program_name << " --type h264 input.yuv output.h264\n";
+  std::cout << "\n  # Passthrough mode (PCM frames passthrough, no encoding)\n";
+  std::cout << "  " << program_name
+            << " --type aac --passthrough input.pcm output.pcm\n";
+  std::cout << "\n  # Passthrough mode (YUV frames passthrough, no encoding)\n";
+  std::cout << "  " << program_name
+            << " --type h264 --passthrough input.yuv output.yuv\n";
+  std::cout << "\nNote: In passthrough mode, data is copied frame by frame "
+               "without encoding.\n";
 }
 
 CodecId GetCodecIdFromType(const std::string& type) {
@@ -93,23 +107,27 @@ bool IsAudioCodec(CodecId codec_id) {
 }
 
 int main(int argc, char** argv) {
-  // Initialize codec factory
-  auto ffmpeg_factory = std::make_shared<FFmpegCodecFactory>();
-  RegisterCodecFactory(ffmpeg_factory);
-
   if (argc < 4) {
     PrintUsage(argv[0]);
     return 1;
   }
 
+  ave::base::LogMessage::LogToDebug(ave::base::LogSeverity::LS_INFO);
+
   std::string codec_type;
   std::string input_file;
   std::string output_file;
+  bool use_passthrough = false;
 
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--type" && i + 1 < argc) {
       codec_type = argv[++i];
+    } else if (arg == "--simple") {
+      // Kept for backward compatibility, but ignored
+      continue;
+    } else if (arg == "--passthrough") {
+      use_passthrough = true;
     } else if (input_file.empty()) {
       input_file = arg;
     } else if (output_file.empty()) {
@@ -128,14 +146,28 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  AVE_LOG(LS_INFO) << "Encoding " << input_file << " to " << output_file
-                   << " using codec: " << codec_type;
-
   // Create codec
-  auto codec = CreateCodecByType(codec_id, true);
-  if (!codec) {
-    AVE_LOG(LS_ERROR) << "Failed to create encoder for codec: " << codec_type;
-    return 1;
+  std::shared_ptr<Codec> codec;
+
+  if (use_passthrough) {
+    // Use passthrough codec (no actual encoding, but uses same data flow)
+    AVE_LOG(LS_INFO) << "Using SimplePassthroughCodec with type " << codec_type
+                     << ": " << input_file << " -> " << output_file;
+    codec = std::make_shared<SimplePassthroughCodec>(true);
+  } else {
+    // Initialize codec factory
+    // Initialize codec factory (FFmpeg codec)
+    auto ffmpeg_factory = std::make_shared<FFmpegCodecFactory>();
+    RegisterCodecFactory(ffmpeg_factory);
+
+    AVE_LOG(LS_INFO) << "Encoding " << input_file << " to " << output_file
+                     << " using codec: " << codec_type;
+
+    codec = CreateCodecByType(codec_id, true);
+    if (!codec) {
+      AVE_LOG(LS_ERROR) << "Failed to create encoder for codec: " << codec_type;
+      return 1;
+    }
   }
 
   // Open input and output files
@@ -212,9 +244,10 @@ int main(int argc, char** argv) {
             input_buffer->EnsureCapacity(bytes_read, true);
             std::memcpy(input_buffer->data(), read_buffer.data(), bytes_read);
             input_buffer->SetRange(0, bytes_read);
-            
+
             auto meta = std::make_shared<MediaMeta>();
-            meta->SetDuration(base::TimeDelta::Micros(frame_count * 1000000 / 30));
+            meta->SetDuration(
+                base::TimeDelta::Micros(frame_count * 1000000 / 30));
             input_buffer->format() = meta;
 
             result = codec->QueueInputBuffer(input_index);
@@ -247,8 +280,7 @@ int main(int argc, char** argv) {
         size_t size = output_buffer->size();
 
         if (size > 0) {
-          output.write(reinterpret_cast<const char*>(
-                           output_buffer->data()),
+          output.write(reinterpret_cast<const char*>(output_buffer->data()),
                        size);
           AVE_LOG(LS_VERBOSE) << "Wrote " << size << " bytes to output";
         }

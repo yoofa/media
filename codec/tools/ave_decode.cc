@@ -20,6 +20,7 @@
 #include "media/codec/codec_factory.h"
 #include "media/codec/codec_id.h"
 #include "media/codec/ffmpeg/ffmpeg_codec_factory.h"
+#include "media/codec/simple_passthrough_codec.h"
 #include "media/foundation/aac_utils.h"
 #include "media/foundation/framing_queue.h"
 #include "media/foundation/media_meta.h"
@@ -61,14 +62,29 @@ class DecoderCallback : public CodecCallback {
 };
 
 void PrintUsage(const char* program_name) {
-  std::cout << "Usage: " << program_name
-            << " --type <codec_type> <input_file> <output_file>\n";
-  std::cout << "Codec types:\n";
+  std::cout
+      << "Usage: " << program_name
+      << " --type <codec_type> [--passthrough] <input_file> <output_file>\n";
+  std::cout << "\nCodec types:\n";
   std::cout << "  Audio: aac, opus, mp3\n";
   std::cout << "  Video: h264, h265, vp8, vp9\n";
-  std::cout << "\nExample:\n";
+  std::cout << "\nOptions:\n";
+  std::cout
+      << "  --passthrough  Use SimplePassthroughCodec (no actual decoding)\n";
+  std::cout << "\nExamples:\n";
+  std::cout << "  # Normal decoding (FFmpeg)\n";
   std::cout << "  " << program_name << " --type aac input.aac output.pcm\n";
-  std::cout << "  " << program_name << " --type h264 input.h264 output.yuv\n";
+  std::cout << "\n  # Passthrough mode (AAC frames passthrough, no decoding)\n";
+  std::cout << "  " << program_name
+            << " --type aac --passthrough input.aac output.aac\n";
+  std::cout
+      << "\n  # Passthrough mode (H264 frames passthrough, no decoding)\n";
+  std::cout << "  " << program_name
+            << " --type h264 --passthrough input.h264 output.h264\n";
+  std::cout
+      << "\nNote: In passthrough mode, frames are extracted but not decoded.\n";
+  std::cout << "      The output will be the same format as input (frame by "
+               "frame).\n";
 }
 
 CodecId GetCodecIdFromType(const std::string& type) {
@@ -114,23 +130,26 @@ FramingQueue::CodecType GetFramingCodecType(const std::string& type) {
 }
 
 int main(int argc, char** argv) {
-  // Initialize codec factory
-  auto ffmpeg_factory = std::make_shared<FFmpegCodecFactory>();
-  RegisterCodecFactory(ffmpeg_factory);
-
-  if (argc < 4) {
+  if (argc < 3) {
     PrintUsage(argv[0]);
     return 1;
   }
+  ave::base::LogMessage::LogToDebug(ave::base::LogSeverity::LS_VERBOSE);
 
   std::string codec_type;
   std::string input_file;
   std::string output_file;
+  bool use_passthrough = false;
 
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--type" && i + 1 < argc) {
       codec_type = argv[++i];
+    } else if (arg == "--simple") {
+      // Kept for backward compatibility, but ignored
+      continue;
+    } else if (arg == "--passthrough") {
+      use_passthrough = true;
     } else if (input_file.empty()) {
       input_file = arg;
     } else if (output_file.empty()) {
@@ -138,25 +157,52 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (codec_type.empty() || input_file.empty() || output_file.empty()) {
+  if (input_file.empty() || output_file.empty()) {
     PrintUsage(argv[0]);
     return 1;
   }
 
-  CodecId codec_id = GetCodecIdFromType(codec_type);
-  if (codec_id == CodecId::AVE_CODEC_ID_NONE) {
-    AVE_LOG(LS_ERROR) << "Unknown codec type: " << codec_type;
+  // For passthrough mode, codec type is still needed for framing
+  if (use_passthrough && codec_type.empty()) {
+    AVE_LOG(LS_ERROR)
+        << "Codec type is required for --passthrough mode (for frame parsing)";
+    PrintUsage(argv[0]);
     return 1;
   }
 
-  AVE_LOG(LS_INFO) << "Decoding " << input_file << " to " << output_file
-                   << " using codec: " << codec_type;
-
   // Create codec
-  auto codec = CreateCodecByType(codec_id, false);
-  if (!codec) {
-    AVE_LOG(LS_ERROR) << "Failed to create decoder for codec: " << codec_type;
-    return 1;
+  std::shared_ptr<Codec> codec;
+
+  if (use_passthrough) {
+    // Use passthrough codec (no actual decoding, but uses same data flow)
+    AVE_LOG(LS_INFO) << "Using SimplePassthroughCodec with type " << codec_type
+                     << ": " << input_file << " -> " << output_file;
+    codec = std::make_shared<SimplePassthroughCodec>(false);
+  } else {
+    // Initialize codec factory (FFmpeg codec)
+    auto ffmpeg_factory = std::make_shared<FFmpegCodecFactory>();
+    RegisterCodecFactory(ffmpeg_factory);
+
+    if (codec_type.empty()) {
+      AVE_LOG(LS_ERROR) << "Codec type is required";
+      PrintUsage(argv[0]);
+      return 1;
+    }
+
+    CodecId codec_id = GetCodecIdFromType(codec_type);
+    if (codec_id == CodecId::AVE_CODEC_ID_NONE) {
+      AVE_LOG(LS_ERROR) << "Unknown codec type: " << codec_type;
+      return 1;
+    }
+
+    AVE_LOG(LS_INFO) << "Decoding " << input_file << " to " << output_file
+                     << " using codec: " << codec_type;
+
+    codec = CreateCodecByType(codec_id, false);
+    if (!codec) {
+      AVE_LOG(LS_ERROR) << "Failed to create decoder for codec: " << codec_type;
+      return 1;
+    }
   }
 
   // Open input and output files
@@ -176,63 +222,69 @@ int main(int argc, char** argv) {
   auto config = std::make_shared<CodecConfig>();
   auto format = std::make_shared<MediaMeta>();
 
+  // Get codec ID for both passthrough and normal modes
+  CodecId codec_id = GetCodecIdFromType(codec_type);
   bool is_audio = IsAudioCodec(codec_id);
 
-  // Set codec ID - decoder will determine other parameters from the bitstream
+  // Set codec ID (needed for framing queue type detection)
   format->SetCodec(codec_id);
+  format->SetStreamType(is_audio ? MediaType::AUDIO : MediaType::VIDEO);
 
-  if (is_audio) {
-    format->SetStreamType(MediaType::AUDIO);
-    // For AAC with ADTS, we need to parse the first frame to get audio info
-    if (codec_type == "aac") {
-      // Read a small amount of data to parse ADTS header
-      const size_t header_buffer_size = 1024;
-      std::vector<uint8_t> header_buffer(header_buffer_size);
-      input.read(reinterpret_cast<char*>(header_buffer.data()),
-                 header_buffer_size);
-      size_t bytes_read = input.gcount();
+  if (!use_passthrough) {
+    // For real codec, parse format parameters
+    if (is_audio) {
+      // For AAC with ADTS, we need to parse the first frame to get audio info
+      if (codec_type == "aac") {
+        // Read a small amount of data to parse ADTS header
+        const size_t header_buffer_size = 1024;
+        std::vector<uint8_t> header_buffer(header_buffer_size);
+        input.read(reinterpret_cast<char*>(header_buffer.data()),
+                   header_buffer_size);
+        size_t bytes_read = input.gcount();
 
-      if (bytes_read >= 7) {
-        const uint8_t* data = header_buffer.data();
-        size_t size = bytes_read;
-        const uint8_t* frameStart = nullptr;
-        size_t frameSize = 0;
+        if (bytes_read >= 7) {
+          const uint8_t* data = header_buffer.data();
+          size_t size = bytes_read;
+          const uint8_t* frameStart = nullptr;
+          size_t frameSize = 0;
 
-        if (GetNextAACFrame(&data, &size, &frameStart, &frameSize) == OK) {
-          ADTSHeader adts_header{};
-          if (ParseADTSHeader(frameStart, frameSize, &adts_header) == OK) {
-            uint32_t sample_rate =
-                GetSamplingRate(adts_header.sampling_freq_index);
-            uint8_t channel_count = GetChannelCount(adts_header.channel_config);
+          if (GetNextAACFrame(&data, &size, &frameStart, &frameSize) == OK) {
+            ADTSHeader adts_header{};
+            if (ParseADTSHeader(frameStart, frameSize, &adts_header) == OK) {
+              uint32_t sample_rate =
+                  GetSamplingRate(adts_header.sampling_freq_index);
+              uint8_t channel_count =
+                  GetChannelCount(adts_header.channel_config);
 
-            AVE_LOG(LS_INFO) << "Detected AAC format: " << sample_rate << "Hz, "
-                             << channel_count << " channels";
+              AVE_LOG(LS_INFO) << "Detected AAC format: " << sample_rate
+                               << "Hz, " << channel_count << " channels";
 
-            format->SetSampleRate(sample_rate);
-            // Map channel count to channel layout
-            if (channel_count == 1) {
-              format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
-            } else if (channel_count == 2) {
-              format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
-            } else {
-              AVE_LOG(LS_WARNING)
-                  << "Unsupported channel count: " << channel_count;
-              format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+              format->SetSampleRate(sample_rate);
+              // Map channel count to channel layout
+              if (channel_count == 1) {
+                format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
+              } else if (channel_count == 2) {
+                format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+              } else {
+                AVE_LOG(LS_WARNING)
+                    << "Unsupported channel count: " << channel_count;
+                format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+              }
             }
           }
         }
-      }
 
-      // Reset file position to beginning
-      input.clear();
-      input.seekg(0, std::ios::beg);
+        // Reset file position to beginning
+        input.clear();
+        input.seekg(0, std::ios::beg);
+      }
+      // For decoders, don't set other parameters
+      // Let the decoder detect them from the bitstream
+    } else {
+      format->SetStreamType(MediaType::VIDEO);
+      // For decoders, don't set width/height etc.
+      // Let the decoder detect them from the bitstream
     }
-    // For decoders, don't set other parameters
-    // Let the decoder detect them from the bitstream
-  } else {
-    format->SetStreamType(MediaType::VIDEO);
-    // For decoders, don't set width/height etc.
-    // Let the decoder detect them from the bitstream
   }
 
   config->format = format;
@@ -263,93 +315,84 @@ int main(int argc, char** argv) {
   FramingQueue::CodecType framing_type = GetFramingCodecType(codec_type);
   FramingQueue framing_queue(framing_type);
 
-  // Read input and feed to framing queue, then decode frames
+  // Main decode loop
   const size_t buffer_size = 65536;
   std::vector<uint8_t> read_buffer(buffer_size);
   bool input_eos = false;
   bool eos_sent = false;
+  bool output_eos = false;
   int64_t frame_count = 0;
-  int64_t packet_count = 0;
+  int64_t output_frame_count = 0;
 
-  while (!eos_sent || framing_queue.HasFrame() ||
-         !callback.output_available_indices_.empty()) {
-    // Read more data from input file
-    if (!input_eos && !input.eof()) {
+  AVE_LOG(LS_INFO) << "Starting decode loop";
+
+  while (!output_eos) {
+    // Step 1: Try to queue input buffer if we have data
+    bool input_queued = false;
+
+    // Read more data from file if framing queue is low
+    if (!input_eos && framing_queue.FrameCount() < 5) {
       input.read(reinterpret_cast<char*>(read_buffer.data()), buffer_size);
       size_t bytes_read = input.gcount();
 
       if (bytes_read > 0) {
-        // Push data to framing queue
         framing_queue.PushData(read_buffer.data(), bytes_read);
-        AVE_LOG(LS_INFO) << "Pushed " << bytes_read
-                         << " bytes to framing queue, frame count: "
-                         << framing_queue.FrameCount();
-        packet_count++;
+        AVE_LOG(LS_VERBOSE)
+            << "Pushed " << bytes_read << " bytes to framing queue";
       }
 
       if (input.eof()) {
         input_eos = true;
-        AVE_LOG(LS_INFO) << "Input end of stream, read " << packet_count
-                         << " packets";
+        AVE_LOG(LS_INFO) << "Input end of stream reached";
       }
     }
 
-    // Feed frames to decoder
-    while (framing_queue.HasFrame()) {
-      AVE_LOG(LS_INFO)
-          << "Framing queue has frames, trying to dequeue input buffer";
-      ssize_t input_index = codec->DequeueInputBuffer(-1);
-      if (input_index < 0) {
-        AVE_LOG(LS_INFO) << "No input buffer available";
-        break;  // No input buffer available, will try again later
-      }
-
-      std::shared_ptr<CodecBuffer> input_buffer;
-      result = codec->GetInputBuffer(input_index, input_buffer);
-      if (result != OK || !input_buffer) {
-        AVE_LOG(LS_ERROR) << "Failed to get input buffer";
-        break;
-      }
-
-      auto frame = framing_queue.PopFrame();
-      if (!frame) {
-        AVE_LOG(LS_WARNING)
-            << "PopFrame returned null even though HasFrame was true";
-        break;
-      }
-
-      AVE_LOG(LS_INFO) << "Got frame from queue with size: " << frame->size();
-
-      // Copy frame data to codec input buffer
-      input_buffer->EnsureCapacity(frame->size(), true);
-      std::memcpy(input_buffer->data(), frame->data(), frame->size());
-      input_buffer->SetRange(0, frame->size());
-
-      auto meta = std::make_shared<MediaMeta>();
-      meta->SetDuration(base::TimeDelta::Micros(frame_count * 1000000 / 30));
-      input_buffer->format() = meta;
-
-      result = codec->QueueInputBuffer(input_index);
-      if (result != OK) {
-        AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << result;
-        break;
-      }
-      AVE_LOG(LS_INFO) << "Successfully queued input buffer";
-      frame_count++;
-      AVE_LOG(LS_INFO) << "Queued frame " << frame_count << " ("
-                       << frame->size() << " bytes)";
-    }
-
-    // Send EOS to decoder if input is done and no more frames
-    if (input_eos && !framing_queue.HasFrame() && !eos_sent) {
-      ssize_t input_index = codec->DequeueInputBuffer(-1);
+    // Try to queue one input frame
+    if (framing_queue.HasFrame() && !eos_sent) {
+      AVE_LOG(LS_INFO) << "Trying to queue input, frames available: "
+                       << framing_queue.FrameCount();
+      ssize_t input_index = codec->DequeueInputBuffer(10);
+      AVE_LOG(LS_INFO) << "DequeueInputBuffer returned: " << input_index;
       if (input_index >= 0) {
         std::shared_ptr<CodecBuffer> input_buffer;
         result = codec->GetInputBuffer(input_index, input_buffer);
         if (result == OK && input_buffer) {
-          auto eos_meta = std::make_shared<MediaMeta>();
+          auto frame = framing_queue.PopFrame();
+          if (frame) {
+            // Copy frame data to codec input buffer
+            input_buffer->EnsureCapacity(frame->size(), true);
+            std::memcpy(input_buffer->data(), frame->data(), frame->size());
+            input_buffer->SetRange(0, frame->size());
+
+            auto meta = MediaMeta::CreatePtr();
+            meta->SetDuration(
+                base::TimeDelta::Micros(frame_count * 1000000 / 30));
+            input_buffer->format() = meta;
+
+            result = codec->QueueInputBuffer(input_index);
+            if (result == OK) {
+              frame_count++;
+              input_queued = true;
+              AVE_LOG(LS_VERBOSE) << "Queued input frame " << frame_count
+                                  << " (" << frame->size() << " bytes)";
+            } else {
+              AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << result;
+            }
+          }
+        } else {
+          AVE_LOG(LS_ERROR) << "Failed to get input buffer: " << result;
+        }
+      }
+    } else if (input_eos && !framing_queue.HasFrame() && !eos_sent) {
+      // Send EOS frame
+      ssize_t input_index = codec->DequeueInputBuffer(10);
+      if (input_index >= 0) {
+        std::shared_ptr<CodecBuffer> input_buffer;
+        result = codec->GetInputBuffer(input_index, input_buffer);
+        if (result == OK && input_buffer) {
+          // Send empty buffer to indicate EOS
           input_buffer->SetRange(0, 0);
-          input_buffer->format() = eos_meta;
+          input_buffer->format() = MediaMeta::CreatePtr();
           codec->QueueInputBuffer(input_index);
           AVE_LOG(LS_INFO) << "Sent EOS to decoder after " << frame_count
                            << " frames";
@@ -358,8 +401,14 @@ int main(int argc, char** argv) {
       }
     }
 
-    // Get output
-    ssize_t output_index = codec->DequeueOutputBuffer(-1);
+    // Step 2: Try to dequeue output buffer
+    // Use longer timeout if we just queued input, shorter if waiting for more
+    // output
+    int output_timeout = (input_queued || !eos_sent) ? 10 : 100;
+    AVE_LOG(LS_INFO) << "Trying to dequeue output, timeout: " << output_timeout;
+    ssize_t output_index = codec->DequeueOutputBuffer(output_timeout);
+    AVE_LOG(LS_INFO) << "DequeueOutputBuffer returned: " << output_index;
+
     if (output_index >= 0) {
       std::shared_ptr<CodecBuffer> output_buffer;
       result = codec->GetOutputBuffer(output_index, output_buffer);
@@ -369,17 +418,23 @@ int main(int argc, char** argv) {
         if (size > 0) {
           output.write(reinterpret_cast<const char*>(output_buffer->data()),
                        size);
-          AVE_LOG(LS_INFO) << "Wrote " << size << " bytes to output";
-        } else {
-          AVE_LOG(LS_WARNING) << "Got output buffer but size is 0";
+          output_frame_count++;
+          AVE_LOG(LS_VERBOSE) << "Output frame " << output_frame_count << ": "
+                              << size << " bytes";
+        } else if (eos_sent) {
+          // If we sent EOS and got empty buffer, consider it as EOS
+          AVE_LOG(LS_INFO) << "Received empty buffer after EOS, decoding done";
+          output_eos = true;
         }
 
+        AVE_LOG(LS_VERBOSE) << "Released output buffer before " << output_index;
         codec->ReleaseOutputBuffer(output_index, false);
+        AVE_LOG(LS_VERBOSE) << "Released output buffer " << output_index;
       }
-    } else if (eos_sent && !framing_queue.HasFrame()) {
-      // If EOS was sent and no output available, decoding is done
-      AVE_LOG(LS_INFO) << "Decoding completed, no more output";
-      break;
+    } else if (eos_sent) {
+      // If we sent EOS and can't get more output, we're done
+      AVE_LOG(LS_INFO) << "No more output after EOS";
+      output_eos = true;
     }
 
     if (callback.has_error_) {
@@ -387,6 +442,9 @@ int main(int argc, char** argv) {
       break;
     }
   }
+
+  AVE_LOG(LS_INFO) << "Decoding completed. Input frames: " << frame_count
+                   << ", Output frames: " << output_frame_count;
 
   // Stop codec
   codec->Stop();
