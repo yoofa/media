@@ -19,7 +19,7 @@
 #include "media/codec/codec.h"
 #include "media/codec/codec_factory.h"
 #include "media/codec/codec_id.h"
-#include "media/codec/ffmpeg/ffmpeg_codec_factory.h"
+#include "media/codec/default_codec_factory.h"
 #include "media/codec/simple_passthrough_codec.h"
 #include "media/foundation/media_meta.h"
 
@@ -62,16 +62,26 @@ class EncoderCallback : public CodecCallback {
 void PrintUsage(const char* program_name) {
   std::cout
       << "Usage: " << program_name
-      << " --type <codec_type> [--passthrough] <input_file> <output_file>\n";
+      << " --type <codec_type> [--passthrough] <input_file> <output_file> "
+         "[options]\n";
   std::cout << "\nCodec types:\n";
   std::cout << "  Audio: aac, opus, mp3\n";
   std::cout << "  Video: h264, h265, vp8, vp9\n";
   std::cout << "\nOptions:\n";
-  std::cout
-      << "  --passthrough  Use SimplePassthroughCodec (no actual encoding)\n";
+  std::cout << "  --passthrough       Use SimplePassthroughCodec (no actual "
+               "encoding)\n";
+  std::cout << "  --width <w>         Video width (default: 1920)\n";
+  std::cout << "  --height <h>        Video height (default: 1080)\n";
+  std::cout << "  --fps <fps>         Video frame rate (default: 30)\n";
+  std::cout << "  --bitrate <bps>     Bitrate in bps (default: 2M video, 128k "
+               "audio)\n";
+  std::cout << "  --sample_rate <sr>  Audio sample rate (default: 48000)\n";
+  std::cout << "  --channels <ch>     Audio channel count (default: 2)\n";
   std::cout << "\nExamples:\n";
   std::cout << "  # Normal encoding (FFmpeg)\n";
   std::cout << "  " << program_name << " --type aac input.pcm output.aac\n";
+  std::cout << "  " << program_name
+            << " --type h264 --width 1280 --height 720 input.yuv output.h264\n";
   std::cout << "\n  # Passthrough mode (PCM frames passthrough, no encoding)\n";
   std::cout << "  " << program_name
             << " --type aac --passthrough input.pcm output.pcm\n";
@@ -119,6 +129,13 @@ int main(int argc, char** argv) {
   std::string output_file;
   bool use_passthrough = false;
 
+  int width = 1920;
+  int height = 1080;
+  int fps = 30;
+  int bitrate = 0;  // 0 means use default based on type
+  int sample_rate = 48000;
+  int channels = 2;
+
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--type" && i + 1 < argc) {
@@ -128,6 +145,18 @@ int main(int argc, char** argv) {
       continue;
     } else if (arg == "--passthrough") {
       use_passthrough = true;
+    } else if (arg == "--width" && i + 1 < argc) {
+      width = std::stoi(argv[++i]);
+    } else if (arg == "--height" && i + 1 < argc) {
+      height = std::stoi(argv[++i]);
+    } else if (arg == "--fps" && i + 1 < argc) {
+      fps = std::stoi(argv[++i]);
+    } else if (arg == "--bitrate" && i + 1 < argc) {
+      bitrate = std::stoi(argv[++i]);
+    } else if (arg == "--sample_rate" && i + 1 < argc) {
+      sample_rate = std::stoi(argv[++i]);
+    } else if (arg == "--channels" && i + 1 < argc) {
+      channels = std::stoi(argv[++i]);
     } else if (input_file.empty()) {
       input_file = arg;
     } else if (output_file.empty()) {
@@ -156,9 +185,9 @@ int main(int argc, char** argv) {
     codec = std::make_shared<SimplePassthroughCodec>(true);
   } else {
     // Initialize codec factory
-    // Initialize codec factory (FFmpeg codec)
-    auto ffmpeg_factory = std::make_shared<FFmpegCodecFactory>();
-    RegisterCodecFactory(ffmpeg_factory);
+    // Initialize codec factory (Default codec factory)
+    auto default_factory = std::make_shared<DefaultCodecFactory>();
+    RegisterCodecFactory(default_factory);
 
     AVE_LOG(LS_INFO) << "Encoding " << input_file << " to " << output_file
                      << " using codec: " << codec_type;
@@ -189,14 +218,18 @@ int main(int argc, char** argv) {
 
   bool is_audio = IsAudioCodec(codec_id);
   if (is_audio) {
-    format->SetSampleRate(48000);
-    format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
-    format->SetBitrate(128000);
+    format->SetSampleRate(sample_rate);
+    if (channels == 1) {
+      format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
+    } else {
+      format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+    }
+    format->SetBitrate(bitrate > 0 ? bitrate : 128000);
   } else {
-    format->SetWidth(1920);
-    format->SetHeight(1080);
-    format->SetFrameRate(30);
-    format->SetBitrate(2000000);
+    format->SetWidth(width);
+    format->SetHeight(height);
+    format->SetFrameRate(fps);
+    format->SetBitrate(bitrate > 0 ? bitrate : 2000000);
   }
 
   config->format = format;
@@ -224,7 +257,7 @@ int main(int argc, char** argv) {
   AVE_LOG(LS_INFO) << "Encoder started successfully";
 
   // Read input and feed to encoder
-  const size_t buffer_size = is_audio ? 4096 : (1920 * 1080 * 3 / 2);
+  const size_t buffer_size = is_audio ? 4096 : (width * height * 3 / 2);
   std::vector<uint8_t> read_buffer(buffer_size);
   bool input_eos = false;
   int64_t frame_count = 0;

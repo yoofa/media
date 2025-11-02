@@ -261,9 +261,45 @@ void FFmpegCodec::ProcessOutput() {
         if (data_size > 0) {
           buffer->EnsureCapacity(data_size, false);
 
+          // Set format on output buffer
+          auto meta = MediaMeta::CreatePtr(MediaType::AUDIO,
+                                           MediaMeta::FormatType::kSample);
+          meta->SetSampleRate(frame->sample_rate);
+          int channels = frame->ch_layout.nb_channels;
+          if (channels == 1) {
+            meta->SetChannelLayout(CHANNEL_LAYOUT_MONO);
+          } else {
+            meta->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+          }
+          meta->SetSamplesPerChannel(frame->nb_samples);
+          meta->SetBitsPerSample(static_cast<int16_t>(
+              av_get_bytes_per_sample(
+                  static_cast<AVSampleFormat>(frame->format)) *
+              8));
+          // FFmpegCodec always interleaves output buffer
+          // meta->SetIsPlanar(false);
           if (av_sample_fmt_is_planar(
                   static_cast<AVSampleFormat>(frame->format))) {
-            int channels = frame->ch_layout.nb_channels;
+            if (frame->format == AV_SAMPLE_FMT_FLTP) {
+              meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_F32LE);
+            } else if (frame->format == AV_SAMPLE_FMT_S16P) {
+              meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_S16LE);
+            } else if (frame->format == AV_SAMPLE_FMT_S32P) {
+              meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_S32LE);
+            }
+          } else {
+            if (frame->format == AV_SAMPLE_FMT_FLT) {
+              meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_F32LE);
+            } else if (frame->format == AV_SAMPLE_FMT_S16) {
+              meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_S16LE);
+            } else if (frame->format == AV_SAMPLE_FMT_S32) {
+              meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_S32LE);
+            }
+          }
+          buffer->format() = meta;
+
+          if (av_sample_fmt_is_planar(
+                  static_cast<AVSampleFormat>(frame->format))) {
             int samples = frame->nb_samples;
             int bytes_per_sample = av_get_bytes_per_sample(
                 static_cast<AVSampleFormat>(frame->format));
@@ -276,10 +312,11 @@ void FFmpegCodec::ProcessOutput() {
                 dst += bytes_per_sample;
               }
             }
+            buffer->SetRange(0, data_size);
           } else {
             std::memcpy(buffer->data(), frame->data[0], data_size);
+            buffer->SetRange(0, data_size);
           }
-          buffer->SetRange(0, data_size);
         }
       } else if (codec_ctx_->codec_type == AVMEDIA_TYPE_VIDEO) {
         int data_size =

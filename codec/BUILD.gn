@@ -46,6 +46,43 @@ ave_library("codec_factory") {
   deps = [
     ":codec_id",
     ":codec_interface",
+    "ffmpeg:ffmpeg_codec_example",
+    "//base:utils",
+  ]
+}
+
+ave_library("software_codec_factory") {
+  sources = [
+    "software_codec_factory.cc",
+    "software_codec_factory.h",
+  ]
+  deps = [
+    ":codec_interface",
+    "ffmpeg:ffmpeg_codec",
+    "//base:utils",
+  ]
+}
+
+ave_library("hardware_codec_factory") {
+  sources = [
+    "hardware_codec_factory.cc",
+    "hardware_codec_factory.h",
+  ]
+  deps = [
+    ":codec_interface",
+    "//base:utils",
+  ]
+}
+
+ave_library("default_codec_factory") {
+  sources = [
+    "default_codec_factory.cc",
+    "default_codec_factory.h",
+  ]
+  deps = [
+    ":codec_interface",
+    ":hardware_codec_factory",
+    ":software_codec_factory",
     "//base:utils",
   ]
 }

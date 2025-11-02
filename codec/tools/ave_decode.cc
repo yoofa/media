@@ -19,7 +19,7 @@
 #include "media/codec/codec.h"
 #include "media/codec/codec_factory.h"
 #include "media/codec/codec_id.h"
-#include "media/codec/ffmpeg/ffmpeg_codec_factory.h"
+#include "media/codec/default_codec_factory.h"
 #include "media/codec/simple_passthrough_codec.h"
 #include "media/foundation/aac_utils.h"
 #include "media/foundation/framing_queue.h"
@@ -64,13 +64,20 @@ class DecoderCallback : public CodecCallback {
 void PrintUsage(const char* program_name) {
   std::cout
       << "Usage: " << program_name
-      << " --type <codec_type> [--passthrough] <input_file> <output_file>\n";
+      << " --type <codec_type> [--passthrough] <input_file> <output_file> "
+         "[options]\n";
   std::cout << "\nCodec types:\n";
   std::cout << "  Audio: aac, opus, mp3\n";
   std::cout << "  Video: h264, h265, vp8, vp9\n";
   std::cout << "\nOptions:\n";
-  std::cout
-      << "  --passthrough  Use SimplePassthroughCodec (no actual decoding)\n";
+  std::cout << "  --passthrough       Use SimplePassthroughCodec (no actual "
+               "decoding)\n";
+  std::cout << "  --width <w>         Video width (optional hint)\n";
+  std::cout << "  --height <h>        Video height (optional hint)\n";
+  std::cout << "  --sample_rate <sr>  Audio sample rate (optional hint)\n";
+  std::cout << "  --channels <ch>     Audio channel count (optional hint)\n";
+  std::cout << "  --force_s16         Force output to 16-bit PCM (convert if "
+               "needed)\n";
   std::cout << "\nExamples:\n";
   std::cout << "  # Normal decoding (FFmpeg)\n";
   std::cout << "  " << program_name << " --type aac input.aac output.pcm\n";
@@ -140,6 +147,12 @@ int main(int argc, char** argv) {
   std::string input_file;
   std::string output_file;
   bool use_passthrough = false;
+  bool force_s16 = false;
+
+  int width = 0;
+  int height = 0;
+  int sample_rate = 0;
+  int channels = 0;
 
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
@@ -150,6 +163,16 @@ int main(int argc, char** argv) {
       continue;
     } else if (arg == "--passthrough") {
       use_passthrough = true;
+    } else if (arg == "--force_s16") {
+      force_s16 = true;
+    } else if (arg == "--width" && i + 1 < argc) {
+      width = std::stoi(argv[++i]);
+    } else if (arg == "--height" && i + 1 < argc) {
+      height = std::stoi(argv[++i]);
+    } else if (arg == "--sample_rate" && i + 1 < argc) {
+      sample_rate = std::stoi(argv[++i]);
+    } else if (arg == "--channels" && i + 1 < argc) {
+      channels = std::stoi(argv[++i]);
     } else if (input_file.empty()) {
       input_file = arg;
     } else if (output_file.empty()) {
@@ -179,9 +202,9 @@ int main(int argc, char** argv) {
                      << ": " << input_file << " -> " << output_file;
     codec = std::make_shared<SimplePassthroughCodec>(false);
   } else {
-    // Initialize codec factory (FFmpeg codec)
-    auto ffmpeg_factory = std::make_shared<FFmpegCodecFactory>();
-    RegisterCodecFactory(ffmpeg_factory);
+    // Initialize codec factory (Default codec factory)
+    auto default_factory = std::make_shared<DefaultCodecFactory>();
+    RegisterCodecFactory(default_factory);
 
     if (codec_type.empty()) {
       AVE_LOG(LS_ERROR) << "Codec type is required";
@@ -251,15 +274,16 @@ int main(int argc, char** argv) {
           if (GetNextAACFrame(&data, &size, &frameStart, &frameSize) == OK) {
             ADTSHeader adts_header{};
             if (ParseADTSHeader(frameStart, frameSize, &adts_header) == OK) {
-              uint32_t sample_rate =
+              uint32_t detected_sample_rate =
                   GetSamplingRate(adts_header.sampling_freq_index);
               uint8_t channel_count =
                   GetChannelCount(adts_header.channel_config);
 
-              AVE_LOG(LS_INFO) << "Detected AAC format: " << sample_rate
-                               << "Hz, " << channel_count << " channels";
+              AVE_LOG(LS_INFO)
+                  << "Detected AAC format: " << detected_sample_rate << "Hz, "
+                  << channel_count << " channels";
 
-              format->SetSampleRate(sample_rate);
+              format->SetSampleRate(detected_sample_rate);
               // Map channel count to channel layout
               if (channel_count == 1) {
                 format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
@@ -286,6 +310,24 @@ int main(int argc, char** argv) {
       // Let the decoder detect them from the bitstream
     }
   }
+
+  // Apply command line overrides/hints
+  if (sample_rate > 0)
+    format->SetSampleRate(sample_rate);
+  if (channels > 0) {
+    if (channels == 1) {
+      format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
+    } else {
+      format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+    }
+  }
+  if (width > 0)
+    format->SetWidth(width);
+  if (height > 0)
+    format->SetHeight(height);
+
+  // Default to 16-bit PCM output
+  // format->SetBitsPerSample(16);
 
   config->format = format;
   status_t result = codec->Configure(config);
@@ -416,6 +458,30 @@ int main(int argc, char** argv) {
         size_t size = output_buffer->size();
 
         if (size > 0) {
+          // Check if conversion is needed
+          if (force_s16 && output_buffer->format() &&
+              output_buffer->format()->stream_type() == MediaType::AUDIO) {
+            CodecId output_codec_id = output_buffer->format()->codec();
+
+            if (output_codec_id == CodecId::AVE_CODEC_ID_PCM_F32LE) {
+              // Convert Packed Float to Packed S16 in-place
+              size_t sample_count = size / 4;
+              float* src = reinterpret_cast<float*>(output_buffer->data());
+              int16_t* dst = reinterpret_cast<int16_t*>(output_buffer->data());
+
+              for (size_t i = 0; i < sample_count; ++i) {
+                float val = src[i];
+                if (val > 1.0f)
+                  val = 1.0f;
+                if (val < -1.0f)
+                  val = -1.0f;
+                dst[i] = static_cast<int16_t>(val * 32767.0f);
+              }
+              size = sample_count * 2;
+              output_buffer->SetRange(0, size);
+            }
+          }
+
           output.write(reinterpret_cast<const char*>(output_buffer->data()),
                        size);
           output_frame_count++;
