@@ -776,6 +776,8 @@ MediaMeta& MediaMeta::SetBitsPerSample(int16_t bits_per_sample) {
 
   if (format_type_ == FormatType::kTrack) {
     track_info()->audio().bits_per_sample = bits_per_sample;
+  } else {
+    sample_info()->audio().bits_per_sample = bits_per_sample;
   }
   return *this;
 }
@@ -789,7 +791,7 @@ int16_t MediaMeta::bits_per_sample() const {
   if (format_type_ == FormatType::kTrack) {
     return std::get<MediaTrackInfo>(info_).audio().bits_per_sample;
   }
-  return -1;
+  return std::get<MediaSampleInfo>(info_).audio().bits_per_sample;
 }
 
 // 2. Track specific methods
