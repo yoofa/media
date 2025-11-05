@@ -243,6 +243,7 @@ int main(int argc, char** argv) {
 
   // Configure codec
   auto config = std::make_shared<CodecConfig>();
+
   auto format = std::make_shared<MediaMeta>();
 
   // Get codec ID for both passthrough and normal modes
@@ -251,6 +252,12 @@ int main(int argc, char** argv) {
 
   // Set codec ID (needed for framing queue type detection)
   format->SetCodec(codec_id);
+  format->SetSampleRate(sample_rate);
+  if (channels == 1) {
+    format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
+  } else {
+    format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+  }
   format->SetStreamType(is_audio ? MediaType::AUDIO : MediaType::VIDEO);
 
   if (!use_passthrough) {
@@ -283,17 +290,41 @@ int main(int argc, char** argv) {
                   << "Detected AAC format: " << detected_sample_rate << "Hz, "
                   << channel_count << " channels";
 
-              format->SetSampleRate(detected_sample_rate);
-              // Map channel count to channel layout
-              if (channel_count == 1) {
-                format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
-              } else if (channel_count == 2) {
-                format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
-              } else {
-                AVE_LOG(LS_WARNING)
-                    << "Unsupported channel count: " << channel_count;
-                format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
-              }
+              AVE_LOG(LS_INFO)
+                  << "Detected AAC format: " << detected_sample_rate << "Hz, "
+                  << channel_count << " channels";
+
+              // Generate AudioSpecificConfig (ASC) from ADTS header
+              // AOT (5 bits) | Freq (4 bits) | Chan (4 bits) | GASpecific (var)
+              // For LC: AOT=2.
+              // ADTS profile: 0=Main, 1=LC, 2=SSR. AOT = profile + 1.
+              uint8_t aot = adts_header.profile + 1;
+              uint8_t freq_idx = adts_header.sampling_freq_index;
+              uint8_t chan_cfg = adts_header.channel_config;
+
+              std::vector<uint8_t> asc;
+              // Simple ASC for LC: 2 bytes
+              // 5 bits AOT, 4 bits Freq, 4 bits Chan, 3 bits padding (0)
+              uint16_t asc_config =
+                  (aot << 11) | (freq_idx << 7) | (chan_cfg << 3);
+              asc.push_back((asc_config >> 8) & 0xFF);
+              asc.push_back(asc_config & 0xFF);
+
+              // format->SetPrivateData(asc.size(), asc.data());
+              // AVE_LOG(LS_INFO) << "Set AAC extradata: " << asc_config;
+
+              // Don't set these for AAC decoder, let it detect from
+              // stream/extradata to avoid conflicts
+              // format->SetSampleRate(detected_sample_rate);
+              // if (channel_count == 1) {
+              //   format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
+              // } else if (channel_count == 2) {
+              //   format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+              // } else {
+              //   AVE_LOG(LS_WARNING)
+              //       << "Unsupported channel count: " << channel_count;
+              //   format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+              // }
             }
           }
         }
@@ -312,8 +343,10 @@ int main(int argc, char** argv) {
   }
 
   // Apply command line overrides/hints
-  if (sample_rate > 0)
+  if (sample_rate > 0) {
     format->SetSampleRate(sample_rate);
+  }
+
   if (channels > 0) {
     if (channels == 1) {
       format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
@@ -321,13 +354,16 @@ int main(int argc, char** argv) {
       format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
     }
   }
-  if (width > 0)
+
+  if (width > 0) {
     format->SetWidth(width);
-  if (height > 0)
+  }
+  if (height > 0) {
     format->SetHeight(height);
+  }
 
   // Default to 16-bit PCM output
-  // format->SetBitsPerSample(16);
+  format->SetBitsPerSample(16);
 
   config->format = format;
   status_t result = codec->Configure(config);
@@ -373,7 +409,8 @@ int main(int argc, char** argv) {
     bool input_queued = false;
 
     // Read more data from file if framing queue is low
-    if (!input_eos && framing_queue.FrameCount() < 5) {
+    if (!input_eos && codec_id != CodecId::AVE_CODEC_ID_OPUS &&
+        framing_queue.FrameCount() < 5) {
       input.read(reinterpret_cast<char*>(read_buffer.data()), buffer_size);
       size_t bytes_read = input.gcount();
 
@@ -390,21 +427,58 @@ int main(int argc, char** argv) {
     }
 
     // Try to queue one input frame
-    if (framing_queue.HasFrame() && !eos_sent) {
-      AVE_LOG(LS_INFO) << "Trying to queue input, frames available: "
-                       << framing_queue.FrameCount();
+    bool try_queue_input = false;
+    if (codec_id == CodecId::AVE_CODEC_ID_OPUS) {
+      try_queue_input = !input_eos;
+    } else {
+      try_queue_input = framing_queue.HasFrame();
+    }
+
+    if (try_queue_input && !eos_sent) {
+      AVE_LOG(LS_INFO) << "Trying to queue input";
       ssize_t input_index = codec->DequeueInputBuffer(10);
       AVE_LOG(LS_INFO) << "DequeueInputBuffer returned: " << input_index;
       if (input_index >= 0) {
         std::shared_ptr<CodecBuffer> input_buffer;
         result = codec->GetInputBuffer(input_index, input_buffer);
         if (result == OK && input_buffer) {
-          auto frame = framing_queue.PopFrame();
-          if (frame) {
+          bool frame_available = false;
+          size_t frame_size = 0;
+          const uint8_t* frame_data = nullptr;
+
+          std::shared_ptr<MediaFrame> frame_ref;
+
+          if (codec_id == CodecId::AVE_CODEC_ID_OPUS) {
+            // Read next Opus frame directly from file
+            uint32_t size = 0;
+            if (input.read(reinterpret_cast<char*>(&size), sizeof(size))) {
+              if (size > read_buffer.size()) {
+                read_buffer.resize(size);
+              }
+              if (input.read(reinterpret_cast<char*>(read_buffer.data()),
+                             size)) {
+                frame_size = size;
+                frame_data = read_buffer.data();
+                frame_available = true;
+              }
+            } else {
+              // EOF
+              input_eos = true;
+            }
+          } else {
+            frame_ref = framing_queue.PopFrame();
+            if (frame_ref) {
+              frame_size = frame_ref->size();
+              frame_data = frame_ref->data();
+              frame_available = true;
+            }
+          }
+
+          if (frame_available) {
             // Copy frame data to codec input buffer
-            input_buffer->EnsureCapacity(frame->size(), true);
-            std::memcpy(input_buffer->data(), frame->data(), frame->size());
-            input_buffer->SetRange(0, frame->size());
+            input_buffer->EnsureCapacity(frame_size, true);
+            std::memcpy(input_buffer->data(), frame_data, frame_size);
+            input_buffer->SetRange(0, frame_size);
 
             auto meta = MediaMeta::CreatePtr();
             meta->SetDuration(
@@ -415,17 +489,20 @@ int main(int argc, char** argv) {
             if (result == OK) {
               frame_count++;
               input_queued = true;
-              AVE_LOG(LS_VERBOSE) << "Queued input frame " << frame_count
-                                  << " (" << frame->size() << " bytes)";
             } else {
               AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << result;
             }
+          } else if (codec_id != CodecId::AVE_CODEC_ID_OPUS) {
+            // Framing queue empty but not EOS?
           }
         } else {
           AVE_LOG(LS_ERROR) << "Failed to get input buffer: " << result;
         }
       }
-    } else if (input_eos && !framing_queue.HasFrame() && !eos_sent) {
+    } else if (input_eos &&
+               (!framing_queue.HasFrame() ||
+                codec_id == CodecId::AVE_CODEC_ID_OPUS) &&
+               !eos_sent) {
       // Send EOS frame
       ssize_t input_index = codec->DequeueInputBuffer(10);
       if (input_index >= 0) {
@@ -447,9 +524,10 @@ int main(int argc, char** argv) {
     // Use longer timeout if we just queued input, shorter if waiting for more
     // output
     int output_timeout = (input_queued || !eos_sent) ? 10 : 100;
-    AVE_LOG(LS_INFO) << "Trying to dequeue output, timeout: " << output_timeout;
+    AVE_LOG(LS_VERBOSE) << "Trying to dequeue output, timeout: "
+                        << output_timeout;
     ssize_t output_index = codec->DequeueOutputBuffer(output_timeout);
-    AVE_LOG(LS_INFO) << "DequeueOutputBuffer returned: " << output_index;
+    AVE_LOG(LS_VERBOSE) << "DequeueOutputBuffer returned: " << output_index;
 
     if (output_index >= 0) {
       std::shared_ptr<CodecBuffer> output_buffer;
@@ -466,15 +544,17 @@ int main(int argc, char** argv) {
             if (output_codec_id == CodecId::AVE_CODEC_ID_PCM_F32LE) {
               // Convert Packed Float to Packed S16 in-place
               size_t sample_count = size / 4;
-              float* src = reinterpret_cast<float*>(output_buffer->data());
-              int16_t* dst = reinterpret_cast<int16_t*>(output_buffer->data());
+              auto* src = reinterpret_cast<float*>(output_buffer->data());
+              auto* dst = reinterpret_cast<int16_t*>(output_buffer->data());
 
               for (size_t i = 0; i < sample_count; ++i) {
                 float val = src[i];
-                if (val > 1.0f)
+                if (val > 1.0f) {
                   val = 1.0f;
-                if (val < -1.0f)
+                }
+                if (val < -1.0f) {
                   val = -1.0f;
+                }
                 dst[i] = static_cast<int16_t>(val * 32767.0f);
               }
               size = sample_count * 2;

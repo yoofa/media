@@ -213,10 +213,11 @@ int main(int argc, char** argv) {
   }
 
   // Configure codec
-  auto config = std::make_shared<CodecConfig>();
-  auto format = std::make_shared<MediaMeta>();
-
   bool is_audio = IsAudioCodec(codec_id);
+  auto config = std::make_shared<CodecConfig>();
+  auto format =
+      MediaMeta::CreatePtr(is_audio ? MediaType::AUDIO : MediaType::VIDEO,
+                           MediaMeta::FormatType::kTrack);
   if (is_audio) {
     format->SetSampleRate(sample_rate);
     if (channels == 1) {
@@ -257,7 +258,9 @@ int main(int argc, char** argv) {
   AVE_LOG(LS_INFO) << "Encoder started successfully";
 
   // Read input and feed to encoder
-  const size_t buffer_size = is_audio ? 4096 : (width * height * 3 / 2);
+  // For audio, read 20ms chunks to be safe with frame-based codecs like Opus
+  const size_t buffer_size = is_audio ? (sample_rate * channels * 2 * 20 / 1000)
+                                      : (width * height * 3 / 2);
   std::vector<uint8_t> read_buffer(buffer_size);
   bool input_eos = false;
   int64_t frame_count = 0;
@@ -283,19 +286,29 @@ int main(int argc, char** argv) {
                 base::TimeDelta::Micros(frame_count * 1000000 / 30));
             input_buffer->format() = meta;
 
+            if (input.eof()) {
+              input_eos = true;
+              auto eos_meta = input_buffer->format();
+              if (!eos_meta) {
+                eos_meta = std::make_shared<MediaMeta>();
+                input_buffer->format() = eos_meta;
+              }
+              eos_meta->SetEos(true);
+            }
+
             result = codec->QueueInputBuffer(input_index);
             if (result != OK) {
               AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << result;
               break;
             }
             frame_count++;
-          }
-
-          if (input.eof() || bytes_read == 0) {
+          } else if (input.eof()) {
+            // EOF reached but no bytes read (exact multiple or empty file)
             input_eos = true;
             auto eos_meta = std::make_shared<MediaMeta>();
-            // Set EOS flag somehow - need to check the proper API
+            eos_meta->SetEos(true);
             input_buffer->format() = eos_meta;
+            input_buffer->SetRange(0, 0);
             codec->QueueInputBuffer(input_index);
             AVE_LOG(LS_INFO) << "Input end of stream, processed " << frame_count
                              << " frames";
@@ -313,6 +326,13 @@ int main(int argc, char** argv) {
         size_t size = output_buffer->size();
 
         if (size > 0) {
+          // Write to file
+          if (codec_id == CodecId::AVE_CODEC_ID_OPUS) {
+            // Write 4-byte size header for Opus
+            uint32_t opus_packet_size = static_cast<uint32_t>(size);
+            output.write(reinterpret_cast<const char*>(&opus_packet_size),
+                         sizeof(opus_packet_size));
+          }
           output.write(reinterpret_cast<const char*>(output_buffer->data()),
                        size);
           AVE_LOG(LS_VERBOSE) << "Wrote " << size << " bytes to output";
