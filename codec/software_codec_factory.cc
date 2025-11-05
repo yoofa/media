@@ -8,6 +8,7 @@
 #include "software_codec_factory.h"
 
 #include "base/logging.h"
+#include "opus/opus_codec.h"
 
 namespace ave {
 namespace media {
@@ -26,8 +27,11 @@ std::vector<CodecInfo> SoftwareCodecFactory::GetSupportedCodecs() {
 
 std::shared_ptr<Codec> SoftwareCodecFactory::CreateCodecByType(CodecId codec_id,
                                                                bool encoder) {
+  if (codec_id == CodecId::AVE_CODEC_ID_OPUS) {
+    return std::make_shared<OpusCodec>(encoder);
+  }
   // TODO: Add logic to choose between FFmpeg and other software codecs (e.g.
-  // FDK-AAC, Opus)
+  // FDK-AAC)
   return ffmpeg_factory_->CreateCodecByType(codec_id, encoder);
 }
 

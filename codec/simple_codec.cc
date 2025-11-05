@@ -17,7 +17,7 @@ namespace media {
 
 namespace {
 const int32_t kMaxInputBuffers = 8;
-const int32_t kMaxOutputBuffers = 7;
+const int32_t kMaxOutputBuffers = 16;
 const int32_t kDefaultBufferSize = 10 * 1024 * 1024;  // 4MB
 const size_t kInvalidIndex = static_cast<size_t>(-1);
 }  // namespace

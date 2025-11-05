@@ -1,0 +1,25 @@
+import("//base/build/ave.gni")
+
+ave_library("opus_codec") {
+  sources = [
+    "opus_codec.cc",
+    "opus_codec.h",
+  ]
+  public_deps = [ "//third_party/opus" ]
+  deps = [
+    "..:codec_buffer",
+    "..:simple_codec",
+    "../../audio:audio_channel_layout",
+    "../../foundation:media_meta",
+    "//base:logging",
+    "//base:utils",
+  ]
+}
+
+ave_executable("test_opus_roundtrip") {
+  sources = [ "test_opus_roundtrip.cc" ]
+  deps = [
+    "//base:logging",
+    "//third_party/opus",
+  ]
+}

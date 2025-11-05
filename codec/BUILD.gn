@@ -59,6 +59,7 @@ ave_library("software_codec_factory") {
   deps = [
     ":codec_interface",
     "ffmpeg:ffmpeg_codec",
+    "opus:opus_codec",
     "//base:utils",
   ]
 }
