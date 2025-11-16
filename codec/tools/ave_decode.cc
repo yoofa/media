@@ -408,7 +408,7 @@ int main(int argc, char** argv) {
     // Step 1: Try to queue input buffer if we have data
     bool input_queued = false;
 
-    // Read more data from file if framing queue is low
+    // Feed more raw data into framing queue
     if (!input_eos && codec_id != CodecId::AVE_CODEC_ID_OPUS &&
         framing_queue.FrameCount() < 5) {
       input.read(reinterpret_cast<char*>(read_buffer.data()), buffer_size);
@@ -416,13 +416,13 @@ int main(int argc, char** argv) {
 
       if (bytes_read > 0) {
         framing_queue.PushData(read_buffer.data(), bytes_read);
-        AVE_LOG(LS_VERBOSE)
-            << "Pushed " << bytes_read << " bytes to framing queue";
       }
 
       if (input.eof()) {
         input_eos = true;
         AVE_LOG(LS_INFO) << "Input end of stream reached";
+        // Flush any partial access unit accumulated in the framing queue
+        framing_queue.Flush();
       }
     }
 
@@ -435,9 +435,7 @@ int main(int argc, char** argv) {
     }
 
     if (try_queue_input && !eos_sent) {
-      AVE_LOG(LS_INFO) << "Trying to queue input";
       ssize_t input_index = codec->DequeueInputBuffer(10);
-      AVE_LOG(LS_INFO) << "DequeueInputBuffer returned: " << input_index;
       if (input_index >= 0) {
         std::shared_ptr<CodecBuffer> input_buffer;
         result = codec->GetInputBuffer(input_index, input_buffer);
@@ -462,7 +460,6 @@ int main(int argc, char** argv) {
                 frame_available = true;
               }
             } else {
-              // EOF
               input_eos = true;
             }
           } else {
@@ -475,7 +472,6 @@ int main(int argc, char** argv) {
           }
 
           if (frame_available) {
-            // Copy frame data to codec input buffer
             input_buffer->EnsureCapacity(frame_size, true);
             std::memcpy(input_buffer->data(), frame_data, frame_size);
             input_buffer->SetRange(0, frame_size);
@@ -492,8 +488,6 @@ int main(int argc, char** argv) {
             } else {
               AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << result;
             }
-          } else if (codec_id != CodecId::AVE_CODEC_ID_OPUS) {
-            // Framing queue empty but not EOS?
           }
         } else {
           AVE_LOG(LS_ERROR) << "Failed to get input buffer: " << result;
@@ -509,7 +503,6 @@ int main(int argc, char** argv) {
         std::shared_ptr<CodecBuffer> input_buffer;
         result = codec->GetInputBuffer(input_index, input_buffer);
         if (result == OK && input_buffer) {
-          // Send empty buffer to indicate EOS
           input_buffer->SetRange(0, 0);
           input_buffer->format() = MediaMeta::CreatePtr();
           codec->QueueInputBuffer(input_index);

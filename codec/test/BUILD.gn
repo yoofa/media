@@ -23,6 +23,24 @@ ave_library("test_codec_support") {
   ]
 }
 
+ave_library("codec_unittest_sources") {
+  testonly = true
+  sources = [
+    "codec_buffer_unittest.cc",
+    "codec_id_unittest.cc",
+    "dummy_codec_unittest.cc",
+    "simple_passthrough_codec_unittest.cc",
+  ]
+  deps = [
+    ":dummy_codec",
+    "//media/codec:codec_buffer",
+    "//media/codec:codec_id",
+    "//media/codec:simple_passthrough_codec",
+    "//media/foundation:media_meta",
+    "//test:test_support",
+  ]
+}
+
 ave_executable("test_decode") {
   sources = [ "test_decode.cc" ]
   deps = [

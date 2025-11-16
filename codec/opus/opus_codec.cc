@@ -79,9 +79,6 @@ status_t OpusCodec::OnConfigure(const std::shared_ptr<CodecConfig>& config) {
     opus_ctx_.decoder =
         opus_decoder_create(static_cast<opus_int32>(sample_rate_),
                             static_cast<int32_t>(channels_), &error);
-    opus_ctx_.decoder =
-        opus_decoder_create(static_cast<opus_int32>(sample_rate_),
-                            static_cast<int32_t>(channels_), &error);
     if (error != OPUS_OK || !opus_ctx_.decoder) {
       AVE_LOG(LS_ERROR) << "Failed to create Opus decoder: " << error
                         << ", sample_rate=" << sample_rate_

@@ -32,7 +32,23 @@ SimpleCodec::SimpleCodec(bool is_encoder)
       callback_(nullptr) {}
 
 SimpleCodec::~SimpleCodec() {
-  Release();
+  // Don't call Release() here - it invokes virtual OnRelease() which causes
+  // pure virtual call since derived class is already destroyed.
+  // Just clean up our own resources.
+  task_runner_->PostTaskAndWait([this]() {
+    AVE_DCHECK_RUN_ON(task_runner_.get());
+    std::lock_guard<std::mutex> lock(lock_);
+    input_buffers_.clear();
+    output_buffers_.clear();
+    while (!input_queue_.empty()) {
+      input_queue_.pop();
+    }
+    while (!output_queue_.empty()) {
+      output_queue_.pop();
+    }
+    state_ = State::RELEASED;
+    callback_ = nullptr;
+  });
 }
 
 status_t SimpleCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
@@ -81,7 +97,7 @@ status_t SimpleCodec::SetCallback(CodecCallback* callback) {
 
 status_t SimpleCodec::Start() {
   status_t ret = OK;
-  task_runner_->PostTask([this, &ret]() {
+  task_runner_->PostTaskAndWait([this, &ret]() {
     AVE_DCHECK_RUN_ON(task_runner_.get());
 
     if (state_ != State::CONFIGURED && state_ != State::STOPPED) {
@@ -99,7 +115,7 @@ status_t SimpleCodec::Start() {
       NotifyError(ret);
     }
   });
-  return OK;
+  return ret;
 }
 
 status_t SimpleCodec::Stop() {

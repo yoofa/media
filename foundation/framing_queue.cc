@@ -13,8 +13,43 @@
 namespace ave {
 namespace media {
 
+namespace {
+// H.264 NAL unit types
+constexpr uint8_t kNalTypeNonIdr = 1;  // Non-IDR slice (P/B frame)
+constexpr uint8_t kNalTypeIdr = 5;     // IDR slice (I frame)
+constexpr uint8_t kNalTypeSei = 6;     // Supplemental Enhancement Info
+constexpr uint8_t kNalTypeSps = 7;     // Sequence Parameter Set
+constexpr uint8_t kNalTypePps = 8;     // Picture Parameter Set
+constexpr uint8_t kNalTypeAud = 9;     // Access Unit Delimiter
+
+// Returns true if the NAL type is a VCL (Video Coding Layer) NAL,
+// i.e., it contains slice data for a picture.
+inline bool IsVclNal(uint8_t nal_type) {
+  return nal_type == kNalTypeNonIdr || nal_type == kNalTypeIdr;
+}
+
+// Returns true if this NAL starts a new access unit (must be output before
+// adding to the next access unit). Per H.264 spec, a new AU starts when:
+// - An AUD NAL is seen after VCL data
+// - SPS/PPS/SEI appears after VCL data (they begin the next AU's header)
+// - A VCL NAL follows VCL data from a different picture
+inline bool StartsNewAccessUnit(uint8_t nal_type, bool au_has_vcl) {
+  if (nal_type == kNalTypeAud) {
+    return au_has_vcl;  // AUD after VCL = flush current AU
+  }
+  if (au_has_vcl && (nal_type == kNalTypeSps || nal_type == kNalTypePps ||
+                     nal_type == kNalTypeSei)) {
+    return true;  // non-VCL header after slices = start of next AU
+  }
+  return false;
+}
+
+const uint8_t kStartCode[] = {0x00, 0x00, 0x00, 0x01};
+}  // namespace
+
 FramingQueue::FramingQueue(CodecType codec_type) : codec_type_(codec_type) {
-  buffer_.reserve(65536);  // Reserve 64KB initially
+  buffer_.reserve(65536);
+  au_buf_.reserve(65536);
 }
 
 FramingQueue::~FramingQueue() {
@@ -26,10 +61,8 @@ status_t FramingQueue::PushData(const uint8_t* data, size_t size) {
     return INVALID_OPERATION;
   }
 
-  // Append new data to buffer
   buffer_.insert(buffer_.end(), data, data + size);
 
-  // Try to parse frames from the buffer
   status_t result = OK;
   while (result == OK) {
     if (codec_type_ == CodecType::kH264) {
@@ -48,7 +81,6 @@ std::shared_ptr<MediaFrame> FramingQueue::PopFrame() {
   if (frames_.empty()) {
     return nullptr;
   }
-
   auto frame = frames_.front();
   frames_.pop();
   return frame;
@@ -64,11 +96,36 @@ size_t FramingQueue::FrameCount() const {
 
 void FramingQueue::Clear() {
   buffer_.clear();
+  au_buf_.clear();
+  au_has_vcl_ = false;
   while (!frames_.empty()) {
     frames_.pop();
   }
 }
 
+void FramingQueue::Flush() {
+  // Emit any accumulated access unit data as the final frame.
+  if (!au_buf_.empty()) {
+    auto frame = MediaFrame::CreateShared(au_buf_.size(), MediaType::VIDEO);
+    std::memcpy(frame->data(), au_buf_.data(), au_buf_.size());
+    frame->setRange(0, au_buf_.size());
+    frames_.push(frame);
+    au_buf_.clear();
+    au_has_vcl_ = false;
+  }
+}
+
+// Parse H.264 bitstream into complete Annex-B access units.
+//
+// Strategy: accumulate NAL units into au_buf_ until we detect a new access
+// unit boundary, then emit the accumulated buffer as one complete frame.
+// A new AU boundary is detected when:
+//   - An AUD NAL appears after we already have VCL data
+//   - SPS/PPS appears after we already have VCL data (start of next AU)
+//   - A second IDR/non-IDR VCL slice appears (multi-slice pictures are
+//     treated as complete when we see SPS/PPS/AUD next; simple heuristic)
+//
+// Each emitted frame contains the full Annex-B AU: start codes + NAL bytes.
 status_t FramingQueue::ParseH264Frame() {
   if (buffer_.empty()) {
     return E_AGAIN;
@@ -76,31 +133,62 @@ status_t FramingQueue::ParseH264Frame() {
 
   const uint8_t* data = buffer_.data();
   size_t size = buffer_.size();
-  const uint8_t* nalStart = nullptr;
-  size_t nalSize = 0;
+  const uint8_t* nal_start = nullptr;
+  size_t nal_size = 0;
 
-  // Get next NAL unit
-  status_t result = getNextNALUnit(&data, &size, &nalStart, &nalSize, false);
+  status_t result = getNextNALUnit(&data, &size, &nal_start, &nal_size, false);
 
   if (result != OK) {
-    // If we consumed some data but didn't get a complete NAL,
-    // keep the remaining data in buffer
-    if (data != buffer_.data()) {
+    // Compact consumed prefix from buffer
+    if (data != nullptr && data != buffer_.data()) {
       size_t consumed = data - buffer_.data();
       buffer_.erase(buffer_.begin(), buffer_.begin() + consumed);
     }
     return result;
   }
 
-  // We have a complete NAL unit, create a frame
-  auto frame = MediaFrame::CreateShared(nalSize, MediaType::VIDEO);
-  std::memcpy(frame->data(), nalStart, nalSize);
-  frame->setRange(0, nalSize);
-  frames_.push(frame);
+  if (nal_size == 0) {
+    // Consume and skip empty NAL
+    if (data == nullptr) {
+      buffer_.clear();
+    } else {
+      size_t consumed = data - buffer_.data();
+      buffer_.erase(buffer_.begin(), buffer_.begin() + consumed);
+    }
+    return OK;
+  }
 
-  // Remove the consumed data from buffer
-  size_t consumed = (data - buffer_.data());
-  buffer_.erase(buffer_.begin(), buffer_.begin() + consumed);
+  uint8_t nal_type = nal_start[0] & 0x1f;
+
+  // Check if this NAL starts a new access unit
+  if (StartsNewAccessUnit(nal_type, au_has_vcl_) && !au_buf_.empty()) {
+    // Emit the current access unit as a complete frame
+    auto frame = MediaFrame::CreateShared(au_buf_.size(), MediaType::VIDEO);
+    std::memcpy(frame->data(), au_buf_.data(), au_buf_.size());
+    frame->setRange(0, au_buf_.size());
+    frames_.push(frame);
+    au_buf_.clear();
+    au_has_vcl_ = false;
+  }
+
+  // Skip AUD NALs themselves (they're just delimiters, not needed in output)
+  if (nal_type != kNalTypeAud) {
+    // Append start code + NAL to current access unit buffer
+    au_buf_.insert(au_buf_.end(), kStartCode, kStartCode + sizeof(kStartCode));
+    au_buf_.insert(au_buf_.end(), nal_start, nal_start + nal_size);
+
+    if (IsVclNal(nal_type)) {
+      au_has_vcl_ = true;
+    }
+  }
+
+  // Consume processed bytes from input buffer
+  if (data == nullptr) {
+    buffer_.clear();
+  } else {
+    size_t consumed = data - buffer_.data();
+    buffer_.erase(buffer_.begin(), buffer_.begin() + consumed);
+  }
 
   return OK;
 }
@@ -115,7 +203,6 @@ status_t FramingQueue::ParseAACFrame() {
   const uint8_t* frameStart = nullptr;
   size_t frameSize = 0;
 
-  // Get next AAC frame
   status_t result = GetNextAACFrame(&data, &size, &frameStart, &frameSize);
 
   if (result == INVALID_OPERATION) {
@@ -124,12 +211,10 @@ status_t FramingQueue::ParseAACFrame() {
       size_t consumed = data - buffer_.data();
       buffer_.erase(buffer_.begin(), buffer_.begin() + consumed);
     }
-    return ParseAACFrame();  // Try to find next frame
+    return ParseAACFrame();
   }
 
   if (result != OK) {
-    // If we consumed some data but didn't get a complete frame,
-    // keep the remaining data in buffer
     if (data != buffer_.data()) {
       size_t consumed = data - buffer_.data();
       buffer_.erase(buffer_.begin(), buffer_.begin() + consumed);
@@ -137,23 +222,18 @@ status_t FramingQueue::ParseAACFrame() {
     return result;
   }
 
-  // We have a complete AAC frame, create a MediaFrame
   auto frame = MediaFrame::CreateShared(frameSize, MediaType::AUDIO);
   std::memcpy(frame->data(), frameStart, frameSize);
   frame->setRange(0, frameSize);
 
-  // Parse ADTS header to set audio info
   ADTSHeader header{};
   if (ParseADTSHeader(frameStart, frameSize, &header) == OK) {
     frame->SetSampleRate(GetSamplingRate(header.sampling_freq_index));
-    // Note: We would need to convert channel_config to ChannelLayout
-    // For now, just set basic channel count info
   }
 
   frames_.push(frame);
 
-  // Remove the consumed data from buffer
-  size_t consumed = (data - buffer_.data());
+  size_t consumed = data - buffer_.data();
   buffer_.erase(buffer_.begin(), buffer_.begin() + consumed);
 
   return OK;

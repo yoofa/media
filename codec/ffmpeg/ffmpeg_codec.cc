@@ -156,22 +156,29 @@ void FFmpegCodec::ProcessInput(size_t index) {
       return;
     }
   } else {
-    // Decoder: send packet
-    AVPacket* pkt = av_packet_alloc();
-    if (!pkt) {
-      NotifyError(NO_MEMORY);
-      return;
-    }
+    // Decoder: send Annex-B packet directly (caller must provide complete AU)
+    if (buffer->size() == 0) {
+      // EOS: send NULL packet to drain the decoder
+      avcodec_send_packet(codec_ctx_, nullptr);
+    } else {
+      AVPacket* pkt = av_packet_alloc();
+      if (!pkt) {
+        NotifyError(NO_MEMORY);
+        return;
+      }
+      pkt->data = buffer->data();
+      pkt->size = static_cast<int>(buffer->size());
 
-    pkt->data = buffer->data();
-    pkt->size = static_cast<int>(buffer->size());
+      int ret = avcodec_send_packet(codec_ctx_, pkt);
+      av_packet_free(&pkt);
 
-    int ret = avcodec_send_packet(codec_ctx_, pkt);
-    av_packet_free(&pkt);
-
-    if (ret < 0 && ret != AVERROR(EAGAIN)) {
-      NotifyError(UNKNOWN_ERROR);
-      return;
+      if (ret < 0 && ret != AVERROR(EAGAIN)) {
+        char errbuf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        AVE_LOG(LS_ERROR) << "avcodec_send_packet failed: " << errbuf;
+        NotifyError(UNKNOWN_ERROR);
+        return;
+      }
     }
   }
 

@@ -154,8 +154,15 @@ void TestCodecRunner::ProcessInput(size_t index) {
     return;
   }
 
-  auto input_buffer = codec_->DequeueInputBuffer(index, 0);
-  if (!input_buffer) {
+  ssize_t buf_index = codec_->DequeueInputBuffer(0);
+  if (buf_index < 0) {
+    return;
+  }
+
+  std::shared_ptr<CodecBuffer> input_buffer;
+  status_t err =
+      codec_->GetInputBuffer(static_cast<size_t>(buf_index), input_buffer);
+  if (err != OK || !input_buffer) {
     return;
   }
 
@@ -176,7 +183,7 @@ void TestCodecRunner::ProcessInput(size_t index) {
   if (bytes_read == 0) {
     // End of stream
     input_buffer->SetRange(0, 0);
-    codec_->QueueInputBuffer(input_buffer, -1);
+    codec_->QueueInputBuffer(static_cast<size_t>(buf_index));
     eos_sent_ = true;
 
     std::lock_guard<std::mutex> lock(completion_lock_);
@@ -187,7 +194,7 @@ void TestCodecRunner::ProcessInput(size_t index) {
 
   input_buffer->SetRange(0, bytes_read);
   memcpy(input_buffer->data(), buffer.data(), bytes_read);
-  status_t err = codec_->QueueInputBuffer(input_buffer, -1);
+  err = codec_->QueueInputBuffer(static_cast<size_t>(buf_index));
   if (err != OK) {
     AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << err;
     HandleError(err);
@@ -199,8 +206,15 @@ void TestCodecRunner::ProcessOutput(size_t index) {
     return;
   }
 
-  auto output_buffer = codec_->DequeueOutputBuffer(index, 0);
-  if (!output_buffer) {
+  ssize_t buf_index = codec_->DequeueOutputBuffer(0);
+  if (buf_index < 0) {
+    return;
+  }
+
+  std::shared_ptr<CodecBuffer> output_buffer;
+  status_t err =
+      codec_->GetOutputBuffer(static_cast<size_t>(buf_index), output_buffer);
+  if (err != OK || !output_buffer) {
     return;
   }
 
@@ -216,7 +230,7 @@ void TestCodecRunner::ProcessOutput(size_t index) {
     return;
   }
 
-  status_t err = codec_->ReleaseOutputBuffer(output_buffer, false);
+  err = codec_->ReleaseOutputBuffer(static_cast<size_t>(buf_index), false);
   if (err != OK) {
     HandleError(err);
   }

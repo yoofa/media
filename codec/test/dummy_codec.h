@@ -16,6 +16,13 @@ namespace ave {
 namespace media {
 namespace test {
 
+/**
+ * @brief A dummy codec for testing that simply copies input to output.
+ *
+ * Implements the current Codec interface with index-based buffer management.
+ * Data passes through unchanged - useful for testing the codec framework
+ * and pipeline without actual encoding/decoding.
+ */
 class DummyCodec : public Codec {
  public:
   explicit DummyCodec(bool is_encoder);
@@ -30,52 +37,23 @@ class DummyCodec : public Codec {
   status_t Flush() override;
   status_t Release() override;
 
-  std::vector<std::shared_ptr<CodecBuffer>> InputBuffers() override;
-  std::vector<std::shared_ptr<CodecBuffer>> OutputBuffers() override;
-
   status_t GetInputBuffer(size_t index,
                           std::shared_ptr<CodecBuffer>& buffer) override;
   status_t GetOutputBuffer(size_t index,
                            std::shared_ptr<CodecBuffer>& buffer) override;
 
-  std::shared_ptr<CodecBuffer> DequeueInputBuffer(int32_t index,
-                                                  int64_t timeout_ms) override;
-  status_t QueueInputBuffer(std::shared_ptr<CodecBuffer>& buffer,
-                            int64_t timeout_ms) override;
-  std::shared_ptr<CodecBuffer> DequeueOutputBuffer(int32_t index,
-                                                   int64_t timeout_ms) override;
-  status_t ReleaseOutputBuffer(std::shared_ptr<CodecBuffer>& buffer,
-                               bool render) override;
+  ssize_t DequeueInputBuffer(int64_t timeout_ms) override;
+  status_t QueueInputBuffer(size_t index) override;
+  ssize_t DequeueOutputBuffer(int64_t timeout_ms) override;
+  status_t ReleaseOutputBuffer(size_t index, bool render) override;
 
  private:
-  enum class BufferState {
-    FREE,     // Buffer is available for use
-    PENDING,  // Buffer is notified but not yet acquired
-    INUSE     // Buffer is being used
-  };
-
   struct BufferEntry {
-    BufferState state{BufferState::FREE};
+    bool in_use{false};
     std::shared_ptr<CodecBuffer> buffer;
   };
 
-  // Helper functions for buffer state management
-  static bool IsBufferAvailable(const BufferEntry& entry) {
-    return entry.state == BufferState::FREE;
-  }
-
-  static bool IsBufferPending(const BufferEntry& entry) {
-    return entry.state == BufferState::PENDING;
-  }
-
-  static bool IsBufferInUse(const BufferEntry& entry) {
-    return entry.state == BufferState::INUSE;
-  }
-
-  void RequestInputBuffer();
   void ProcessBuffer(size_t input_index);
-  std::shared_ptr<CodecBuffer> FindAvailableInputBuffer(int32_t index);
-  std::shared_ptr<CodecBuffer> FindAvailableOutputBuffer();
 
   const bool is_encoder_;
   std::mutex lock_;
@@ -84,6 +62,7 @@ class DummyCodec : public Codec {
   CodecCallback* callback_ = nullptr;
   std::vector<BufferEntry> input_buffers_;
   std::vector<BufferEntry> output_buffers_;
+  std::queue<size_t> input_queue_;
   std::queue<size_t> output_queue_;
 
   std::unique_ptr<base::TaskRunner> task_runner_;

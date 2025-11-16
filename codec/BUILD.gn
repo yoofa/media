@@ -8,10 +8,10 @@ group("codec") {
   ]
 }
 
-ave_library("audio_codec_properity") {
+ave_library("audio_codec_property") {
   sources = [
-    "audio_codec_properity.cc",
-    "audio_codec_properity.h",
+    "audio_codec_property.cc",
+    "audio_codec_property.h",
   ]
 }
 

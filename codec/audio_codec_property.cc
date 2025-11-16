@@ -11,7 +11,7 @@ namespace ave {
 namespace media {
 
 AudioCodecProperty::AudioCodecProperty()
-    : codec_id(CodecId::AV_CODEC_ID_NONE),
+    : codec_id(CodecId::AVE_CODEC_ID_NONE),
       channels(0),
       samples_per_channel(0),
       sample_rate(0),
