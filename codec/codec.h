@@ -28,10 +28,18 @@ struct CodecInfo {
   std::string mime;
   MediaType media_type = MediaType::UNKNOWN;
 
-  // TODO: support resolution, frame rate, bit rate, etc
-
   bool is_encoder = false;
   bool hardware_accelerated = false;
+
+  std::pair<int, int> max_resolution;
+  int max_bitrate;
+  std::string profile;
+  std::string level;
+  std::vector<std::string> supported_color_formats;
+  std::pair<int, int> frame_rate_range;
+  std::vector<int> supported_sample_rates;
+  std::vector<std::string> supported_channel_layouts;
+  int latency;
 };
 
 // callback for codec
