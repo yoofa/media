@@ -1,0 +1,826 @@
+diff --git a/codec/BUILD.gn b/codec/BUILD.gn
+index 9225b65..ab0aa97 100644
+--- a/codec/BUILD.gn
++++ b/codec/BUILD.gn
+@@ -59,6 +59,7 @@ ave_library("software_codec_factory") {
+   deps = [
+     ":codec_interface",
+     "ffmpeg:ffmpeg_codec",
++    "opus:opus_codec",
+     "//base:utils",
+   ]
+ }
+diff --git a/codec/opus/BUILD.gn b/codec/opus/BUILD.gn
+new file mode 100644
+index 0000000..718310b
+--- /dev/null
++++ b/codec/opus/BUILD.gn
+@@ -0,0 +1,25 @@
++import("//base/build/ave.gni")
++
++ave_library("opus_codec") {
++  sources = [
++    "opus_codec.cc",
++    "opus_codec.h",
++  ]
++  public_deps = [ "//third_party/opus" ]
++  deps = [
++    "..:codec_buffer",
++    "..:simple_codec",
++    "../../audio:audio_channel_layout",
++    "../../foundation:media_meta",
++    "//base:logging",
++    "//base:utils",
++  ]
++}
++
++ave_executable("test_opus_roundtrip") {
++  sources = [ "test_opus_roundtrip.cc" ]
++  deps = [
++    "//base:logging",
++    "//third_party/opus",
++  ]
++}
+diff --git a/codec/opus/opus_codec.cc b/codec/opus/opus_codec.cc
+new file mode 100644
+index 0000000..635ec7b
+--- /dev/null
++++ b/codec/opus/opus_codec.cc
+@@ -0,0 +1,267 @@
++/*
++ * opus_codec.cc
++ * Copyright (C) 2025 youfa <vsyfar@gmail.com>
++ *
++ * Distributed under terms of the GPLv2 license.
++ */
++
++#include "opus_codec.h"
++
++#include "base/logging.h"
++#include "media/audio/channel_layout.h"
++
++namespace ave {
++namespace media {
++
++namespace {
++const size_t kInvalidIndex = static_cast<size_t>(-1);
++const int kOpusFrameDuration = 20;  // 20ms frame duration
++}  // namespace
++
++OpusCodec::OpusCodec(bool is_encoder)
++    : SimpleCodec(is_encoder),
++      opus_ctx_(),
++      sample_rate_(48000),
++      channels_(2),
++      frame_size_(0),
++      complexity_(10),
++      signal_type_(OPUS_AUTO) {
++  opus_ctx_.encoder = nullptr;
++}
++
++OpusCodec::~OpusCodec() {
++  Release();
++}
++
++status_t OpusCodec::OnConfigure(const std::shared_ptr<CodecConfig>& config) {
++  auto format = config->format;
++  if (format->stream_type() != MediaType::AUDIO) {
++    AVE_LOG(LS_ERROR) << "OpusCodec only supports audio streams";
++    return INVALID_OPERATION;
++  }
++
++  sample_rate_ = format->sample_rate();
++  if (sample_rate_ <= 0) {
++    sample_rate_ = 48000;  // Default to 48kHz
++  }
++
++  auto channel_layout = format->channel_layout();
++  channels_ = ChannelLayoutToChannelCount(channel_layout);
++  if (channels_ == 0) {
++    channels_ = 2;  // Default to stereo
++  }
++
++  // Calculate frame size based on sample rate and frame duration
++  frame_size_ = sample_rate_ * kOpusFrameDuration / 1000;
++
++  AVE_LOG(LS_INFO) << "Configuring OpusCodec: sample_rate=" << sample_rate_
++                   << ", channels=" << channels_ << ", is_encoder=" << is_encoder_;
++
++  int32_t error = OPUS_OK;
++  if (is_encoder_) {
++    opus_ctx_.encoder = opus_encoder_create(
++        static_cast<opus_int32>(sample_rate_), static_cast<int32_t>(channels_),
++        OPUS_APPLICATION_AUDIO, &error);
++    if (error != OPUS_OK || !opus_ctx_.encoder) {
++      AVE_LOG(LS_ERROR) << "Failed to create Opus encoder: " << error;
++      return UNKNOWN_ERROR;
++    }
++
++    // Set encoder parameters
++    auto bitrate = format->bitrate();
++    if (bitrate > 0) {
++      opus_encoder_ctl(opus_ctx_.encoder, OPUS_SET_BITRATE(bitrate));
++    }
++    opus_encoder_ctl(opus_ctx_.encoder, OPUS_SET_COMPLEXITY(complexity_));
++    opus_encoder_ctl(opus_ctx_.encoder, OPUS_SET_SIGNAL(signal_type_));
++  } else {
++    opus_ctx_.decoder =
++        opus_decoder_create(static_cast<opus_int32>(sample_rate_),
++                            static_cast<int32_t>(channels_), &error);
++    opus_ctx_.decoder =
++        opus_decoder_create(static_cast<opus_int32>(sample_rate_),
++                            static_cast<int32_t>(channels_), &error);
++    if (error != OPUS_OK || !opus_ctx_.decoder) {
++      AVE_LOG(LS_ERROR) << "Failed to create Opus decoder: " << error
++                        << ", sample_rate=" << sample_rate_
++                        << ", channels=" << channels_;
++      return UNKNOWN_ERROR;
++    }
++  }
++
++  return OK;
++}
++
++status_t OpusCodec::OnStart() {
++  return OK;
++}
++
++status_t OpusCodec::OnStop() {
++  return OK;
++}
++
++status_t OpusCodec::OnReset() {
++  if (is_encoder_ && opus_ctx_.encoder) {
++    opus_encoder_ctl(opus_ctx_.encoder, OPUS_RESET_STATE);
++  } else if (!is_encoder_ && opus_ctx_.decoder) {
++    opus_decoder_ctl(opus_ctx_.decoder, OPUS_RESET_STATE);
++  }
++  return OK;
++}
++
++status_t OpusCodec::OnFlush() {
++  if (is_encoder_ && opus_ctx_.encoder) {
++    opus_encoder_ctl(opus_ctx_.encoder, OPUS_RESET_STATE);
++  } else if (!is_encoder_ && opus_ctx_.decoder) {
++    opus_decoder_ctl(opus_ctx_.decoder, OPUS_RESET_STATE);
++  }
++  return OK;
++}
++
++status_t OpusCodec::OnRelease() {
++  if (is_encoder_ && opus_ctx_.encoder) {
++    opus_encoder_destroy(opus_ctx_.encoder);
++    opus_ctx_.encoder = nullptr;
++  } else if (!is_encoder_ && opus_ctx_.decoder) {
++    opus_decoder_destroy(opus_ctx_.decoder);
++    opus_ctx_.decoder = nullptr;
++  }
++  return OK;
++}
++
++void OpusCodec::ProcessInput(size_t index) {
++  std::lock_guard<std::mutex> lock(lock_);
++  if (index >= input_buffers_.size() || !input_buffers_[index].in_use) {
++    AVE_LOG(LS_WARNING) << "Invalid input buffer index or not in use";
++    return;
++  }
++
++  auto& buffer = input_buffers_[index].buffer;
++
++  if (is_encoder_) {
++    // Encoding: PCM to Opus
++    const opus_int16* pcm =
++        reinterpret_cast<const opus_int16*>(buffer->data());
++    int pcm_samples = buffer->size() / (channels_ * sizeof(opus_int16));
++
++    // Opus requires exact frame size
++    if (pcm_samples != frame_size_) {
++      if (pcm_samples < frame_size_ && pcm_samples > 0) {
++        AVE_LOG(LS_INFO) << "Padding partial frame: " << pcm_samples << " -> "
++                         << frame_size_;
++        // Pad with zeros
++        size_t current_size = buffer->size();
++        size_t required_size = frame_size_ * channels_ * sizeof(opus_int16);
++        if (buffer->capacity() >= required_size) {
++          std::memset(buffer->data() + current_size, 0,
++                      required_size - current_size);
++          buffer->SetRange(0, required_size);
++          pcm_samples = frame_size_;
++        } else {
++          AVE_LOG(LS_WARNING) << "Buffer capacity insufficient for padding";
++          input_buffers_[index].in_use = false;
++          NotifyInputBufferAvailable(index);
++          return;
++        }
++      } else {
++        AVE_LOG(LS_WARNING) << "PCM samples (" << pcm_samples
++                            << ") doesn't match frame size (" << frame_size_
++                            << "), skipping frame";
++        input_buffers_[index].in_use = false;
++        NotifyInputBufferAvailable(index);
++        return;
++      }
++    }
++
++    size_t output_index = GetAvailableOutputBufferIndex();
++    if (output_index == kInvalidIndex) {
++      AVE_LOG(LS_WARNING) << "No available output buffer for encoding";
++      input_buffers_[index].in_use = false;
++      NotifyInputBufferAvailable(index);
++      return;
++    }
++
++    auto& output_buffer = output_buffers_[output_index].buffer;
++    int encoded_bytes =
++        opus_encode(opus_ctx_.encoder, pcm, frame_size_,
++                    output_buffer->data(),
++                    static_cast<opus_int32>(output_buffer->capacity()));
++
++    if (encoded_bytes < 0) {
++      AVE_LOG(LS_ERROR) << "Opus encoding failed: " << encoded_bytes;
++      input_buffers_[index].in_use = false;
++      NotifyInputBufferAvailable(index);
++      NotifyError(UNKNOWN_ERROR);
++      return;
++    }
++
++    output_buffer->SetRange(0, encoded_bytes);
++    AVE_LOG(LS_INFO) << "Encoded " << pcm_samples << " samples to "
++                     << encoded_bytes << " bytes";
++
++    size_t pushed_index = PushOutputBuffer(output_index);
++    if (pushed_index != kInvalidIndex) {
++      NotifyOutputBufferAvailable(pushed_index);
++    }
++  } else {
++    // Decoding: Opus to PCM
++    const unsigned char* opus_data = buffer->data();
++    uint32_t opus_size = buffer->size();
++    bool is_plc = (opus_size == 0);
++
++    size_t output_index = GetAvailableOutputBufferIndex();
++    if (output_index == kInvalidIndex) {
++      AVE_LOG(LS_WARNING) << "No available output buffer for decoding";
++      input_buffers_[index].in_use = false;
++      NotifyInputBufferAvailable(index);
++      return;
++    }
++
++    auto& output_buffer = output_buffers_[output_index].buffer;
++    auto* pcm = reinterpret_cast<opus_int16*>(output_buffer->data());
++    auto max_samples =
++        output_buffer->capacity() / (channels_ * sizeof(opus_int16));
++
++    int decoded_samples = 0;
++    if (is_plc) {
++      // Treat empty buffer as EOS for now to avoid crash/infinite loop
++      decoded_samples = 0;
++    } else {
++      decoded_samples = opus_decode(opus_ctx_.decoder, opus_data,
++                                    static_cast<opus_int32>(opus_size), pcm,
++                                    static_cast<int32_t>(max_samples), 0);
++    }
++
++    if (decoded_samples < 0) {
++      AVE_LOG(LS_ERROR) << "Opus decoding failed: " << decoded_samples;
++      input_buffers_[index].in_use = false;
++      NotifyInputBufferAvailable(index);
++      NotifyError(UNKNOWN_ERROR);
++      return;
++    }
++
++    auto pcm_bytes = decoded_samples * channels_ * sizeof(opus_int16);
++    output_buffer->SetRange(0, pcm_bytes);
++    if (!is_plc) {
++      AVE_LOG(LS_INFO) << "Decoded " << opus_size << " bytes to "
++                       << decoded_samples << " samples (" << pcm_bytes
++                       << " bytes)";
++    }
++
++    size_t pushed_index = PushOutputBuffer(output_index);
++    if (pushed_index != kInvalidIndex) {
++      NotifyOutputBufferAvailable(pushed_index);
++    }
++  }
++
++  input_buffers_[index].in_use = false;
++  NotifyInputBufferAvailable(index);
++}
++
++void OpusCodec::ProcessOutput() {
++  // OpusCodec generates output synchronously in ProcessInput, so no need to
++  // generate output here.
++}
++
++}  // namespace media
++}  // namespace ave
+diff --git a/codec/opus/opus_codec.h b/codec/opus/opus_codec.h
+new file mode 100644
+index 0000000..dd9e1ca
+--- /dev/null
++++ b/codec/opus/opus_codec.h
+@@ -0,0 +1,53 @@
++/*
++ * opus_codec.h
++ * Copyright (C) 2025 youfa <vsyfar@gmail.com>
++ *
++ * Distributed under terms of the GPLv2 license.
++ */
++
++#ifndef AVE_MEDIA_OPUS_CODEC_H
++#define AVE_MEDIA_OPUS_CODEC_H
++
++#include "media/codec/simple_codec.h"
++
++extern "C" {
++#include <opus.h>
++}
++
++namespace ave {
++namespace media {
++
++class OpusCodec : public SimpleCodec {
++ public:
++  explicit OpusCodec(bool is_encoder);
++  ~OpusCodec() override;
++
++ protected:
++  status_t OnConfigure(const std::shared_ptr<CodecConfig>& config)
++      REQUIRES(task_runner_) override;
++  status_t OnStart() REQUIRES(task_runner_) override;
++  status_t OnStop() REQUIRES(task_runner_) override;
++  status_t OnReset() REQUIRES(task_runner_) override;
++  status_t OnFlush() REQUIRES(task_runner_) override;
++  status_t OnRelease() REQUIRES(task_runner_) override;
++
++  void ProcessInput(size_t index) REQUIRES(task_runner_) override;
++  void ProcessOutput() REQUIRES(task_runner_) override;
++
++ private:
++  union {
++    OpusEncoder* encoder;
++    OpusDecoder* decoder;
++  } opus_ctx_ GUARDED_BY(task_runner_);
++
++  int sample_rate_ GUARDED_BY(task_runner_);
++  int channels_ GUARDED_BY(task_runner_);
++  int frame_size_ GUARDED_BY(task_runner_);
++  int complexity_ GUARDED_BY(task_runner_);
++  int signal_type_ GUARDED_BY(task_runner_);
++};
++
++}  // namespace media
++}  // namespace ave
++
++#endif /* !AVE_MEDIA_OPUS_CODEC_H */
+diff --git a/codec/opus/test_opus_roundtrip.cc b/codec/opus/test_opus_roundtrip.cc
+new file mode 100644
+index 0000000..ce72fa1
+--- /dev/null
++++ b/codec/opus/test_opus_roundtrip.cc
+@@ -0,0 +1,70 @@
++/*
++ * test_opus_roundtrip.cc
++ * Simple test to encode and decode with OpusCodec
++ */
++
++#include <fstream>
++#include <iostream>
++#include <memory>
++#include <vector>
++#include <cmath>
++
++extern "C" {
++#include <opus.h>
++}
++
++int main() {
++    const int SAMPLE_RATE = 48000;
++    const int CHANNELS = 2;
++    const int FRAME_SIZE = 960;  // 20ms at 48kHz
++    const int BITRATE = 128000;
++    
++    // Create encoder
++    int error = 0;
++    OpusEncoder* encoder = opus_encoder_create(SAMPLE_RATE, CHANNELS, 
++                                                OPUS_APPLICATION_AUDIO, &error);
++    if (error != OPUS_OK) {
++        std::cerr << "Failed to create encoder: " << error << std::endl;
++        return 1;
++    }
++    opus_encoder_ctl(encoder, OPUS_SET_BITRATE(BITRATE));
++    
++    // Generate PCM data (1 second of 440Hz sine wave)
++    std::vector<opus_int16> pcm_data;
++    for (int i = 0; i < SAMPLE_RATE; i++) {
++        opus_int16 sample = (opus_int16)(16000 * std::sin(2 * M_PI * 440 * i / SAMPLE_RATE));
++        pcm_data.push_back(sample);  // Left channel
++        pcm_data.push_back(sample);  // Right channel
++    }
++    
++    // Encode to file
++    std::ofstream out_encoded("/tmp/test_opus_raw.opus", std::ios::binary);
++    std::vector<unsigned char> encoded_packet(4000);
++    
++    int num_frames = SAMPLE_RATE / FRAME_SIZE;
++    for (int frame_num = 0; frame_num < num_frames; frame_num++) {
++        const opus_int16* frame_data = pcm_data.data() + frame_num * FRAME_SIZE * CHANNELS;
++        int encoded_bytes = opus_encode(encoder, frame_data, FRAME_SIZE,
++                                        encoded_packet.data(), encoded_packet.size());
++        
++        if (encoded_bytes < 0) {
++            std::cerr << "Encoding failed: " << encoded_bytes << std::endl;
++            break;
++        }
++        
++        // Write packet size (4 bytes) followed by packet data
++        uint32_t packet_size = encoded_bytes;
++        out_encoded.write(reinterpret_cast<const char*>(&packet_size), 4);
++        out_encoded.write(reinterpret_cast<const char*>(encoded_packet.data()), encoded_bytes);
++        
++        std::cout << "Encoded frame " << frame_num << ": " << encoded_bytes << " bytes" << std::endl;
++    }
++    
++    out_encoded.close();
++    opus_encoder_destroy(encoder);
++    
++    std::cout << "Created /tmp/test_opus_raw.opus with " << num_frames << " frames" << std::endl;
++    std::cout << "Format: Each frame has 4-byte size header + opus packet data" << std::endl;
++    
++    return 0;
++}
+diff --git a/codec/simple_codec.cc b/codec/simple_codec.cc
+index 31dee65..cd08ac1 100644
+--- a/codec/simple_codec.cc
++++ b/codec/simple_codec.cc
+@@ -17,7 +17,7 @@ namespace media {
+ 
+ namespace {
+ const int32_t kMaxInputBuffers = 8;
+-const int32_t kMaxOutputBuffers = 7;
++const int32_t kMaxOutputBuffers = 16;
+ const int32_t kDefaultBufferSize = 10 * 1024 * 1024;  // 4MB
+ const size_t kInvalidIndex = static_cast<size_t>(-1);
+ }  // namespace
+diff --git a/codec/software_codec_factory.cc b/codec/software_codec_factory.cc
+index 3ff0d0d..98688b5 100644
+--- a/codec/software_codec_factory.cc
++++ b/codec/software_codec_factory.cc
+@@ -8,6 +8,7 @@
+ #include "software_codec_factory.h"
+ 
+ #include "base/logging.h"
++#include "opus/opus_codec.h"
+ 
+ namespace ave {
+ namespace media {
+@@ -26,8 +27,11 @@ std::vector<CodecInfo> SoftwareCodecFactory::GetSupportedCodecs() {
+ 
+ std::shared_ptr<Codec> SoftwareCodecFactory::CreateCodecByType(CodecId codec_id,
+                                                                bool encoder) {
++  if (codec_id == CodecId::AVE_CODEC_ID_OPUS) {
++    return std::make_shared<OpusCodec>(encoder);
++  }
+   // TODO: Add logic to choose between FFmpeg and other software codecs (e.g.
+-  // FDK-AAC, Opus)
++  // FDK-AAC)
+   return ffmpeg_factory_->CreateCodecByType(codec_id, encoder);
+ }
+ 
+diff --git a/codec/tools/ave_decode.cc b/codec/tools/ave_decode.cc
+index 7bdf0b0..d774d80 100644
+--- a/codec/tools/ave_decode.cc
++++ b/codec/tools/ave_decode.cc
+@@ -243,6 +243,7 @@ int main(int argc, char** argv) {
+ 
+   // Configure codec
+   auto config = std::make_shared<CodecConfig>();
++
+   auto format = std::make_shared<MediaMeta>();
+ 
+   // Get codec ID for both passthrough and normal modes
+@@ -251,6 +252,12 @@ int main(int argc, char** argv) {
+ 
+   // Set codec ID (needed for framing queue type detection)
+   format->SetCodec(codec_id);
++  format->SetSampleRate(sample_rate);
++  if (channels == 1) {
++    format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
++  } else {
++    format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
++  }
+   format->SetStreamType(is_audio ? MediaType::AUDIO : MediaType::VIDEO);
+ 
+   if (!use_passthrough) {
+@@ -283,17 +290,41 @@ int main(int argc, char** argv) {
+                   << "Detected AAC format: " << detected_sample_rate << "Hz, "
+                   << channel_count << " channels";
+ 
+-              format->SetSampleRate(detected_sample_rate);
+-              // Map channel count to channel layout
+-              if (channel_count == 1) {
+-                format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
+-              } else if (channel_count == 2) {
+-                format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+-              } else {
+-                AVE_LOG(LS_WARNING)
+-                    << "Unsupported channel count: " << channel_count;
+-                format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+-              }
++              AVE_LOG(LS_INFO)
++                  << "Detected AAC format: " << detected_sample_rate << "Hz, "
++                  << channel_count << " channels";
++
++              // Generate AudioSpecificConfig (ASC) from ADTS header
++              // AOT (5 bits) | Freq (4 bits) | Chan (4 bits) | GASpecific (var)
++              // For LC: AOT=2.
++              // ADTS profile: 0=Main, 1=LC, 2=SSR. AOT = profile + 1.
++              uint8_t aot = adts_header.profile + 1;
++              uint8_t freq_idx = adts_header.sampling_freq_index;
++              uint8_t chan_cfg = adts_header.channel_config;
++
++              std::vector<uint8_t> asc;
++              // Simple ASC for LC: 2 bytes
++              // 5 bits AOT, 4 bits Freq, 4 bits Chan, 3 bits padding (0)
++              uint16_t asc_config =
++                  (aot << 11) | (freq_idx << 7) | (chan_cfg << 3);
++              asc.push_back((asc_config >> 8) & 0xFF);
++              asc.push_back(asc_config & 0xFF);
++
++              // format->SetPrivateData(asc.size(), asc.data());
++              // AVE_LOG(LS_INFO) << "Set AAC extradata: " << asc_config;
++
++              // Don't set these for AAC decoder, let it detect from
++              // stream/extradata to avoid conflicts
++              // format->SetSampleRate(detected_sample_rate);
++              // if (channel_count == 1) {
++              //   format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
++              // } else if (channel_count == 2) {
++              //   format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
++              // } else {
++              //   AVE_LOG(LS_WARNING)
++              //       << "Unsupported channel count: " << channel_count;
++              //   format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
++              // }
+             }
+           }
+         }
+@@ -312,8 +343,10 @@ int main(int argc, char** argv) {
+   }
+ 
+   // Apply command line overrides/hints
+-  if (sample_rate > 0)
++  if (sample_rate > 0) {
+     format->SetSampleRate(sample_rate);
++  }
++
+   if (channels > 0) {
+     if (channels == 1) {
+       format->SetChannelLayout(CHANNEL_LAYOUT_MONO);
+@@ -321,13 +354,16 @@ int main(int argc, char** argv) {
+       format->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
+     }
+   }
+-  if (width > 0)
++
++  if (width > 0) {
+     format->SetWidth(width);
+-  if (height > 0)
++  }
++  if (height > 0) {
+     format->SetHeight(height);
++  }
+ 
+   // Default to 16-bit PCM output
+-  // format->SetBitsPerSample(16);
++  format->SetBitsPerSample(16);
+ 
+   config->format = format;
+   status_t result = codec->Configure(config);
+@@ -373,7 +409,8 @@ int main(int argc, char** argv) {
+     bool input_queued = false;
+ 
+     // Read more data from file if framing queue is low
+-    if (!input_eos && framing_queue.FrameCount() < 5) {
++    if (!input_eos && codec_id != CodecId::AVE_CODEC_ID_OPUS &&
++        framing_queue.FrameCount() < 5) {
+       input.read(reinterpret_cast<char*>(read_buffer.data()), buffer_size);
+       size_t bytes_read = input.gcount();
+ 
+@@ -390,21 +427,58 @@ int main(int argc, char** argv) {
+     }
+ 
+     // Try to queue one input frame
+-    if (framing_queue.HasFrame() && !eos_sent) {
+-      AVE_LOG(LS_INFO) << "Trying to queue input, frames available: "
+-                       << framing_queue.FrameCount();
++    bool try_queue_input = false;
++    if (codec_id == CodecId::AVE_CODEC_ID_OPUS) {
++      try_queue_input = !input_eos;
++    } else {
++      try_queue_input = framing_queue.HasFrame();
++    }
++
++    if (try_queue_input && !eos_sent) {
++      AVE_LOG(LS_INFO) << "Trying to queue input";
+       ssize_t input_index = codec->DequeueInputBuffer(10);
+       AVE_LOG(LS_INFO) << "DequeueInputBuffer returned: " << input_index;
+       if (input_index >= 0) {
+         std::shared_ptr<CodecBuffer> input_buffer;
+         result = codec->GetInputBuffer(input_index, input_buffer);
+         if (result == OK && input_buffer) {
+-          auto frame = framing_queue.PopFrame();
+-          if (frame) {
++          bool frame_available = false;
++          size_t frame_size = 0;
++          const uint8_t* frame_data = nullptr;
++
++          std::shared_ptr<MediaFrame> frame_ref;
++
++          if (codec_id == CodecId::AVE_CODEC_ID_OPUS) {
++            // Read next Opus frame directly from file
++            uint32_t size = 0;
++            if (input.read(reinterpret_cast<char*>(&size), sizeof(size))) {
++              if (size > read_buffer.size()) {
++                read_buffer.resize(size);
++              }
++              if (input.read(reinterpret_cast<char*>(read_buffer.data()),
++                             size)) {
++                frame_size = size;
++                frame_data = read_buffer.data();
++                frame_available = true;
++              }
++            } else {
++              // EOF
++              input_eos = true;
++            }
++          } else {
++            frame_ref = framing_queue.PopFrame();
++            if (frame_ref) {
++              frame_size = frame_ref->size();
++              frame_data = frame_ref->data();
++              frame_available = true;
++            }
++          }
++
++          if (frame_available) {
+             // Copy frame data to codec input buffer
+-            input_buffer->EnsureCapacity(frame->size(), true);
+-            std::memcpy(input_buffer->data(), frame->data(), frame->size());
+-            input_buffer->SetRange(0, frame->size());
++            input_buffer->EnsureCapacity(frame_size, true);
++            std::memcpy(input_buffer->data(), frame_data, frame_size);
++            input_buffer->SetRange(0, frame_size);
+ 
+             auto meta = MediaMeta::CreatePtr();
+             meta->SetDuration(
+@@ -415,17 +489,20 @@ int main(int argc, char** argv) {
+             if (result == OK) {
+               frame_count++;
+               input_queued = true;
+-              AVE_LOG(LS_VERBOSE) << "Queued input frame " << frame_count
+-                                  << " (" << frame->size() << " bytes)";
+             } else {
+               AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << result;
+             }
++          } else if (codec_id != CodecId::AVE_CODEC_ID_OPUS) {
++            // Framing queue empty but not EOS?
+           }
+         } else {
+           AVE_LOG(LS_ERROR) << "Failed to get input buffer: " << result;
+         }
+       }
+-    } else if (input_eos && !framing_queue.HasFrame() && !eos_sent) {
++    } else if (input_eos &&
++               (!framing_queue.HasFrame() ||
++                codec_id == CodecId::AVE_CODEC_ID_OPUS) &&
++               !eos_sent) {
+       // Send EOS frame
+       ssize_t input_index = codec->DequeueInputBuffer(10);
+       if (input_index >= 0) {
+@@ -447,9 +524,10 @@ int main(int argc, char** argv) {
+     // Use longer timeout if we just queued input, shorter if waiting for more
+     // output
+     int output_timeout = (input_queued || !eos_sent) ? 10 : 100;
+-    AVE_LOG(LS_INFO) << "Trying to dequeue output, timeout: " << output_timeout;
++    AVE_LOG(LS_VERBOSE) << "Trying to dequeue output, timeout: "
++                        << output_timeout;
+     ssize_t output_index = codec->DequeueOutputBuffer(output_timeout);
+-    AVE_LOG(LS_INFO) << "DequeueOutputBuffer returned: " << output_index;
++    AVE_LOG(LS_VERBOSE) << "DequeueOutputBuffer returned: " << output_index;
+ 
+     if (output_index >= 0) {
+       std::shared_ptr<CodecBuffer> output_buffer;
+@@ -466,15 +544,17 @@ int main(int argc, char** argv) {
+             if (output_codec_id == CodecId::AVE_CODEC_ID_PCM_F32LE) {
+               // Convert Packed Float to Packed S16 in-place
+               size_t sample_count = size / 4;
+-              float* src = reinterpret_cast<float*>(output_buffer->data());
+-              int16_t* dst = reinterpret_cast<int16_t*>(output_buffer->data());
++              auto* src = reinterpret_cast<float*>(output_buffer->data());
++              auto* dst = reinterpret_cast<int16_t*>(output_buffer->data());
+ 
+               for (size_t i = 0; i < sample_count; ++i) {
+                 float val = src[i];
+-                if (val > 1.0f)
++                if (val > 1.0f) {
+                   val = 1.0f;
+-                if (val < -1.0f)
++                }
++                if (val < -1.0f) {
+                   val = -1.0f;
++                }
+                 dst[i] = static_cast<int16_t>(val * 32767.0f);
+               }
+               size = sample_count * 2;
+diff --git a/codec/tools/ave_encode.cc b/codec/tools/ave_encode.cc
+index ec41713..8ff505b 100644
+--- a/codec/tools/ave_encode.cc
++++ b/codec/tools/ave_encode.cc
+@@ -213,10 +213,11 @@ int main(int argc, char** argv) {
+   }
+ 
+   // Configure codec
+-  auto config = std::make_shared<CodecConfig>();
+-  auto format = std::make_shared<MediaMeta>();
+-
+   bool is_audio = IsAudioCodec(codec_id);
++  auto config = std::make_shared<CodecConfig>();
++  auto format =
++      MediaMeta::CreatePtr(is_audio ? MediaType::AUDIO : MediaType::VIDEO,
++                           MediaMeta::FormatType::kTrack);
+   if (is_audio) {
+     format->SetSampleRate(sample_rate);
+     if (channels == 1) {
+@@ -257,7 +258,9 @@ int main(int argc, char** argv) {
+   AVE_LOG(LS_INFO) << "Encoder started successfully";
+ 
+   // Read input and feed to encoder
+-  const size_t buffer_size = is_audio ? 4096 : (width * height * 3 / 2);
++  // For audio, read 20ms chunks to be safe with frame-based codecs like Opus
++  const size_t buffer_size = is_audio ? (sample_rate * channels * 2 * 20 / 1000)
++                                      : (width * height * 3 / 2);
+   std::vector<uint8_t> read_buffer(buffer_size);
+   bool input_eos = false;
+   int64_t frame_count = 0;
+@@ -283,19 +286,29 @@ int main(int argc, char** argv) {
+                 base::TimeDelta::Micros(frame_count * 1000000 / 30));
+             input_buffer->format() = meta;
+ 
++            if (input.eof()) {
++              input_eos = true;
++              auto eos_meta = input_buffer->format();
++              if (!eos_meta) {
++                eos_meta = std::make_shared<MediaMeta>();
++                input_buffer->format() = eos_meta;
++              }
++              eos_meta->SetEos(true);
++            }
++
+             result = codec->QueueInputBuffer(input_index);
+             if (result != OK) {
+               AVE_LOG(LS_ERROR) << "Failed to queue input buffer: " << result;
+               break;
+             }
+             frame_count++;
+-          }
+-
+-          if (input.eof() || bytes_read == 0) {
++          } else if (input.eof()) {
++            // EOF reached but no bytes read (exact multiple or empty file)
+             input_eos = true;
+             auto eos_meta = std::make_shared<MediaMeta>();
+-            // Set EOS flag somehow - need to check the proper API
++            eos_meta->SetEos(true);
+             input_buffer->format() = eos_meta;
++            input_buffer->SetRange(0, 0);
+             codec->QueueInputBuffer(input_index);
+             AVE_LOG(LS_INFO) << "Input end of stream, processed " << frame_count
+                              << " frames";
+@@ -313,6 +326,13 @@ int main(int argc, char** argv) {
+         size_t size = output_buffer->size();
+ 
+         if (size > 0) {
++          // Write to file
++          if (codec_id == CodecId::AVE_CODEC_ID_OPUS) {
++            // Write 4-byte size header for Opus
++            uint32_t opus_packet_size = static_cast<uint32_t>(size);
++            output.write(reinterpret_cast<const char*>(&opus_packet_size),
++                         sizeof(opus_packet_size));
++          }
+           output.write(reinterpret_cast<const char*>(output_buffer->data()),
+                        size);
+           AVE_LOG(LS_VERBOSE) << "Wrote " << size << " bytes to output";
+diff --git a/modules/ffmpeg/ffmpeg_utils.cc b/modules/ffmpeg/ffmpeg_utils.cc
+index 5301c89..e0124d0 100644
+--- a/modules/ffmpeg/ffmpeg_utils.cc
++++ b/modules/ffmpeg/ffmpeg_utils.cc
+@@ -415,6 +415,8 @@ void ConfigureAudioCodec(MediaMeta* format, AVCodecContext* codec_context) {
+   }
+ 
+   auto sample_rate = format->sample_rate();
++  AVE_LOG(LS_INFO) << "ConfigureAudioCodec: sample_rate=" << sample_rate
++                   << ", bits_per_sample=" << bits_per_sample;
+   if (sample_rate > 0) {
+     codec_context->sample_rate = static_cast<int>(sample_rate);
+   }

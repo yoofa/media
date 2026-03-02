@@ -37,6 +37,7 @@ class FFmpegCodec : public SimpleCodec {
  private:
   const AVCodec* codec_;
   AVCodecContext* codec_ctx_ GUARDED_BY(task_runner_);
+  std::queue<int64_t> pts_queue_ GUARDED_BY(lock_);  // input PTS fifo (us)
 };
 
 }  // namespace media

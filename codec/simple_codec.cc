@@ -109,6 +109,20 @@ status_t SimpleCodec::Start() {
     ret = OnStart();
     if (ret == OK) {
       state_ = State::STARTED;
+      // Notify all initially free input buffers to kick off processing
+      std::vector<size_t> free_indices;
+      {
+        std::lock_guard<std::mutex> lock(lock_);
+        for (size_t i = 0; i < input_buffers_.size(); ++i) {
+          if (!input_buffers_[i].in_use) {
+            input_buffers_[i].in_use = true;  // mark as given to the caller
+            free_indices.push_back(i);
+          }
+        }
+      }
+      for (size_t idx : free_indices) {
+        NotifyInputBufferAvailable(idx);
+      }
       Process();
     } else {
       state_ = State::ERROR;
@@ -286,10 +300,12 @@ ssize_t SimpleCodec::DequeueInputBuffer(int64_t timeout_ms)
 
 status_t SimpleCodec::QueueInputBuffer(size_t index) {
   std::lock_guard<std::mutex> lock(lock_);
-  if (index >= input_buffers_.size() || !input_buffers_[index].in_use) {
+  if (index >= input_buffers_.size()) {
     return INVALID_OPERATION;
   }
-
+  // Mark in_use here so ProcessInput's check passes even when called from
+  // the NotifyInputBufferAvailable callback (where in_use was reset to false).
+  input_buffers_[index].in_use = true;
   input_queue_.push(index);
 
   task_runner_->PostTask([this]() {

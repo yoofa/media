@@ -7,9 +7,12 @@
 
 #include "ffmpeg_codec.h"
 
+#include <queue>
+
 #include "base/attributes.h"
 #include "base/logging.h"
 #include "base/sequence_checker.h"
+#include "media/foundation/pixel_format.h"
 #include "media/modules/ffmpeg/ffmpeg_utils.h"
 
 extern "C" {
@@ -169,6 +172,16 @@ void FFmpegCodec::ProcessInput(size_t index) {
       pkt->data = buffer->data();
       pkt->size = static_cast<int>(buffer->size());
 
+      // Track input PTS so we can stamp output frames
+      int64_t pts_us = AV_NOPTS_VALUE;
+      if (buffer->format()) {
+        base::Timestamp pts = buffer->format()->pts();
+        if (!pts.IsMinusInfinity()) {
+          pts_us = pts.us();
+        }
+      }
+      pts_queue_.push(pts_us);
+
       int ret = avcodec_send_packet(codec_ctx_, pkt);
       av_packet_free(&pkt);
 
@@ -260,6 +273,13 @@ void FFmpegCodec::ProcessOutput() {
 
       auto& buffer = output_buffers_[index].buffer;
 
+      // Pop the PTS associated with this output frame
+      int64_t pts_us = AV_NOPTS_VALUE;
+      if (!pts_queue_.empty()) {
+        pts_us = pts_queue_.front();
+        pts_queue_.pop();
+      }
+
       if (codec_ctx_->codec_type == AVMEDIA_TYPE_AUDIO) {
         int data_size = av_samples_get_buffer_size(
             nullptr, frame->ch_layout.nb_channels, frame->nb_samples,
@@ -283,8 +303,6 @@ void FFmpegCodec::ProcessOutput() {
               av_get_bytes_per_sample(
                   static_cast<AVSampleFormat>(frame->format)) *
               8));
-          // FFmpegCodec always interleaves output buffer
-          // meta->SetIsPlanar(false);
           if (av_sample_fmt_is_planar(
                   static_cast<AVSampleFormat>(frame->format))) {
             if (frame->format == AV_SAMPLE_FMT_FLTP) {
@@ -302,6 +320,9 @@ void FFmpegCodec::ProcessOutput() {
             } else if (frame->format == AV_SAMPLE_FMT_S32) {
               meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_S32LE);
             }
+          }
+          if (pts_us != AV_NOPTS_VALUE) {
+            meta->SetPts(base::Timestamp::Micros(pts_us));
           }
           buffer->format() = meta;
 
@@ -338,6 +359,20 @@ void FFmpegCodec::ProcessOutput() {
                                   static_cast<AVPixelFormat>(frame->format),
                                   frame->width, frame->height, 1);
           buffer->SetRange(0, data_size);
+
+          // Set video format metadata for downstream consumers
+          auto meta = MediaMeta::CreatePtr(MediaType::VIDEO,
+                                           MediaMeta::FormatType::kSample);
+          meta->SetWidth(frame->width);
+          meta->SetHeight(frame->height);
+          meta->SetStride(frame->linesize[0]);
+          if (frame->format == AV_PIX_FMT_YUV420P) {
+            meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_YUV420P);
+          }
+          if (pts_us != AV_NOPTS_VALUE) {
+            meta->SetPts(base::Timestamp::Micros(pts_us));
+          }
+          buffer->format() = meta;
         }
       }
 

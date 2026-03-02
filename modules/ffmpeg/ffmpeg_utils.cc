@@ -7,6 +7,8 @@
 
 #include "ffmpeg_utils.h"
 
+#include <cstring>
+
 #include "base/attributes.h"
 #include "base/checks.h"
 #include "base/logging.h"
@@ -424,7 +426,17 @@ void ConfigureAudioCodec(MediaMeta* format, AVCodecContext* codec_context) {
     auto ch_count = ChannelLayoutToChannelCount(channel_layout);
     av_channel_layout_default(&codec_context->ch_layout, ch_count);
   }
-  // TODO: extra data
+
+  // Pass codec extradata (e.g. AudioSpecificConfig for AAC)
+  auto priv = format->private_data();
+  if (priv && priv->size() > 0) {
+    codec_context->extradata = static_cast<uint8_t*>(
+        av_mallocz(priv->size() + AV_INPUT_BUFFER_PADDING_SIZE));
+    if (codec_context->extradata) {
+      std::memcpy(codec_context->extradata, priv->data(), priv->size());
+      codec_context->extradata_size = static_cast<int>(priv->size());
+    }
+  }
 }
 
 void ConfigureVideoCodec(MediaMeta* format, AVCodecContext* codec_context) {
@@ -447,7 +459,17 @@ void ConfigureVideoCodec(MediaMeta* format, AVCodecContext* codec_context) {
   if (pix_fmt != AVE_PIX_FMT_NONE) {
     codec_context->pix_fmt = ConvertToFFmpegPixelFormat(pix_fmt);
   }
-  // TODO: extra data
+
+  // Pass codec extradata (e.g. SPS/PPS for H.264)
+  auto priv = format->private_data();
+  if (priv && priv->size() > 0) {
+    codec_context->extradata = static_cast<uint8_t*>(
+        av_mallocz(priv->size() + AV_INPUT_BUFFER_PADDING_SIZE));
+    if (codec_context->extradata) {
+      std::memcpy(codec_context->extradata, priv->data(), priv->size());
+      codec_context->extradata_size = static_cast<int>(priv->size());
+    }
+  }
 }
 
 }  // namespace ffmpeg_utils
