@@ -43,6 +43,11 @@ status_t FFmpegCodec::OnConfigure(const std::shared_ptr<CodecConfig>& config) {
   auto format = config->format;
   if (format->stream_type() == MediaType::VIDEO) {
     ffmpeg_utils::ConfigureVideoCodec(format.get(), codec_ctx_);
+    // Use single-threaded decoding to prevent avcodec_send_packet EAGAIN
+    // caused by frame-threading buffering too many frames internally.
+    if (!is_encoder_) {
+      codec_ctx_->thread_count = 1;
+    }
   } else if (format->stream_type() == MediaType::AUDIO) {
     ffmpeg_utils::ConfigureAudioCodec(format.get(), codec_ctx_);
   }
@@ -86,9 +91,7 @@ status_t FFmpegCodec::OnRelease() {
 }
 
 void FFmpegCodec::ProcessInput(size_t index) {
-  AVE_LOG(LS_INFO) << "FFmpegCodec::ProcessInput(" << index << ") called";
   std::lock_guard<std::mutex> lock(lock_);
-  AVE_LOG(LS_INFO) << "FFmpegCodec::ProcessInput got lock";
 
   if (index >= input_buffers_.size() || !input_buffers_[index].in_use) {
     AVE_LOG(LS_WARNING) << "Invalid input buffer index or not in use";
@@ -96,7 +99,7 @@ void FFmpegCodec::ProcessInput(size_t index) {
   }
 
   auto& buffer = input_buffers_[index].buffer;
-  AVE_LOG(LS_INFO) << "Input buffer size: " << buffer->size();
+  AVE_LOG(LS_VERBOSE) << "Input buffer size: " << buffer->size();
 
   if (is_encoder_) {
     AVFrame* frame = av_frame_alloc();
@@ -180,18 +183,33 @@ void FFmpegCodec::ProcessInput(size_t index) {
           pts_us = pts.us();
         }
       }
-      pts_queue_.push(pts_us);
 
       int ret = avcodec_send_packet(codec_ctx_, pkt);
       av_packet_free(&pkt);
 
-      if (ret < 0 && ret != AVERROR(EAGAIN)) {
+      if (ret == AVERROR(EAGAIN)) {
+        // Decoder's internal buffer is full; output buffers are exhausted.
+        // Retry sending this input later without dropping the packet.
+        AVE_LOG(LS_WARNING) << "avcodec_send_packet EAGAIN at input index "
+                            << index << ", retrying after 5ms";
+        // Retry after a short delay (output consumption will free buffers)
+        task_runner_->PostDelayedTask([this, index]() {
+          AVE_DCHECK_RUN_ON(task_runner_.get());
+          ProcessInput(index);
+        }, 5000);
+        return;  // Do NOT release input buffer or notify; do NOT push pts
+      }
+
+      if (ret < 0) {
         char errbuf[AV_ERROR_MAX_STRING_SIZE];
         av_strerror(ret, errbuf, sizeof(errbuf));
         AVE_LOG(LS_ERROR) << "avcodec_send_packet failed: " << errbuf;
         NotifyError(UNKNOWN_ERROR);
         return;
       }
+
+      // Push PTS only after the packet was successfully accepted by FFmpeg
+      pts_queue_.push(pts_us);
     }
   }
 
@@ -269,7 +287,7 @@ void FFmpegCodec::ProcessOutput() {
         return;
       }
 
-      AVE_LOG(LS_INFO) << "Decoder produced output frame";
+      AVE_LOG(LS_VERBOSE) << "Decoder produced output frame";
 
       auto& buffer = output_buffers_[index].buffer;
 

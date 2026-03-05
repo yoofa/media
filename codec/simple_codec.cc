@@ -393,12 +393,15 @@ void SimpleCodec::Process() {
   {
     std::lock_guard<std::mutex> lock(lock_);
     AVE_LOG(LS_VERBOSE) << "Input queue size: " << input_queue_.size();
-    if (!input_queue_.empty()) {
+    // Only dequeue input when an output slot is available. This prevents
+    // feeding the codec when all output buffers are in-use, which would cause
+    // avcodec_send_packet to return EAGAIN (internal buffer full).
+    if (!input_queue_.empty() &&
+        GetAvailableOutputBufferIndex() != kInvalidIndex) {
       input_index = input_queue_.front();
       input_queue_.pop();
-      AVE_LOG(LS_INFO) << "Will process input buffer index: " << input_index;
     } else {
-      AVE_LOG(LS_VERBOSE) << "Input queue is empty";
+      AVE_LOG(LS_VERBOSE) << "Input queue is empty or no output slot available";
     }
   }
 

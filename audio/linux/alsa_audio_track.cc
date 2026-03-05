@@ -8,6 +8,7 @@
 #include "media/audio/linux/alsa_audio_track.h"
 
 #include <algorithm>
+#include <vector>
 
 #include "base/logging.h"
 #include "base/task_util/repeating_task.h"
@@ -62,9 +63,12 @@ ssize_t AlsaAudioTrack::channelCount() const {
 }
 
 ssize_t AlsaAudioTrack::frameSize() const {
-  // For PCM_16_BIT format, we use 2 bytes per sample
-  return ChannelLayoutToChannelCount(config_.channel_layout) *
-         2;  // 16 bits = 2 bytes
+  int channels = ChannelLayoutToChannelCount(config_.channel_layout);
+  // Return bytes per frame based on actual input format
+  if (config_.format == AUDIO_FORMAT_PCM_FLOAT) {
+    return channels * 4;  // float32: 4 bytes per sample
+  }
+  return channels * 2;  // S16_LE: 2 bytes per sample
 }
 
 uint32_t AlsaAudioTrack::sampleRate() const {
@@ -77,10 +81,18 @@ uint32_t AlsaAudioTrack::latency() const {
   }
 
   snd_pcm_sframes_t delay = 0;
-  if (LATE(snd_pcm_delay)(handle_, &delay) < 0) {
+  int err = LATE(snd_pcm_delay)(handle_, &delay);
+  if (err < 0) {
     return 0;
   }
-  return delay * 1000 / config_.sample_rate;
+  AVE_LOG(LS_VERBOSE) << "snd_pcm_delay=" << delay
+                      << " sample_rate=" << config_.sample_rate
+                      << " latency_ms=" << delay * 1000 / config_.sample_rate;
+  // Clamp delay to buffer size to avoid bogus values when ALSA is not running.
+  if (delay < 0) {
+    delay = 0;
+  }
+  return static_cast<uint32_t>(delay) * 1000 / config_.sample_rate;
 }
 
 float AlsaAudioTrack::msecsPerFrame() const {
@@ -323,6 +335,46 @@ status_t AlsaAudioTrack::RecoverIfNeeded(int error) {
 ssize_t AlsaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
   if (!ready_ || !playing_) {
     return -EINVAL;
+  }
+
+  int channels = ChannelLayoutToChannelCount(config_.channel_layout);
+
+  // Convert float32 input to S16_LE if needed (ALSA is opened as S16_LE)
+  if (config_.format == AUDIO_FORMAT_PCM_FLOAT) {
+    size_t num_samples = size / sizeof(float);
+    size_t frames = num_samples / channels;
+    std::vector<int16_t> s16_buf(num_samples);
+    const auto* float_src = static_cast<const float*>(buffer);
+    for (size_t i = 0; i < num_samples; i++) {
+      float f = std::max(-1.0f, std::min(1.0f, float_src[i]));
+      s16_buf[i] = static_cast<int16_t>(f * 32767.0f);
+    }
+    const auto* data = s16_buf.data();
+    size_t remaining = frames;
+    ssize_t written = 0;
+    while (remaining > 0) {
+      snd_pcm_sframes_t ret = LATE(snd_pcm_writei)(handle_, data, remaining);
+      if (ret == -EAGAIN) {
+        if (!blocking) {
+          break;
+        }
+        LATE(snd_pcm_wait)(handle_, -1);
+        continue;
+      }
+      if (ret < 0) {
+        if (ret == -EPIPE) {
+          LATE(snd_pcm_prepare)(handle_);
+          continue;
+        }
+        return ret;
+      }
+      remaining -= ret;
+      data += ret * channels;
+      written += ret;
+      frames_written_ += ret;
+    }
+    // Return bytes written in float32 input terms
+    return written * channels * static_cast<ssize_t>(sizeof(float));
   }
 
   const auto* data = static_cast<const uint8_t*>(buffer);
