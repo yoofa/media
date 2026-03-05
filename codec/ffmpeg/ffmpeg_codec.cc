@@ -383,7 +383,9 @@ void FFmpegCodec::ProcessOutput() {
                                            MediaMeta::FormatType::kSample);
           meta->SetWidth(frame->width);
           meta->SetHeight(frame->height);
-          meta->SetStride(frame->linesize[0]);
+          // av_image_copy_to_buffer with alignment=1 packs rows tightly,
+          // so the effective Y stride equals width (not linesize[0]).
+          meta->SetStride(frame->width);
           if (frame->format == AV_PIX_FMT_YUV420P) {
             meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_YUV420P);
           }
