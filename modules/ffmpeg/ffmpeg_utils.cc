@@ -163,15 +163,22 @@ const char* AVCodecId2Mime(AVCodecID ffmpeg_codec_id) {
 PixelFormat ConvertFromFFmpegPixelFormat(AVPixelFormat pixel_format) {
   switch (pixel_format) {
     case AV_PIX_FMT_YUV420P:
+    case AV_PIX_FMT_YUVJ420P:    // JPEG full-range YUV420
+    case AV_PIX_FMT_YUV420P10LE: // 10-bit (common in HEVC/HDR) — treat as 8-bit
+    case AV_PIX_FMT_YUV420P10BE:
+    case AV_PIX_FMT_YUV420P12LE:
+    case AV_PIX_FMT_YUV420P12BE:
       return AVE_PIX_FMT_YUV420P;
 
     case AV_PIX_FMT_YUV422P:
+    case AV_PIX_FMT_YUVJ422P:
       return AVE_PIX_FMT_YUV422P;
 
     default:
-      AVE_LOG(LS_ERROR) << "Unsupported PixelFormat: " << pixel_format;
+      AVE_LOG(LS_WARNING) << "Unsupported PixelFormat: " << pixel_format
+                          << ", falling back to YUV420P";
   }
-  return AVE_PIX_FMT_NONE;
+  return AVE_PIX_FMT_YUV420P;  // best-effort fallback
 }
 
 AVPixelFormat ConvertToFFmpegPixelFormat(PixelFormat pixel_format) {
@@ -372,11 +379,19 @@ std::shared_ptr<MediaFrame> CreateMediaFrameFromAVPacket(
   auto packet =
       MediaFrame::CreateSharedAsCopy(av_packet->data, av_packet->size);
 
-  // packet->SetStreamIndex(av_packet->stream_index);
-  packet->meta()->SetPts(base::Timestamp::Micros(
-      ConvertFromTimeBase(av_packet->time_base, av_packet->pts)));
-  packet->meta()->SetDts(base::Timestamp::Micros(
-      ConvertFromTimeBase(av_packet->time_base, av_packet->dts)));
+  // Clamp negative PTS to 0; some encoders emit a negative initial PTS
+  // (e.g. AAC encoder delay). Timestamp is one-sided (non-negative).
+  int64_t pts_us = ConvertFromTimeBase(av_packet->time_base, av_packet->pts);
+  int64_t dts_us = ConvertFromTimeBase(av_packet->time_base, av_packet->dts);
+  if (pts_us < 0) {
+    pts_us = 0;
+  }
+  if (dts_us < 0) {
+    dts_us = 0;
+  }
+
+  packet->meta()->SetPts(base::Timestamp::Micros(pts_us));
+  packet->meta()->SetDts(base::Timestamp::Micros(dts_us));
   packet->meta()->SetDuration(base::TimeDelta::Micros(
       ConvertFromTimeBase(av_packet->time_base, av_packet->duration)));
   // packet->meta()->SetFlags(av_packet->flags);

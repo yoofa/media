@@ -365,31 +365,64 @@ void FFmpegCodec::ProcessOutput() {
           }
         }
       } else if (codec_ctx_->codec_type == AVMEDIA_TYPE_VIDEO) {
+        AVPixelFormat src_fmt = static_cast<AVPixelFormat>(frame->format);
+
+        // Check if source needs conversion to yuv420p (e.g. 10/12-bit HEVC HDR)
+        bool is_yuv420_hbd =
+            (src_fmt == AV_PIX_FMT_YUV420P10LE ||
+             src_fmt == AV_PIX_FMT_YUV420P10BE ||
+             src_fmt == AV_PIX_FMT_YUV420P12LE ||
+             src_fmt == AV_PIX_FMT_YUV420P12BE);
+        bool is_yuvj420 = (src_fmt == AV_PIX_FMT_YUVJ420P);
+        AVPixelFormat dst_fmt =
+            (is_yuv420_hbd || is_yuvj420) ? AV_PIX_FMT_YUV420P : src_fmt;
+
         int data_size =
-            av_image_get_buffer_size(static_cast<AVPixelFormat>(frame->format),
-                                     frame->width, frame->height, 1);
+            av_image_get_buffer_size(dst_fmt, frame->width, frame->height, 1);
 
         if (data_size > 0) {
           buffer->EnsureCapacity(data_size, false);
-          av_image_copy_to_buffer(buffer->data(), data_size,
-                                  const_cast<const uint8_t**>(frame->data),
-                                  frame->linesize,
-                                  static_cast<AVPixelFormat>(frame->format),
-                                  frame->width, frame->height, 1);
-          buffer->SetRange(0, data_size);
 
-          // Set video format metadata for downstream consumers
+          if (is_yuv420_hbd) {
+            // Manually convert high-bit-depth YUV420 to 8-bit YUV420P.
+            // Each sample is stored as uint16_t; right-shift 2 (10-bit) or 4
+            // (12-bit) to produce uint8_t.
+            const int shift = (src_fmt == AV_PIX_FMT_YUV420P12LE ||
+                               src_fmt == AV_PIX_FMT_YUV420P12BE)
+                                  ? 4
+                                  : 2;
+            uint8_t* dst = buffer->data();
+            for (int p = 0; p < 3; ++p) {
+              int plane_w = (p == 0) ? frame->width : (frame->width + 1) / 2;
+              int plane_h = (p == 0) ? frame->height : (frame->height + 1) / 2;
+              const uint16_t* src16 =
+                  reinterpret_cast<const uint16_t*>(frame->data[p]);
+              int src_stride16 = frame->linesize[p] / 2;
+              for (int y = 0; y < plane_h; ++y) {
+                for (int x = 0; x < plane_w; ++x) {
+                  *dst++ = static_cast<uint8_t>(src16[y * src_stride16 + x] >>
+                                                shift);
+                }
+              }
+            }
+            buffer->SetRange(0, data_size);
+          } else {
+            // Direct copy for yuv420p / yuvj420p
+            av_image_copy_to_buffer(
+                buffer->data(), data_size,
+                const_cast<const uint8_t**>(frame->data), frame->linesize,
+                dst_fmt, frame->width, frame->height, 1);
+            buffer->SetRange(0, data_size);
+          }
+
+          // Set video format metadata
           auto meta = MediaMeta::CreatePtr(MediaType::VIDEO,
                                            MediaMeta::FormatType::kSample);
           meta->SetWidth(frame->width);
           meta->SetHeight(frame->height);
-          // av_image_copy_to_buffer with alignment=1 packs rows tightly,
-          // so the effective Y stride equals width (not linesize[0]).
           meta->SetStride(frame->width);
-          if (frame->format == AV_PIX_FMT_YUV420P) {
-            meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_YUV420P);
-          }
-          if (pts_us != AV_NOPTS_VALUE) {
+          meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_YUV420P);
+          if (pts_us != AV_NOPTS_VALUE && pts_us >= 0) {
             meta->SetPts(base::Timestamp::Micros(pts_us));
           }
           buffer->format() = meta;
