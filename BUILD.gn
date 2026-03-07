@@ -6,6 +6,9 @@ group("media") {
     "codec",
     "foundation",
   ]
+  if (is_android) {
+    deps += [ "android" ]
+  }
 }
 
 ave_executable("media_unittests") {

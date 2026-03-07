@@ -1,0 +1,48 @@
+import("//base/build/ave.gni")
+import("//build/config/android/rules.gni")
+import("//third_party/jni_zero/jni_zero.gni")
+
+group("android") {
+  if (is_android) {
+    deps = [
+      ":ave_media_java",
+      ":ave_media_jni",
+    ]
+  }
+}
+
+if (is_android) {
+  ave_android_library("ave_media_java") {
+    visibility = [ "*" ]
+    sources = [
+      "java/io/github/yoofa/media/MediaFormat.java",
+      "java/io/github/yoofa/media/VideoFrame.java",
+      "java/io/github/yoofa/media/VideoRenderer.java",
+    ]
+    deps = [
+      "//third_party/jni_zero:jni_zero_java",
+    ]
+  }
+
+  generate_jni("generated_media_jni") {
+    sources = [
+      "java/io/github/yoofa/media/MediaFormat.java",
+      "java/io/github/yoofa/media/VideoFrame.java",
+    ]
+    namespace = "ave::media::jni"
+    jni_generator_include = "//base/android/jni/jni_generator_helper.h"
+  }
+
+  ave_library("ave_media_jni") {
+    visibility = [ "*" ]
+    sources = [
+      "jni/video_frame_jni.cc",
+      "jni/video_frame_jni.h",
+    ]
+    deps = [
+      ":generated_media_jni",
+      "//base:logging",
+      "//third_party/jni_zero",
+    ]
+  }
+}
