@@ -379,19 +379,11 @@ std::shared_ptr<MediaFrame> CreateMediaFrameFromAVPacket(
   auto packet =
       MediaFrame::CreateSharedAsCopy(av_packet->data, av_packet->size);
 
-  // Clamp negative PTS to 0; some encoders emit a negative initial PTS
-  // (e.g. AAC encoder delay). Timestamp is one-sided (non-negative).
-  int64_t pts_us = ConvertFromTimeBase(av_packet->time_base, av_packet->pts);
-  int64_t dts_us = ConvertFromTimeBase(av_packet->time_base, av_packet->dts);
-  if (pts_us < 0) {
-    pts_us = 0;
-  }
-  if (dts_us < 0) {
-    dts_us = 0;
-  }
-
-  packet->meta()->SetPts(base::Timestamp::Micros(pts_us));
-  packet->meta()->SetDts(base::Timestamp::Micros(dts_us));
+  // packet->SetStreamIndex(av_packet->stream_index);
+  packet->meta()->SetPts(base::Timestamp::Micros(
+      ConvertFromTimeBase(av_packet->time_base, av_packet->pts)));
+  packet->meta()->SetDts(base::Timestamp::Micros(
+      ConvertFromTimeBase(av_packet->time_base, av_packet->dts)));
   packet->meta()->SetDuration(base::TimeDelta::Micros(
       ConvertFromTimeBase(av_packet->time_base, av_packet->duration)));
   // packet->meta()->SetFlags(av_packet->flags);

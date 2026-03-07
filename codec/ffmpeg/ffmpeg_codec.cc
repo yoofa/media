@@ -422,7 +422,7 @@ void FFmpegCodec::ProcessOutput() {
           meta->SetHeight(frame->height);
           meta->SetStride(frame->width);
           meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_YUV420P);
-          if (pts_us != AV_NOPTS_VALUE && pts_us >= 0) {
+          if (pts_us != AV_NOPTS_VALUE) {
             meta->SetPts(base::Timestamp::Micros(pts_us));
           }
           buffer->format() = meta;
