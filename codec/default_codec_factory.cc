@@ -15,6 +15,9 @@ namespace media {
 DefaultCodecFactory::DefaultCodecFactory() {
   software_factory_ = std::make_shared<SoftwareCodecFactory>();
   hardware_factory_ = std::make_shared<HardwareCodecFactory>();
+  AVE_LOG(LS_INFO) << "DefaultCodecFactory: created with software("
+                   << software_factory_->name() << ") and hardware("
+                   << hardware_factory_->name() << ") factories";
 }
 
 DefaultCodecFactory::~DefaultCodecFactory() {}

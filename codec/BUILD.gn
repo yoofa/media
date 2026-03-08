@@ -73,6 +73,9 @@ ave_library("hardware_codec_factory") {
     ":codec_interface",
     "//base:utils",
   ]
+  if (is_android) {
+    deps += [ "android:android_ndk_media_codec" ]
+  }
 }
 
 ave_library("default_codec_factory") {

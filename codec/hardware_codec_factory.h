@@ -8,11 +8,17 @@
 #ifndef HARDWARE_CODEC_FACTORY_H
 #define HARDWARE_CODEC_FACTORY_H
 
+#include <memory>
+
 #include "codec_factory.h"
 
 namespace ave {
 namespace media {
 
+/**
+ * Hardware codec factory that delegates to platform-specific hardware codec
+ * implementations. On Android, delegates to AndroidNdkMediaCodecFactory.
+ */
 class HardwareCodecFactory : public CodecFactory {
  public:
   HardwareCodecFactory();
@@ -27,6 +33,9 @@ class HardwareCodecFactory : public CodecFactory {
 
   std::string name() const override { return "hardware"; }
   int16_t priority() const override { return 200; }
+
+ private:
+  std::shared_ptr<CodecFactory> platform_factory_;
 };
 
 }  // namespace media

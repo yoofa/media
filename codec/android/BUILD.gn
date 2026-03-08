@@ -1,0 +1,24 @@
+import("//base/build/ave.gni")
+
+ave_library("android_ndk_media_codec") {
+  sources = [
+    "android_media_codec_buffer.cc",
+    "android_media_codec_buffer.h",
+    "android_ndk_media_codec.cc",
+    "android_ndk_media_codec.h",
+    "android_ndk_media_codec_factory.cc",
+    "android_ndk_media_codec_factory.h",
+  ]
+  deps = [
+    "..:codec_buffer",
+    "..:codec_id",
+    "..:codec_interface",
+    "../../audio:audio_channel_layout",
+    "../../foundation:handler",
+    "../../foundation:media_buffer",
+    "../../foundation:media_meta",
+    "//base:logging",
+    "//base:utils",
+  ]
+  libs = [ "mediandk" ]
+}
