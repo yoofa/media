@@ -53,16 +53,22 @@ SimpleCodec::~SimpleCodec() {
 
 status_t SimpleCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
   status_t ret = OK;
+  AVE_LOG(LS_INFO) << "SimpleCodec::Configure: posting task to task runner";
   task_runner_->PostTaskAndWait([this, &ret, config]() {
     AVE_DCHECK_RUN_ON(task_runner_.get());
+    AVE_LOG(LS_INFO)
+        << "SimpleCodec::Configure: task running on task runner thread";
 
     if (state_ != State::UNINITIALIZED) {
+      AVE_LOG(LS_ERROR) << "SimpleCodec::Configure: bad state="
+                        << static_cast<int>(state_);
       ret = INVALID_OPERATION;
       return;
     }
 
     std::lock_guard<std::mutex> lock(lock_);
 
+    AVE_LOG(LS_INFO) << "SimpleCodec::Configure: allocating buffers";
     input_buffers_ = std::vector<BufferEntry>(kMaxInputBuffers);
     for (auto& entry : input_buffers_) {
       entry.buffer = std::make_shared<CodecBuffer>(kDefaultBufferSize);
@@ -76,7 +82,9 @@ status_t SimpleCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
     }
 
     config_ = config;
+    AVE_LOG(LS_INFO) << "SimpleCodec::Configure: calling OnConfigure";
     ret = OnConfigure(config);
+    AVE_LOG(LS_INFO) << "SimpleCodec::Configure: OnConfigure returned " << ret;
     if (ret == OK) {
       state_ = State::CONFIGURED;
     } else {
@@ -84,6 +92,8 @@ status_t SimpleCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
     }
   });
 
+  AVE_LOG(LS_INFO) << "SimpleCodec::Configure: PostTaskAndWait returned, ret="
+                   << ret;
   return ret;
 }
 

@@ -163,8 +163,9 @@ const char* AVCodecId2Mime(AVCodecID ffmpeg_codec_id) {
 PixelFormat ConvertFromFFmpegPixelFormat(AVPixelFormat pixel_format) {
   switch (pixel_format) {
     case AV_PIX_FMT_YUV420P:
-    case AV_PIX_FMT_YUVJ420P:    // JPEG full-range YUV420
-    case AV_PIX_FMT_YUV420P10LE: // 10-bit (common in HEVC/HDR) — treat as 8-bit
+    case AV_PIX_FMT_YUVJ420P:     // JPEG full-range YUV420
+    case AV_PIX_FMT_YUV420P10LE:  // 10-bit (common in HEVC/HDR) — treat as
+                                  // 8-bit
     case AV_PIX_FMT_YUV420P10BE:
     case AV_PIX_FMT_YUV420P12LE:
     case AV_PIX_FMT_YUV420P12BE:

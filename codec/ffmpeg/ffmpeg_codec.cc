@@ -35,13 +35,17 @@ FFmpegCodec::~FFmpegCodec() {
 }
 
 status_t FFmpegCodec::OnConfigure(const std::shared_ptr<CodecConfig>& config) {
+  AVE_LOG(LS_INFO) << "FFmpegCodec::OnConfigure: allocating codec context";
   codec_ctx_ = avcodec_alloc_context3(codec_);
   if (!codec_ctx_) {
+    AVE_LOG(LS_ERROR)
+        << "FFmpegCodec::OnConfigure: avcodec_alloc_context3 failed";
     return NO_MEMORY;
   }
 
   auto format = config->format;
   if (format->stream_type() == MediaType::VIDEO) {
+    AVE_LOG(LS_INFO) << "FFmpegCodec::OnConfigure: configuring video codec";
     ffmpeg_utils::ConfigureVideoCodec(format.get(), codec_ctx_);
     // Use single-threaded decoding to prevent avcodec_send_packet EAGAIN
     // caused by frame-threading buffering too many frames internally.
@@ -49,14 +53,28 @@ status_t FFmpegCodec::OnConfigure(const std::shared_ptr<CodecConfig>& config) {
       codec_ctx_->thread_count = 1;
     }
   } else if (format->stream_type() == MediaType::AUDIO) {
+    AVE_LOG(LS_INFO) << "FFmpegCodec::OnConfigure: configuring audio codec"
+                     << ", sample_rate=" << format->sample_rate()
+                     << ", codec=" << static_cast<int>(format->codec());
     ffmpeg_utils::ConfigureAudioCodec(format.get(), codec_ctx_);
   }
 
-  if (avcodec_open2(codec_ctx_, codec_, nullptr) < 0) {
+  AVE_LOG(LS_INFO) << "FFmpegCodec::OnConfigure: calling avcodec_open2"
+                   << ", codec_id=" << codec_ctx_->codec_id
+                   << ", codec_name=" << (codec_ ? codec_->name : "null");
+  int open_ret = avcodec_open2(codec_ctx_, codec_, nullptr);
+  AVE_LOG(LS_INFO) << "FFmpegCodec::OnConfigure: avcodec_open2 returned "
+                   << open_ret;
+  if (open_ret < 0) {
+    char errbuf[AV_ERROR_MAX_STRING_SIZE];
+    av_strerror(open_ret, errbuf, sizeof(errbuf));
+    AVE_LOG(LS_ERROR) << "FFmpegCodec::OnConfigure: avcodec_open2 failed: "
+                      << errbuf;
     avcodec_free_context(&codec_ctx_);
     return UNKNOWN_ERROR;
   }
 
+  AVE_LOG(LS_INFO) << "FFmpegCodec::OnConfigure: success";
   return OK;
 }
 
@@ -193,10 +211,12 @@ void FFmpegCodec::ProcessInput(size_t index) {
         AVE_LOG(LS_WARNING) << "avcodec_send_packet EAGAIN at input index "
                             << index << ", retrying after 5ms";
         // Retry after a short delay (output consumption will free buffers)
-        task_runner_->PostDelayedTask([this, index]() {
-          AVE_DCHECK_RUN_ON(task_runner_.get());
-          ProcessInput(index);
-        }, 5000);
+        task_runner_->PostDelayedTask(
+            [this, index]() {
+              AVE_DCHECK_RUN_ON(task_runner_.get());
+              ProcessInput(index);
+            },
+            5000);
         return;  // Do NOT release input buffer or notify; do NOT push pts
       }
 
@@ -368,11 +388,10 @@ void FFmpegCodec::ProcessOutput() {
         AVPixelFormat src_fmt = static_cast<AVPixelFormat>(frame->format);
 
         // Check if source needs conversion to yuv420p (e.g. 10/12-bit HEVC HDR)
-        bool is_yuv420_hbd =
-            (src_fmt == AV_PIX_FMT_YUV420P10LE ||
-             src_fmt == AV_PIX_FMT_YUV420P10BE ||
-             src_fmt == AV_PIX_FMT_YUV420P12LE ||
-             src_fmt == AV_PIX_FMT_YUV420P12BE);
+        bool is_yuv420_hbd = (src_fmt == AV_PIX_FMT_YUV420P10LE ||
+                              src_fmt == AV_PIX_FMT_YUV420P10BE ||
+                              src_fmt == AV_PIX_FMT_YUV420P12LE ||
+                              src_fmt == AV_PIX_FMT_YUV420P12BE);
         bool is_yuvj420 = (src_fmt == AV_PIX_FMT_YUVJ420P);
         AVPixelFormat dst_fmt =
             (is_yuv420_hbd || is_yuvj420) ? AV_PIX_FMT_YUV420P : src_fmt;
@@ -408,10 +427,10 @@ void FFmpegCodec::ProcessOutput() {
             buffer->SetRange(0, data_size);
           } else {
             // Direct copy for yuv420p / yuvj420p
-            av_image_copy_to_buffer(
-                buffer->data(), data_size,
-                const_cast<const uint8_t**>(frame->data), frame->linesize,
-                dst_fmt, frame->width, frame->height, 1);
+            av_image_copy_to_buffer(buffer->data(), data_size,
+                                    const_cast<const uint8_t**>(frame->data),
+                                    frame->linesize, dst_fmt, frame->width,
+                                    frame->height, 1);
             buffer->SetRange(0, data_size);
           }
 
