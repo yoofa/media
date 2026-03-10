@@ -19,9 +19,7 @@ if (is_android) {
       "java/io/github/yoofa/media/VideoFrame.java",
       "java/io/github/yoofa/media/VideoRenderer.java",
     ]
-    deps = [
-      "//third_party/jni_zero:jni_zero_java",
-    ]
+    deps = [ "//third_party/jni_zero:jni_zero_java" ]
   }
 
   generate_jni("generated_media_jni") {

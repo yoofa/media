@@ -29,15 +29,14 @@ namespace jni {
  * @param data_size Size of the pixel data in bytes.
  * @return A Java VideoFrame object, or null on failure.
  */
-jni_zero::ScopedJavaLocalRef<jobject> CreateJavaVideoFrame(
-    JNIEnv* env,
-    int width,
-    int height,
-    int stride,
-    int64_t timestamp_us,
-    int rotation,
-    const uint8_t* data,
-    size_t data_size);
+jni_zero::ScopedJavaLocalRef<jobject> CreateJavaVideoFrame(JNIEnv* env,
+                                                           int width,
+                                                           int height,
+                                                           int stride,
+                                                           int64_t timestamp_us,
+                                                           int rotation,
+                                                           const uint8_t* data,
+                                                           size_t data_size);
 
 }  // namespace jni
 }  // namespace media
