@@ -32,7 +32,8 @@ class TestCallback : public CodecCallback {
     output_count++;
   }
 
-  void OnOutputFormatChanged(const std::shared_ptr<MediaMeta>& format) override {
+  void OnOutputFormatChanged(
+      const std::shared_ptr<MediaMeta>& format) override {
     std::cout << "Output format changed" << std::endl;
   }
 
@@ -101,23 +102,26 @@ int main(int argc, char** argv) {
   std::vector<uint8_t> buffer(65536);
   input.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
   size_t bytes_read = input.gcount();
-  
+
   std::cout << "Read " << bytes_read << " bytes" << std::endl;
 
   // Push to framing queue
   framing_queue.PushData(buffer.data(), bytes_read);
-  std::cout << "Framing queue has " << framing_queue.FrameCount() << " frames" << std::endl;
+  std::cout << "Framing queue has " << framing_queue.FrameCount() << " frames"
+            << std::endl;
 
   // Process a few frames
   int frames_processed = 0;
   while (framing_queue.HasFrame() && frames_processed < 5) {
     auto frame = framing_queue.PopFrame();
-    std::cout << "Frame " << frames_processed << " size: " << frame->size() << std::endl;
+    std::cout << "Frame " << frames_processed << " size: " << frame->size()
+              << std::endl;
 
     // Dequeue input buffer
     ssize_t input_index = codec->DequeueInputBuffer(1000);
     if (input_index < 0) {
-      std::cout << "Failed to dequeue input buffer after frame " << frames_processed << std::endl;
+      std::cout << "Failed to dequeue input buffer after frame "
+                << frames_processed << std::endl;
       break;
     }
 
@@ -149,7 +153,8 @@ int main(int argc, char** argv) {
     if (output_index >= 0) {
       std::shared_ptr<CodecBuffer> output_buffer;
       if (codec->GetOutputBuffer(output_index, output_buffer) == OK) {
-        std::cout << "Got output buffer with size: " << output_buffer->size() << std::endl;
+        std::cout << "Got output buffer with size: " << output_buffer->size()
+                  << std::endl;
         codec->ReleaseOutputBuffer(output_index, false);
       }
     }

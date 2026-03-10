@@ -29,7 +29,8 @@ class TestCallback : public CodecCallback {
     output_count++;
   }
 
-  void OnOutputFormatChanged(const std::shared_ptr<MediaMeta>& format) override {
+  void OnOutputFormatChanged(
+      const std::shared_ptr<MediaMeta>& format) override {
     std::cout << "✓ Output format changed" << std::endl;
   }
 
@@ -50,7 +51,7 @@ int main(int argc, char** argv) {
 
   // Create passthrough codec (decoder mode, but doesn't matter for passthrough)
   auto codec = std::make_shared<SimplePassthroughCodec>(false);
-  
+
   // Configure codec
   auto config = std::make_shared<CodecConfig>();
   auto format = MediaMeta::CreatePtr();
@@ -80,7 +81,7 @@ int main(int argc, char** argv) {
   // Test data
   const int TEST_FRAMES = 5;
   std::vector<std::vector<uint8_t>> test_data;
-  
+
   // Generate test data
   for (int i = 0; i < TEST_FRAMES; i++) {
     std::vector<uint8_t> data(100 + i * 10);  // Variable size
@@ -91,13 +92,13 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "\n3. Processing " << TEST_FRAMES << " frames..." << std::endl;
-  
+
   int frames_processed = 0;
   int frames_output = 0;
-  
+
   for (int i = 0; i < TEST_FRAMES; i++) {
     std::cout << "\n--- Frame " << (i + 1) << " ---" << std::endl;
-    
+
     // Dequeue input buffer
     ssize_t input_index = codec->DequeueInputBuffer(1000);
     if (input_index < 0) {
@@ -118,7 +119,8 @@ int main(int argc, char** argv) {
     input_buffer->EnsureCapacity(data.size(), true);
     std::memcpy(input_buffer->data(), data.data(), data.size());
     input_buffer->SetRange(0, data.size());
-    std::cout << "✓ Wrote " << data.size() << " bytes to input buffer" << std::endl;
+    std::cout << "✓ Wrote " << data.size() << " bytes to input buffer"
+              << std::endl;
 
     // Queue input buffer
     if (codec->QueueInputBuffer(input_index) != OK) {
@@ -151,13 +153,13 @@ int main(int argc, char** argv) {
 
     // Verify output data matches input data
     size_t output_size = output_buffer->size();
-    std::cout << "✓ Got output buffer: " << output_index 
+    std::cout << "✓ Got output buffer: " << output_index
               << ", size: " << output_size << " bytes" << std::endl;
 
     bool data_matches = (output_size == data.size());
     if (data_matches) {
-      data_matches = (std::memcmp(output_buffer->data(), data.data(), 
-                                   data.size()) == 0);
+      data_matches =
+          (std::memcmp(output_buffer->data(), data.data(), data.size()) == 0);
     }
 
     if (data_matches) {
@@ -182,7 +184,7 @@ int main(int argc, char** argv) {
 
     std::shared_ptr<CodecBuffer> output_buffer;
     if (codec->GetOutputBuffer(output_index, output_buffer) == OK) {
-      std::cout << "✓ Got delayed output buffer: " << output_index 
+      std::cout << "✓ Got delayed output buffer: " << output_index
                 << ", size: " << output_buffer->size() << std::endl;
       codec->ReleaseOutputBuffer(output_index, false);
       frames_output++;
@@ -201,11 +203,11 @@ int main(int argc, char** argv) {
   std::cout << "Frames output:     " << frames_output << std::endl;
   std::cout << "Input callbacks:   " << callback.input_count << std::endl;
   std::cout << "Output callbacks:  " << callback.output_count << std::endl;
-  std::cout << "Errors:            " << (callback.has_error ? "YES" : "NO") << std::endl;
+  std::cout << "Errors:            " << (callback.has_error ? "YES" : "NO")
+            << std::endl;
 
-  bool success = (frames_processed == TEST_FRAMES) && 
-                 (frames_output == TEST_FRAMES) &&
-                 !callback.has_error;
+  bool success = (frames_processed == TEST_FRAMES) &&
+                 (frames_output == TEST_FRAMES) && !callback.has_error;
 
   if (success) {
     std::cout << "\n✓✓✓ ALL TESTS PASSED! ✓✓✓" << std::endl;
