@@ -4,6 +4,8 @@ ave_library("android_ndk_media_codec") {
   sources = [
     "android_media_codec_buffer.cc",
     "android_media_codec_buffer.h",
+    "android_native_window_render.cc",
+    "android_native_window_render.h",
     "android_ndk_media_codec.cc",
     "android_ndk_media_codec.h",
     "android_ndk_media_codec_factory.cc",
@@ -17,8 +19,12 @@ ave_library("android_ndk_media_codec") {
     "../../foundation:handler",
     "../../foundation:media_buffer",
     "../../foundation:media_meta",
+    "../../video:video_render",
     "//base:logging",
     "//base:utils",
   ]
-  libs = [ "mediandk" ]
+  libs = [
+    "android",
+    "mediandk",
+  ]
 }

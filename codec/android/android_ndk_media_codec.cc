@@ -7,6 +7,9 @@
 
 #include "android_ndk_media_codec.h"
 
+#include <vector>
+
+#include <android/native_window.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormat.h>
 
@@ -16,6 +19,7 @@
 #include "media/NdkMediaCodec.h"
 #include "media/audio/channel_layout.h"
 #include "media/foundation/media_errors.h"
+#include "media/foundation/pixel_format.h"
 
 namespace ave {
 namespace media {
@@ -42,67 +46,258 @@ status_t MapMediaStatus(media_status_t status) {
   }
 }
 
-class AMediaCodecCallbackHelper : public AMediaCodecOnAsyncNotifyCallback {
- public:
-  static void onAsyncInputAvailable(AMediaCodec* codec AVE_MAYBE_UNUSED,
-                                    void* userdata,
-                                    int32_t index) {
-    AVE_LOG(LS_VERBOSE) << "NDK callback: input buffer available, index="
-                        << index;
-    auto* c = reinterpret_cast<AndroidNdkMediaCodec*>(userdata);
-    c->NotifyInputBufferAvailable(static_cast<size_t>(index));
+// ---------------------------------------------------------------------------
+// AVCC → Annex B CSD conversion for H.264/AVC.
+//
+// FFmpeg's MP4 demuxer stores the avcC configuration record (AVCC format) in
+// extradata/private_data.  Android MediaCodec expects Annex B format:
+//   csd-0: 00 00 00 01 <SPS NALU>
+//   csd-1: 00 00 00 01 <PPS NALU>
+//
+// Note: The actual access unit packets are already converted to Annex B by the
+// h264_mp4toannexb bitstream filter in FFmpegDemuxer — only the CSD needs
+// conversion here.
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Check if H.264 extradata is in AVCC format (avcC configuration record)
+ * @param data Extradata pointer
+ * @param size Extradata size in bytes
+ * @return true if AVCC format (configurationVersion == 1 and not a start code)
+ */
+bool IsAvccFormat(const uint8_t* data, size_t size) {
+  if (!data || size < 7) {
+    return false;
+  }
+  // AVCC configurationVersion must be 1
+  if (data[0] != 0x01) {
+    return false;
+  }
+  // Ensure it's not already Annex B (start code 00 00 00 01 or 00 00 01)
+  if (size >= 4 && data[0] == 0x00 && data[1] == 0x00) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * @brief Convert AVCC configuration record to Annex B csd-0 (SPS) and csd-1
+ *        (PPS) buffers for Android MediaCodec.
+ * @param avcc Raw avcC box data from MP4 container
+ * @param avcc_size Size of avcc data
+ * @param[out] csd0 SPS with Annex B start code(s)
+ * @param[out] csd1 PPS with Annex B start code(s)
+ * @return true on success, false if parsing fails
+ */
+bool ConvertAvccToAnnexBCsd(const uint8_t* avcc,
+                            size_t avcc_size,
+                            std::vector<uint8_t>& csd0,
+                            std::vector<uint8_t>& csd1) {
+  // AVCC record layout:
+  //   [0]    configurationVersion (1)
+  //   [1]    AVCProfileIndication
+  //   [2]    profile_compatibility
+  //   [3]    AVCLevelIndication
+  //   [4]    0xFC | (lengthSizeMinusOne & 0x03)
+  //   [5]    0xE0 | (numSPS & 0x1F)
+  //   For each SPS: [2 bytes length] [SPS data]
+  //   [1 byte] numPPS
+  //   For each PPS: [2 bytes length] [PPS data]
+  if (avcc_size < 7) {
+    AVE_LOG(LS_ERROR) << "ConvertAvccToAnnexBCsd: too small (" << avcc_size
+                      << " bytes)";
+    return false;
   }
 
-  static void onAsyncOutputAvailable(AMediaCodec* codec AVE_MAYBE_UNUSED,
-                                     void* userdata,
-                                     int32_t index,
-                                     AMediaCodecBufferInfo* bufferInfo) {
-    AVE_LOG(LS_VERBOSE) << "NDK callback: output buffer available, index="
-                        << index
-                        << ", size=" << (bufferInfo ? bufferInfo->size : -1)
-                        << ", pts="
-                        << (bufferInfo ? bufferInfo->presentationTimeUs : -1)
-                        << ", flags=" << (bufferInfo ? bufferInfo->flags : -1);
-    auto* c = reinterpret_cast<AndroidNdkMediaCodec*>(userdata);
-    c->NotifyOutputBufferAvailable(
-        static_cast<size_t>(index), bufferInfo ? bufferInfo->offset : 0,
-        bufferInfo ? bufferInfo->size : 0,
-        bufferInfo ? bufferInfo->presentationTimeUs : 0,
-        bufferInfo ? static_cast<uint32_t>(bufferInfo->flags) : 0);
+  static const uint8_t kStartCode[] = {0x00, 0x00, 0x00, 0x01};
+
+  size_t offset = 5;
+
+  // Parse SPS entries
+  uint8_t num_sps = avcc[offset] & 0x1F;
+  offset++;
+  AVE_LOG(LS_INFO) << "ConvertAvccToAnnexBCsd: num_sps=" << (int)num_sps;
+
+  for (uint8_t i = 0; i < num_sps; i++) {
+    if (offset + 2 > avcc_size) {
+      AVE_LOG(LS_ERROR) << "ConvertAvccToAnnexBCsd: SPS length overflow";
+      return false;
+    }
+    uint16_t sps_len =
+        (static_cast<uint16_t>(avcc[offset]) << 8) | avcc[offset + 1];
+    offset += 2;
+    if (offset + sps_len > avcc_size) {
+      AVE_LOG(LS_ERROR) << "ConvertAvccToAnnexBCsd: SPS data overflow, len="
+                        << sps_len;
+      return false;
+    }
+    csd0.insert(csd0.end(), kStartCode, kStartCode + 4);
+    csd0.insert(csd0.end(), avcc + offset, avcc + offset + sps_len);
+    AVE_LOG(LS_INFO) << "ConvertAvccToAnnexBCsd: SPS[" << (int)i
+                     << "] len=" << sps_len;
+    offset += sps_len;
   }
 
-  static void onAsyncFormatChanged(AMediaCodec* codec AVE_MAYBE_UNUSED,
-                                   void* userdata,
-                                   AMediaFormat* format) {
-    AVE_LOG(LS_INFO) << "NDK callback: format changed: "
-                     << (format ? AMediaFormat_toString(format) : "null");
-    auto* c = reinterpret_cast<AndroidNdkMediaCodec*>(userdata);
-    c->NotifyOutputFormatChanged(format);
+  // Parse PPS entries
+  if (offset >= avcc_size) {
+    AVE_LOG(LS_ERROR) << "ConvertAvccToAnnexBCsd: no PPS data";
+    return false;
+  }
+  uint8_t num_pps = avcc[offset];
+  offset++;
+  AVE_LOG(LS_INFO) << "ConvertAvccToAnnexBCsd: num_pps=" << (int)num_pps;
+
+  for (uint8_t i = 0; i < num_pps; i++) {
+    if (offset + 2 > avcc_size) {
+      AVE_LOG(LS_ERROR) << "ConvertAvccToAnnexBCsd: PPS length overflow";
+      return false;
+    }
+    uint16_t pps_len =
+        (static_cast<uint16_t>(avcc[offset]) << 8) | avcc[offset + 1];
+    offset += 2;
+    if (offset + pps_len > avcc_size) {
+      AVE_LOG(LS_ERROR) << "ConvertAvccToAnnexBCsd: PPS data overflow, len="
+                        << pps_len;
+      return false;
+    }
+    csd1.insert(csd1.end(), kStartCode, kStartCode + 4);
+    csd1.insert(csd1.end(), avcc + offset, avcc + offset + pps_len);
+    AVE_LOG(LS_INFO) << "ConvertAvccToAnnexBCsd: PPS[" << (int)i
+                     << "] len=" << pps_len;
+    offset += pps_len;
   }
 
-  static void onAsyncError(AMediaCodec* codec AVE_MAYBE_UNUSED,
+  return !csd0.empty() && !csd1.empty();
+}
+
+/**
+ * @brief Check if HEVC extradata is in HVCC format (hvcC configuration record)
+ * @param data Extradata pointer
+ * @param size Extradata size in bytes
+ * @return true if HVCC format
+ */
+bool IsHvccFormat(const uint8_t* data, size_t size) {
+  if (!data || size < 23) {
+    return false;
+  }
+  // HVCC configurationVersion must be 1
+  if (data[0] != 0x01) {
+    return false;
+  }
+  // Ensure it's not already Annex B
+  if (data[0] == 0x00 && data[1] == 0x00) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * @brief Convert HVCC configuration record to Annex B csd-0 (VPS+SPS+PPS)
+ *        buffer for Android MediaCodec.
+ * @param hvcc Raw hvcC box data
+ * @param hvcc_size Size of hvcc data
+ * @param[out] csd0 All parameter sets (VPS, SPS, PPS) with start codes
+ * @return true on success
+ */
+bool ConvertHvccToAnnexBCsd(const uint8_t* hvcc,
+                            size_t hvcc_size,
+                            std::vector<uint8_t>& csd0) {
+  // HVCC layout:
+  //   [0..21] header (configurationVersion + various fields)
+  //   [22]    numOfArrays
+  //   For each array:
+  //     [0]    array_completeness(1) | reserved(1) | NAL_unit_type(6)
+  //     [1..2] numNalus
+  //     For each NALU: [2 bytes length] [NALU data]
+  if (hvcc_size < 23) {
+    return false;
+  }
+
+  static const uint8_t kStartCode[] = {0x00, 0x00, 0x00, 0x01};
+
+  size_t offset = 22;
+  uint8_t num_arrays = hvcc[offset];
+  offset++;
+
+  for (uint8_t arr = 0; arr < num_arrays; arr++) {
+    if (offset + 3 > hvcc_size) {
+      return false;
+    }
+    // uint8_t nal_type = hvcc[offset] & 0x3F;
+    offset++;
+    uint16_t num_nalus =
+        (static_cast<uint16_t>(hvcc[offset]) << 8) | hvcc[offset + 1];
+    offset += 2;
+
+    for (uint16_t n = 0; n < num_nalus; n++) {
+      if (offset + 2 > hvcc_size) {
+        return false;
+      }
+      uint16_t nalu_len =
+          (static_cast<uint16_t>(hvcc[offset]) << 8) | hvcc[offset + 1];
+      offset += 2;
+      if (offset + nalu_len > hvcc_size) {
+        return false;
+      }
+      csd0.insert(csd0.end(), kStartCode, kStartCode + 4);
+      csd0.insert(csd0.end(), hvcc + offset, hvcc + offset + nalu_len);
+      offset += nalu_len;
+    }
+  }
+
+  return !csd0.empty();
+}
+
+// ---------------------------------------------------------------------------
+// NDK async callback free functions (AMediaCodecOnAsyncNotifyCallback).
+// userdata is AndroidNdkMediaCodec*.  These are called on an internal looper
+// thread managed by the AMediaCodec implementation.
+// ---------------------------------------------------------------------------
+
+void OnAsyncInputAvailable(AMediaCodec* /*codec*/,
                            void* userdata,
-                           media_status_t error,
-                           int32_t actionCode AVE_MAYBE_UNUSED,
-                           const char* detail) {
-    AVE_LOG(LS_ERROR) << "NDK callback: codec error=" << error
-                      << ", actionCode=" << actionCode
-                      << ", detail=" << (detail ? detail : "none");
-    auto* c = reinterpret_cast<AndroidNdkMediaCodec*>(userdata);
-    c->NotifyError(MapMediaStatus(error));
-  }
+                           int32_t index) {
+  AVE_LOG(LS_VERBOSE) << "NDK cb: input available, index=" << index;
+  reinterpret_cast<AndroidNdkMediaCodec*>(userdata)->NotifyInputBufferAvailable(
+      static_cast<size_t>(index));
+}
 
-  static void onFrameRendered(AMediaCodec* codec AVE_MAYBE_UNUSED,
-                              void* userdata,
-                              int64_t mediaTimeUs,
-                              int64_t systemNano AVE_MAYBE_UNUSED) {
-    AVE_LOG(LS_VERBOSE) << "NDK callback: frame rendered, mediaTimeUs="
-                        << mediaTimeUs;
-    auto* c = reinterpret_cast<AndroidNdkMediaCodec*>(userdata);
-    auto msg = std::make_shared<Message>();
-    c->NotifyFrameRendered(msg);
-  }
-};
+void OnAsyncOutputAvailable(AMediaCodec* /*codec*/,
+                            void* userdata,
+                            int32_t index,
+                            AMediaCodecBufferInfo* info) {
+  AVE_LOG(LS_INFO) << "NDK cb: output available, index=" << index
+                   << ", size=" << (info ? info->size : -1)
+                   << ", pts=" << (info ? info->presentationTimeUs : -1)
+                   << ", flags=" << (info ? info->flags : -1);
+  reinterpret_cast<AndroidNdkMediaCodec*>(userdata)
+      ->NotifyOutputBufferAvailable(
+          static_cast<size_t>(index), info ? info->offset : 0,
+          info ? info->size : 0, info ? info->presentationTimeUs : 0,
+          info ? static_cast<uint32_t>(info->flags) : 0);
+}
+
+void OnAsyncFormatChanged(AMediaCodec* /*codec*/,
+                          void* userdata,
+                          AMediaFormat* format) {
+  AVE_LOG(LS_INFO) << "NDK cb: format changed: "
+                   << (format ? AMediaFormat_toString(format) : "null");
+  reinterpret_cast<AndroidNdkMediaCodec*>(userdata)->NotifyOutputFormatChanged(
+      format);
+}
+
+void OnAsyncError(AMediaCodec* /*codec*/,
+                  void* userdata,
+                  media_status_t error,
+                  int32_t action_code,
+                  const char* detail) {
+  AVE_LOG(LS_ERROR) << "NDK cb: error=" << error
+                    << ", action_code=" << action_code
+                    << ", detail=" << (detail ? detail : "none");
+  reinterpret_cast<AndroidNdkMediaCodec*>(userdata)->NotifyError(
+      MapMediaStatus(error));
+}
+
 }  // namespace
 
 AndroidNdkMediaCodec::AndroidNdkMediaCodec(const char* mime_or_name,
@@ -166,23 +361,31 @@ AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
       AVE_LOG(LS_VERBOSE) << "MediaMetaToAMediaFormat: fps=" << fps;
     }
 
-    int32_t profile = format->codec_profile();
-    if (profile > 0) {
-      // AMEDIAFORMAT_KEY_PROFILE requires API 28+
-      if (__builtin_available(android 28, *)) {
-        AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_PROFILE, profile);
+    // Only set profile/level for encoders. Decoders read profile/level from
+    // the bitstream (SPS NALU inside csd-0) and don't need — and may reject —
+    // externally supplied values. FFmpeg profile constants (e.g. 578 for
+    // Constrained Baseline = 66|512) differ from Android MediaCodec constants
+    // (e.g. AVCProfileBaseline=1), so passing FFmpeg values to a hardware
+    // decoder can cause silent failures on strict implementations like
+    // Qualcomm c2.qti.avc.decoder.
+    if (is_encoder_) {
+      int32_t profile = format->codec_profile();
+      if (profile > 0) {
+        if (__builtin_available(android 28, *)) {
+          AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_PROFILE, profile);
+        }
       }
-    }
 
-    int32_t level = format->codec_level();
-    if (level > 0) {
-      if (__builtin_available(android 28, *)) {
-        AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_LEVEL, level);
+      int32_t level = format->codec_level();
+      if (level > 0) {
+        if (__builtin_available(android 28, *)) {
+          AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_LEVEL, level);
+        }
       }
     }
 
     int16_t rotation = format->rotation();
-    if (rotation != 0) {
+    if (rotation == 0 || rotation == 90 || rotation == 180 || rotation == 270) {
       if (__builtin_available(android 28, *)) {
         AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_ROTATION, rotation);
       }
@@ -214,11 +417,60 @@ AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
   }
 
   // CSD (Codec Specific Data) - SPS/PPS for H.264, AudioSpecificConfig, etc.
+  // For H.264, FFmpeg MP4 demuxer stores the raw avcC configuration record
+  // (AVCC format), but Android MediaCodec expects Annex B format:
+  //   csd-0 = 00 00 00 01 + SPS NALU
+  //   csd-1 = 00 00 00 01 + PPS NALU
+  // For HEVC, similarly convert hvcC to Annex B with all parameter sets.
   auto csd = format->private_data();
   if (csd && csd->size() > 0) {
-    AMediaFormat_setBuffer(ndk_format, "csd-0", csd->data(), csd->size());
-    AVE_LOG(LS_VERBOSE) << "MediaMetaToAMediaFormat: csd-0 size="
-                        << csd->size();
+    const auto* csd_data = static_cast<const uint8_t*>(csd->data());
+    size_t csd_size = csd->size();
+
+    if (mime == "video/avc" && IsAvccFormat(csd_data, csd_size)) {
+      // H.264: Convert AVCC → Annex B csd-0 (SPS) + csd-1 (PPS)
+      // Also extract NAL length size for access unit conversion.
+      nal_length_size_ = (csd_data[4] & 0x03) + 1;
+      AVE_LOG(LS_INFO) << "MediaMetaToAMediaFormat: AVCC nal_length_size="
+                       << (int)nal_length_size_;
+      std::vector<uint8_t> csd0_buf;
+      std::vector<uint8_t> csd1_buf;
+      if (ConvertAvccToAnnexBCsd(csd_data, csd_size, csd0_buf, csd1_buf)) {
+        AMediaFormat_setBuffer(ndk_format, "csd-0", csd0_buf.data(),
+                               csd0_buf.size());
+        AMediaFormat_setBuffer(ndk_format, "csd-1", csd1_buf.data(),
+                               csd1_buf.size());
+        AVE_LOG(LS_INFO) << "MediaMetaToAMediaFormat: AVCC→AnnexB csd-0="
+                         << csd0_buf.size()
+                         << " bytes, csd-1=" << csd1_buf.size() << " bytes";
+      } else {
+        AVE_LOG(LS_WARNING)
+            << "MediaMetaToAMediaFormat: AVCC parse failed, passing raw CSD";
+        AMediaFormat_setBuffer(ndk_format, "csd-0", csd->data(), csd->size());
+        nal_length_size_ = 0;  // disable access unit conversion
+      }
+    } else if (mime == "video/hevc" && IsHvccFormat(csd_data, csd_size)) {
+      // HEVC: Convert HVCC → Annex B csd-0 (VPS+SPS+PPS)
+      nal_length_size_ = (csd_data[21] & 0x03) + 1;
+      AVE_LOG(LS_INFO) << "MediaMetaToAMediaFormat: HVCC nal_length_size="
+                       << (int)nal_length_size_;
+      std::vector<uint8_t> csd0_buf;
+      if (ConvertHvccToAnnexBCsd(csd_data, csd_size, csd0_buf)) {
+        AMediaFormat_setBuffer(ndk_format, "csd-0", csd0_buf.data(),
+                               csd0_buf.size());
+        AVE_LOG(LS_INFO) << "MediaMetaToAMediaFormat: HVCC→AnnexB csd-0="
+                         << csd0_buf.size() << " bytes";
+      } else {
+        AVE_LOG(LS_WARNING)
+            << "MediaMetaToAMediaFormat: HVCC parse failed, passing raw CSD";
+        AMediaFormat_setBuffer(ndk_format, "csd-0", csd->data(), csd->size());
+      }
+    } else {
+      // Audio (AudioSpecificConfig) or already Annex B — pass through as-is
+      AMediaFormat_setBuffer(ndk_format, "csd-0", csd->data(), csd->size());
+      AVE_LOG(LS_VERBOSE) << "MediaMetaToAMediaFormat: csd-0 passthrough, size="
+                          << csd->size();
+    }
   }
 
   AVE_LOG(LS_INFO) << "MediaMetaToAMediaFormat: result="
@@ -241,8 +493,9 @@ status_t AndroidNdkMediaCodec::Configure(
   }
 
   mime_ = config->info.mime;
-  AVE_LOG(LS_INFO) << "Configure: mime=" << mime_ << ", media_type="
-                   << static_cast<int>(config->info.media_type)
+  media_type_ = config->info.media_type;
+  AVE_LOG(LS_INFO) << "Configure: mime=" << mime_
+                   << ", media_type=" << static_cast<int>(media_type_)
                    << ", is_encoder=" << is_encoder_;
 
   AMediaFormat* ndk_format = MediaMetaToAMediaFormat(config->format);
@@ -251,11 +504,56 @@ status_t AndroidNdkMediaCodec::Configure(
     return UNKNOWN_ERROR;
   }
 
-  // For video decoders, we don't pass a surface for now (decode to buffer).
-  // TODO(youfa): Support surface-based rendering with ANativeWindow.
+  // For video decoders, check if the video_render provides an ANativeWindow
+  // for hardware surface rendering.  Surface mode lets the codec decode
+  // directly into the display pipeline, bypassing CPU pixel copies.
+  ANativeWindow* surface = nullptr;
+  surface_mode_ = false;
+  if (!is_encoder_ && media_type_ == MediaType::VIDEO && config->video_render) {
+    surface = config->video_render->android_native_window();
+    if (surface) {
+      surface_mode_ = true;
+      ANativeWindow_acquire(surface);
+      surface_ = surface;
+      AVE_LOG(LS_INFO) << "Configure: surface mode, window=" << surface;
+    }
+  }
+  if (!surface_mode_) {
+    AVE_LOG(LS_INFO) << "Configure: buffer mode";
+  }
+
+  // Register NDK async callbacks BEFORE AMediaCodec_configure.
+  // Per the NDK API contract, AMediaCodec_setAsyncNotifyCallback must be
+  // called before configure (or start) to put the codec into async mode.
+  if (__builtin_available(android 28, *)) {
+    AMediaCodecOnAsyncNotifyCallback async_cb{};
+    async_cb.onAsyncInputAvailable = OnAsyncInputAvailable;
+    async_cb.onAsyncOutputAvailable = OnAsyncOutputAvailable;
+    async_cb.onAsyncFormatChanged = OnAsyncFormatChanged;
+    async_cb.onAsyncError = OnAsyncError;
+
+    media_status_t cb_status = AMediaCodec_setAsyncNotifyCallback(
+        android_media_codec_, async_cb, this);
+    if (cb_status != AMEDIA_OK) {
+      AVE_LOG(LS_ERROR) << "Configure: setAsyncNotifyCallback failed, status="
+                        << cb_status;
+      AMediaFormat_delete(ndk_format);
+      if (surface_) {
+        ANativeWindow_release(surface_);
+        surface_ = nullptr;
+      }
+      return MapMediaStatus(cb_status);
+    }
+    AVE_LOG(LS_INFO) << "Configure: async callbacks registered";
+  } else {
+    AVE_LOG(LS_ERROR) << "Configure: async callbacks require API 28+";
+    AMediaFormat_delete(ndk_format);
+    return ERROR_UNSUPPORTED;
+  }
+
   media_status_t status = AMediaCodec_configure(
       android_media_codec_, ndk_format,
-      nullptr,  // surface (ANativeWindow*)
+      surface,  // ANativeWindow* for surface mode (nullptr = buffer mode)
       nullptr,  // crypto
       is_encoder_ ? AMEDIACODEC_CONFIGURE_FLAG_ENCODE : 0);
 
@@ -265,6 +563,16 @@ status_t AndroidNdkMediaCodec::Configure(
     AVE_LOG(LS_ERROR) << "Configure: AMediaCodec_configure failed, status="
                       << status;
     return MapMediaStatus(status);
+  }
+
+  // Initialize output format from input config as fallback
+  if (media_type_ == MediaType::AUDIO) {
+    output_sample_rate_ = static_cast<int32_t>(config->format->sample_rate());
+    output_channel_count_ =
+        ChannelLayoutToChannelCount(config->format->channel_layout());
+  } else if (media_type_ == MediaType::VIDEO) {
+    output_width_ = config->format->width();
+    output_height_ = config->format->height();
   }
 
   AVE_LOG(LS_INFO) << "Configure: success";
@@ -280,30 +588,8 @@ status_t AndroidNdkMediaCodec::SetCallback(CodecCallback* callback) {
   }
 
   callback_ = callback;
-  AVE_LOG(LS_VERBOSE) << "SetCallback: setting async callbacks";
-
-  if (__builtin_available(android 28, *)) {
-    media_status_t status = AMediaCodec_setAsyncNotifyCallback(
-        android_media_codec_, AMediaCodecCallbackHelper{}, this);
-    if (status != AMEDIA_OK) {
-      AVE_LOG(LS_ERROR) << "SetCallback: setAsyncNotifyCallback failed, status="
-                        << status;
-      return MapMediaStatus(status);
-    }
-  } else {
-    AVE_LOG(LS_ERROR) << "SetCallback: async callbacks require API 28+";
-    return ERROR_UNSUPPORTED;
-  }
-
-  if (__builtin_available(android 33, *)) {
-    media_status_t status = AMediaCodec_setOnFrameRenderedCallback(
-        android_media_codec_, AMediaCodecCallbackHelper::onFrameRendered, this);
-    if (status != AMEDIA_OK) {
-      AVE_LOG(LS_WARNING) << "SetCallback: setOnFrameRenderedCallback failed"
-                          << " (non-fatal), status=" << status;
-    }
-  }
-
+  AVE_LOG(LS_INFO) << "SetCallback: callback stored, codec="
+                   << android_media_codec_;
   return OK;
 }
 
@@ -327,8 +613,6 @@ status_t AndroidNdkMediaCodec::Start() {
 }
 
 status_t AndroidNdkMediaCodec::Stop() {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   if (!android_media_codec_) {
     AVE_LOG(LS_WARNING) << "Stop: codec not created";
     return NO_INIT;
@@ -340,10 +624,18 @@ status_t AndroidNdkMediaCodec::Stop() {
     AVE_LOG(LS_ERROR) << "Stop: AMediaCodec_stop failed, status=" << status;
   }
 
-  // Clear buffer maps
-  input_buffers_.clear();
-  output_buffers_.clear();
-  output_buffer_infos_.clear();
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    input_buffers_.clear();
+    output_buffers_.clear();
+    output_buffer_infos_.clear();
+
+    if (surface_) {
+      ANativeWindow_release(surface_);
+      surface_ = nullptr;
+    }
+    surface_mode_ = false;
+  }
 
   return MapMediaStatus(status);
 }
@@ -417,6 +709,28 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
     return NO_INIT;
   }
 
+  // In surface mode, the codec renders directly to the ANativeWindow.
+  // Output buffer data is not accessible; create a metadata-only buffer.
+  if (surface_mode_) {
+    auto codec_buffer = std::make_shared<CodecBuffer>(0);  // empty buffer
+
+    auto info_it = output_buffer_infos_.find(index);
+    auto meta =
+        MediaMeta::CreatePtr(MediaType::VIDEO, MediaMeta::FormatType::kSample);
+    meta->SetWidth(output_width_);
+    meta->SetHeight(output_height_);
+    meta->SetStride(output_stride_ > 0 ? output_stride_ : output_width_);
+    if (info_it != output_buffer_infos_.end()) {
+      meta->SetPts(
+          base::Timestamp::Micros(info_it->second.presentation_time_us));
+    }
+    codec_buffer->format() = meta;
+
+    output_buffers_[index] = codec_buffer;
+    buffer = codec_buffer;
+    return OK;
+  }
+
   size_t total_size = 0;
   auto* addr =
       AMediaCodec_getOutputBuffer(android_media_codec_, index, &total_size);
@@ -442,12 +756,61 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
   auto codec_buffer =
       std::make_shared<CodecBuffer>(addr + data_offset, data_size);
 
-  // Attach PTS metadata from the output buffer info
-  if (info_it != output_buffer_infos_.end()) {
-    auto meta = MediaMeta::CreatePtr(MediaType::UNKNOWN,
-                                     MediaMeta::FormatType::kSample);
-    meta->SetPts(base::Timestamp::Micros(info_it->second.presentation_time_us));
+  // Build rich metadata matching FFmpegCodec's output format
+  if (media_type_ == MediaType::AUDIO) {
+    auto meta =
+        MediaMeta::CreatePtr(MediaType::AUDIO, MediaMeta::FormatType::kSample);
+    if (output_sample_rate_ > 0) {
+      meta->SetSampleRate(static_cast<uint32_t>(output_sample_rate_));
+    }
+    if (output_channel_count_ > 0) {
+      meta->SetChannelLayout(GuessChannelLayout(output_channel_count_));
+    }
+    // Android MediaCodec always outputs 16-bit PCM
+    meta->SetBitsPerSample(16);
+    meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_S16LE);
+    // Compute samples per channel: data_size / (channels * 2 bytes)
+    if (output_channel_count_ > 0) {
+      int32_t samples_per_ch = data_size / (output_channel_count_ * 2);
+      meta->SetSamplesPerChannel(samples_per_ch);
+    }
+    if (info_it != output_buffer_infos_.end()) {
+      meta->SetPts(
+          base::Timestamp::Micros(info_it->second.presentation_time_us));
+    }
     codec_buffer->format() = meta;
+  } else if (media_type_ == MediaType::VIDEO) {
+    auto meta =
+        MediaMeta::CreatePtr(MediaType::VIDEO, MediaMeta::FormatType::kSample);
+    meta->SetWidth(output_width_);
+    meta->SetHeight(output_height_);
+    meta->SetStride(output_stride_ > 0 ? output_stride_ : output_width_);
+    // MediaCodec buffer mode typically outputs NV12
+    // (COLOR_FormatYUV420SemiPlanar) Map to our pixel format. 21 =
+    // COLOR_FormatYUV420SemiPlanar (NV12)
+    if (output_color_format_ == 21) {
+      meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_NV12);
+    } else if (output_color_format_ == 19) {
+      // 19 = COLOR_FormatYUV420Planar (I420)
+      meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_YUV420P);
+    } else {
+      // Default assumption: NV12 (most common on modern Android devices)
+      meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_NV12);
+    }
+    if (info_it != output_buffer_infos_.end()) {
+      meta->SetPts(
+          base::Timestamp::Micros(info_it->second.presentation_time_us));
+    }
+    codec_buffer->format() = meta;
+  } else {
+    // Fallback: just PTS
+    if (info_it != output_buffer_infos_.end()) {
+      auto meta = MediaMeta::CreatePtr(MediaType::UNKNOWN,
+                                       MediaMeta::FormatType::kSample);
+      meta->SetPts(
+          base::Timestamp::Micros(info_it->second.presentation_time_us));
+      codec_buffer->format() = meta;
+    }
   }
 
   output_buffers_[index] = codec_buffer;
@@ -496,6 +859,31 @@ status_t AndroidNdkMediaCodec::QueueInputBuffer(size_t index) {
     flags = AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM;
   }
 
+  // Convert AVCC (4-byte NAL length prefix) → Annex B (start code) in-place.
+  // Both use exactly 4 bytes, so the buffer size doesn't change.
+  if (nal_length_size_ == 4 && size >= 4 && input_buffer->data()) {
+    auto* p = static_cast<uint8_t*>(input_buffer->data());
+    size_t pos = 0;
+    while (pos + 4 <= size) {
+      uint32_t nal_size = (static_cast<uint32_t>(p[pos]) << 24) |
+                          (static_cast<uint32_t>(p[pos + 1]) << 16) |
+                          (static_cast<uint32_t>(p[pos + 2]) << 8) |
+                          static_cast<uint32_t>(p[pos + 3]);
+      // Replace length with Annex B start code
+      p[pos] = 0x00;
+      p[pos + 1] = 0x00;
+      p[pos + 2] = 0x00;
+      p[pos + 3] = 0x01;
+      pos += 4 + nal_size;
+    }
+    // Log first few bytes after conversion to confirm Annex B start code
+    AVE_LOG(LS_INFO) << "QueueInputBuffer[VIDEO]: index=" << index
+                     << ", size=" << size << ", pts=" << pts << ", first4=["
+                     << static_cast<int>(p[0]) << " " << static_cast<int>(p[1])
+                     << " " << static_cast<int>(p[2]) << " "
+                     << static_cast<int>(p[3]) << "]";
+  }
+
   AVE_LOG(LS_VERBOSE) << "QueueInputBuffer: index=" << index
                       << ", offset=" << offset << ", size=" << size
                       << ", pts=" << pts << ", flags=" << flags;
@@ -505,7 +893,8 @@ status_t AndroidNdkMediaCodec::QueueInputBuffer(size_t index) {
                                                     size, pts, flags);
 
   if (ret != AMEDIA_OK) {
-    AVE_LOG(LS_ERROR) << "QueueInputBuffer: failed, status=" << ret;
+    AVE_LOG(LS_ERROR) << "QueueInputBuffer: failed, status=" << ret
+                      << ", index=" << index << ", size=" << size;
   }
 
   return MapMediaStatus(ret);
@@ -540,8 +929,8 @@ status_t AndroidNdkMediaCodec::ReleaseOutputBuffer(size_t index, bool render) {
     return NO_INIT;
   }
 
-  AVE_LOG(LS_VERBOSE) << "ReleaseOutputBuffer: index=" << index
-                      << ", render=" << render;
+  AVE_LOG(LS_INFO) << "ReleaseOutputBuffer: index=" << index
+                   << ", render=" << render;
 
   media_status_t ret =
       AMediaCodec_releaseOutputBuffer(android_media_codec_, index, render);
@@ -593,21 +982,42 @@ void AndroidNdkMediaCodec::NotifyOutputFormatChanged(AMediaFormat* format) {
   auto meta = MediaMeta::CreatePtr();
   if (format) {
     // Extract key fields from the new format
-    int32_t width = 0, height = 0, sample_rate = 0, channel_count = 0;
+    int32_t width = 0;
+    int32_t height = 0;
+    int32_t sample_rate = 0;
+    int32_t channel_count = 0;
+    int32_t color_format = 0;
+    int32_t stride = 0;
+
     if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_WIDTH, &width) &&
         AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_HEIGHT, &height)) {
       meta->SetWidth(width);
       meta->SetHeight(height);
+      output_width_ = width;
+      output_height_ = height;
       AVE_LOG(LS_INFO) << "OutputFormatChanged: video " << width << "x"
                        << height;
     }
     if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_SAMPLE_RATE,
                               &sample_rate)) {
       meta->SetSampleRate(static_cast<uint32_t>(sample_rate));
+      output_sample_rate_ = sample_rate;
+      AVE_LOG(LS_INFO) << "OutputFormatChanged: sample_rate=" << sample_rate;
     }
     if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_CHANNEL_COUNT,
                               &channel_count)) {
       meta->SetChannelLayout(GuessChannelLayout(channel_count));
+      output_channel_count_ = channel_count;
+      AVE_LOG(LS_INFO) << "OutputFormatChanged: channels=" << channel_count;
+    }
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_COLOR_FORMAT,
+                              &color_format)) {
+      output_color_format_ = color_format;
+      AVE_LOG(LS_INFO) << "OutputFormatChanged: color_format=" << color_format;
+    }
+    if (AMediaFormat_getInt32(format, "stride", &stride)) {
+      output_stride_ = stride;
+      AVE_LOG(LS_INFO) << "OutputFormatChanged: stride=" << stride;
     }
   }
 

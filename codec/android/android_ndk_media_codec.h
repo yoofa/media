@@ -15,6 +15,7 @@
 
 struct AMediaCodec;
 struct AMediaFormat;
+struct ANativeWindow;
 
 namespace ave {
 namespace media {
@@ -83,6 +84,26 @@ class AndroidNdkMediaCodec : public Codec {
   CodecCallback* callback_ = nullptr;
   bool is_encoder_ = false;
   std::string mime_;
+  MediaType media_type_ = MediaType::UNKNOWN;
+
+  // True when video decoder is configured with a surface (ANativeWindow).
+  // In surface mode, output buffers contain no accessible pixel data; the
+  // caller must use ReleaseOutputBuffer(index, true) to render to the surface.
+  bool surface_mode_ = false;
+  ANativeWindow* surface_ = nullptr;
+
+  // NAL length size extracted from AVCC/HVCC configuration record.
+  // Used to convert AVCC access units to Annex B in QueueInputBuffer.
+  // 0 = no conversion needed (data is already Annex B or non-video).
+  uint8_t nal_length_size_ = 0;
+
+  // Tracked output format from NotifyOutputFormatChanged
+  int32_t output_sample_rate_ = 0;
+  int32_t output_channel_count_ = 0;
+  int32_t output_width_ = 0;
+  int32_t output_height_ = 0;
+  int32_t output_color_format_ = 0;
+  int32_t output_stride_ = 0;
 
   // <index, CodecBuffer>
   std::unordered_map<size_t, std::shared_ptr<CodecBuffer>> input_buffers_;
