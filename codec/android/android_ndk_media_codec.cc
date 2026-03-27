@@ -672,14 +672,19 @@ status_t AndroidNdkMediaCodec::Release() {
 status_t AndroidNdkMediaCodec::GetInputBuffer(
     size_t index,
     std::shared_ptr<CodecBuffer>& buffer) {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  if (!android_media_codec_) {
-    return NO_INIT;
+  // Do NOT hold mutex_ during AMediaCodec_getInputBuffer — same deadlock
+  // avoidance as QueueInputBuffer / ReleaseOutputBuffer.
+  AMediaCodec* codec = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!android_media_codec_) {
+      return NO_INIT;
+    }
+    codec = android_media_codec_;
   }
 
   size_t size = 0;
-  auto* addr = AMediaCodec_getInputBuffer(android_media_codec_, index, &size);
+  auto* addr = AMediaCodec_getInputBuffer(codec, index, &size);
   if (!addr) {
     AVE_LOG(LS_ERROR) << "GetInputBuffer: null buffer for index=" << index;
     return ERROR_RETRY;
@@ -688,52 +693,79 @@ status_t AndroidNdkMediaCodec::GetInputBuffer(
   AVE_LOG(LS_VERBOSE) << "GetInputBuffer: index=" << index
                       << ", capacity=" << size;
 
-  if (input_buffers_.find(index) == input_buffers_.end()) {
-    auto codec_buffer = std::make_shared<CodecBuffer>(addr, size);
-    input_buffers_[index] = codec_buffer;
-  } else {
-    auto& codec_buffer = input_buffers_[index];
-    auto new_buffer = std::make_shared<media::Buffer>(addr, size);
-    codec_buffer->ResetBuffer(new_buffer);
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (input_buffers_.find(index) == input_buffers_.end()) {
+      auto codec_buffer = std::make_shared<CodecBuffer>(addr, size);
+      input_buffers_[index] = codec_buffer;
+    } else {
+      auto& codec_buffer = input_buffers_[index];
+      auto new_buffer = std::make_shared<media::Buffer>(addr, size);
+      codec_buffer->ResetBuffer(new_buffer);
+    }
+    buffer = input_buffers_[index];
   }
-  buffer = input_buffers_[index];
   return OK;
 }
 
 status_t AndroidNdkMediaCodec::GetOutputBuffer(
     size_t index,
     std::shared_ptr<CodecBuffer>& buffer) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  // Snapshot state under lock, then do the NDK call without holding mutex_
+  // to avoid deadlock with async callbacks (same reason as QueueInputBuffer).
+  AMediaCodec* codec = nullptr;
+  bool is_surface = false;
+  OutputBufferInfo buf_info{};
+  bool has_buf_info = false;
+  int32_t out_width = 0, out_height = 0, out_stride = 0;
+  int32_t out_sample_rate = 0, out_channel_count = 0, out_color_format = 0;
+  MediaType mtype = MediaType::UNKNOWN;
 
-  if (!android_media_codec_) {
-    return NO_INIT;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!android_media_codec_) {
+      return NO_INIT;
+    }
+    codec = android_media_codec_;
+    is_surface = surface_mode_;
+    mtype = media_type_;
+    out_width = output_width_;
+    out_height = output_height_;
+    out_stride = output_stride_;
+    out_sample_rate = output_sample_rate_;
+    out_channel_count = output_channel_count_;
+    out_color_format = output_color_format_;
+    auto info_it = output_buffer_infos_.find(index);
+    if (info_it != output_buffer_infos_.end()) {
+      buf_info = info_it->second;
+      has_buf_info = true;
+    }
   }
 
   // In surface mode, the codec renders directly to the ANativeWindow.
   // Output buffer data is not accessible; create a metadata-only buffer.
-  if (surface_mode_) {
+  if (is_surface) {
     auto codec_buffer = std::make_shared<CodecBuffer>(0);  // empty buffer
 
-    auto info_it = output_buffer_infos_.find(index);
     auto meta =
         MediaMeta::CreatePtr(MediaType::VIDEO, MediaMeta::FormatType::kSample);
-    meta->SetWidth(output_width_);
-    meta->SetHeight(output_height_);
-    meta->SetStride(output_stride_ > 0 ? output_stride_ : output_width_);
-    if (info_it != output_buffer_infos_.end()) {
-      meta->SetPts(
-          base::Timestamp::Micros(info_it->second.presentation_time_us));
+    meta->SetWidth(out_width);
+    meta->SetHeight(out_height);
+    meta->SetStride(out_stride > 0 ? out_stride : out_width);
+    if (has_buf_info) {
+      meta->SetPts(base::Timestamp::Micros(buf_info.presentation_time_us));
     }
     codec_buffer->format() = meta;
 
+    std::lock_guard<std::mutex> lock(mutex_);
     output_buffers_[index] = codec_buffer;
     buffer = codec_buffer;
     return OK;
   }
 
+  // Buffer mode: get the raw buffer pointer without holding mutex_
   size_t total_size = 0;
-  auto* addr =
-      AMediaCodec_getOutputBuffer(android_media_codec_, index, &total_size);
+  auto* addr = AMediaCodec_getOutputBuffer(codec, index, &total_size);
   if (!addr) {
     AVE_LOG(LS_ERROR) << "GetOutputBuffer: null buffer for index=" << index;
     return UNKNOWN_ERROR;
@@ -742,78 +774,81 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
   // Use the actual data range from bufferInfo
   int32_t data_offset = 0;
   int32_t data_size = static_cast<int32_t>(total_size);
-  auto info_it = output_buffer_infos_.find(index);
-  if (info_it != output_buffer_infos_.end()) {
-    data_offset = info_it->second.offset;
-    data_size = info_it->second.size;
+  if (has_buf_info) {
+    data_offset = buf_info.offset;
+    data_size = buf_info.size;
+  } else {
+    AVE_LOG(LS_WARNING) << "GetOutputBuffer: no bufferInfo for index=" << index
+                        << ", using raw capacity=" << total_size;
   }
 
-  AVE_LOG(LS_VERBOSE) << "GetOutputBuffer: index=" << index
-                      << ", total_size=" << total_size
-                      << ", data_offset=" << data_offset
-                      << ", data_size=" << data_size;
+  AVE_LOG(LS_INFO) << "GetOutputBuffer: index=" << index
+                   << ", total_size=" << total_size
+                   << ", data_offset=" << data_offset
+                   << ", data_size=" << data_size
+                   << ", has_buf_info=" << has_buf_info;
 
   auto codec_buffer =
       std::make_shared<CodecBuffer>(addr + data_offset, data_size);
 
   // Build rich metadata matching FFmpegCodec's output format
-  if (media_type_ == MediaType::AUDIO) {
+  if (mtype == MediaType::AUDIO) {
     auto meta =
         MediaMeta::CreatePtr(MediaType::AUDIO, MediaMeta::FormatType::kSample);
-    if (output_sample_rate_ > 0) {
-      meta->SetSampleRate(static_cast<uint32_t>(output_sample_rate_));
+    if (out_sample_rate > 0) {
+      meta->SetSampleRate(static_cast<uint32_t>(out_sample_rate));
     }
-    if (output_channel_count_ > 0) {
-      meta->SetChannelLayout(GuessChannelLayout(output_channel_count_));
+    if (out_channel_count > 0) {
+      meta->SetChannelLayout(GuessChannelLayout(out_channel_count));
     }
     // Android MediaCodec always outputs 16-bit PCM
     meta->SetBitsPerSample(16);
     meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_S16LE);
     // Compute samples per channel: data_size / (channels * 2 bytes)
-    if (output_channel_count_ > 0) {
-      int32_t samples_per_ch = data_size / (output_channel_count_ * 2);
+    if (out_channel_count > 0) {
+      int32_t samples_per_ch = data_size / (out_channel_count * 2);
       meta->SetSamplesPerChannel(samples_per_ch);
     }
-    if (info_it != output_buffer_infos_.end()) {
-      meta->SetPts(
-          base::Timestamp::Micros(info_it->second.presentation_time_us));
+    if (has_buf_info) {
+      meta->SetPts(base::Timestamp::Micros(buf_info.presentation_time_us));
     }
     codec_buffer->format() = meta;
-  } else if (media_type_ == MediaType::VIDEO) {
+  } else if (mtype == MediaType::VIDEO) {
     auto meta =
         MediaMeta::CreatePtr(MediaType::VIDEO, MediaMeta::FormatType::kSample);
-    meta->SetWidth(output_width_);
-    meta->SetHeight(output_height_);
-    meta->SetStride(output_stride_ > 0 ? output_stride_ : output_width_);
+    meta->SetWidth(out_width);
+    meta->SetHeight(out_height);
+    meta->SetStride(out_stride > 0 ? out_stride : out_width);
     // MediaCodec buffer mode typically outputs NV12
     // (COLOR_FormatYUV420SemiPlanar) Map to our pixel format. 21 =
     // COLOR_FormatYUV420SemiPlanar (NV12)
-    if (output_color_format_ == 21) {
+    if (out_color_format == 21) {
       meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_NV12);
-    } else if (output_color_format_ == 19) {
+    } else if (out_color_format == 19) {
       // 19 = COLOR_FormatYUV420Planar (I420)
       meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_YUV420P);
     } else {
       // Default assumption: NV12 (most common on modern Android devices)
       meta->SetPixelFormat(PixelFormat::AVE_PIX_FMT_NV12);
     }
-    if (info_it != output_buffer_infos_.end()) {
-      meta->SetPts(
-          base::Timestamp::Micros(info_it->second.presentation_time_us));
+    if (has_buf_info) {
+      meta->SetPts(base::Timestamp::Micros(buf_info.presentation_time_us));
     }
     codec_buffer->format() = meta;
   } else {
     // Fallback: just PTS
-    if (info_it != output_buffer_infos_.end()) {
+    if (has_buf_info) {
       auto meta = MediaMeta::CreatePtr(MediaType::UNKNOWN,
                                        MediaMeta::FormatType::kSample);
-      meta->SetPts(
-          base::Timestamp::Micros(info_it->second.presentation_time_us));
+      meta->SetPts(base::Timestamp::Micros(buf_info.presentation_time_us));
       codec_buffer->format() = meta;
     }
   }
 
-  output_buffers_[index] = codec_buffer;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    output_buffers_[index] = codec_buffer;
+  }
   buffer = codec_buffer;
   return OK;
 }
@@ -923,20 +958,29 @@ ssize_t AndroidNdkMediaCodec::DequeueOutputBuffer(int64_t timeout_us) {
 }
 
 status_t AndroidNdkMediaCodec::ReleaseOutputBuffer(size_t index, bool render) {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  if (!android_media_codec_) {
-    return NO_INIT;
+  // Do NOT hold mutex_ during AMediaCodec_releaseOutputBuffer — it may
+  // trigger async callbacks that also try to lock mutex_, causing deadlock
+  // (same pattern as QueueInputBuffer).
+  AMediaCodec* codec = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!android_media_codec_) {
+      return NO_INIT;
+    }
+    codec = android_media_codec_;
+    // Erase map entries BEFORE the NDK call. The NDK call may immediately
+    // recycle the buffer and trigger OnAsyncOutputAvailable for the same
+    // index, which stores a new entry.  If we erased AFTER the NDK call,
+    // we would delete the freshly-stored new entry — causing the next
+    // GetOutputBuffer to fall back to raw buffer capacity (wrong size).
+    output_buffers_.erase(index);
+    output_buffer_infos_.erase(index);
   }
 
   AVE_LOG(LS_INFO) << "ReleaseOutputBuffer: index=" << index
                    << ", render=" << render;
 
-  media_status_t ret =
-      AMediaCodec_releaseOutputBuffer(android_media_codec_, index, render);
-
-  output_buffers_.erase(index);
-  output_buffer_infos_.erase(index);
+  media_status_t ret = AMediaCodec_releaseOutputBuffer(codec, index, render);
 
   if (ret != AMEDIA_OK) {
     AVE_LOG(LS_ERROR) << "ReleaseOutputBuffer: failed, status=" << ret;

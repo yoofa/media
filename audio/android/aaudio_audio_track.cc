@@ -90,14 +90,15 @@ uint32_t AAudioAudioTrack::sampleRate() const {
 }
 
 uint32_t AAudioAudioTrack::latency() const {
-  if (!stream_) {
+  if (!stream_ || config_.sample_rate == 0) {
     return 0;
   }
-  int32_t microseconds = AAudioStream_getFramesPerBurst(stream_);
-  if (microseconds <= 0) {
+  // Use actual buffer size for latency, not just burst size
+  int32_t buffer_frames = AAudioStream_getBufferSizeInFrames(stream_);
+  if (buffer_frames <= 0) {
     return 0;
   }
-  return static_cast<uint32_t>((static_cast<int64_t>(microseconds) * 1000) /
+  return static_cast<uint32_t>((static_cast<int64_t>(buffer_frames) * 1000) /
                                config_.sample_rate);
 }
 
@@ -135,6 +136,32 @@ status_t AAudioAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
 }
 
 int64_t AAudioAudioTrack::GetBufferDurationInUs() const {
+  if (!stream_ || config_.sample_rate == 0) {
+    return 0;
+  }
+
+  // Use AAudioStream_getTimestamp for accurate remaining-buffer latency.
+  // This returns the frame count that has been presented at the hardware DAC
+  // and the system time at which that presentation occurred.
+  int64_t hardware_frames = 0;
+  int64_t hardware_time_ns = 0;
+  aaudio_result_t result = AAudioStream_getTimestamp(
+      stream_, CLOCK_MONOTONIC, &hardware_frames, &hardware_time_ns);
+  if (result == AAUDIO_OK) {
+    int64_t frames_written = AAudioStream_getFramesWritten(stream_);
+    int64_t buffered = frames_written - hardware_frames;
+    if (buffered > 0) {
+      return buffered * 1000000LL / static_cast<int64_t>(config_.sample_rate);
+    }
+    return 0;
+  }
+
+  // Fallback: use current buffer size as an approximation
+  int32_t buffer_frames = AAudioStream_getBufferSizeInFrames(stream_);
+  if (buffer_frames > 0) {
+    return static_cast<int64_t>(buffer_frames) * 1000000LL /
+           static_cast<int64_t>(config_.sample_rate);
+  }
   return 0;
 }
 
@@ -234,25 +261,24 @@ ssize_t AAudioAudioTrack::Write(const void* buffer,
   if (frames <= 0) {
     return 0;
   }
-  // unified write logic using do-while
-  int32_t total_written = 0;
-  int32_t remaining_frames = frames;
-  const char* buffer_ptr = static_cast<const char*>(buffer);
 
-  do {
-    int32_t written =
-        AAudioStream_write(stream_, buffer_ptr, remaining_frames, 0);
-    if (written < 0) {
-      // Error occurred
-      return written;
-    }
-    // Some frames written successfully
-    total_written += written;
-    remaining_frames -= written;
-    buffer_ptr += written * frameSize();
-  } while (blocking && remaining_frames > 0);
+  // Single-shot write: use a short timeout in blocking mode so the caller's
+  // mutex is not held for a long time.  The caller (RenderFrameInternal)
+  // handles partial writes by retaining cached_frame_ and retrying.
+  // A 2 ms timeout lets AAudio drain one burst before giving up, which is
+  // enough to make steady progress without stalling other threads.
+  int64_t timeout_ns = blocking ? 2 * 1000000LL : 0;
+  int32_t written = AAudioStream_write(stream_, buffer, frames, timeout_ns);
 
-  return static_cast<ssize_t>(total_written * frameSize());
+  AVE_LOG(LS_INFO) << "AAudio Write: requested=" << frames
+                   << " frames, written=" << written
+                   << " frames, blocking=" << blocking
+                   << " state=" << AAudioStream_getState(stream_);
+
+  if (written < 0) {
+    return static_cast<ssize_t>(written);  // propagate error code
+  }
+  return static_cast<ssize_t>(written * frameSize());
 }
 
 aaudio_data_callback_result_t AAudioAudioTrack::DataCallback(
