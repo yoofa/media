@@ -60,7 +60,8 @@ int32_t Looper::start(int32_t priority AVE_MAYBE_UNUSED) {
 }
 
 int32_t Looper::stop() {
-  // TODO(youfa) support stop in loop thread.
+  // Detect if the caller is the looper thread itself (self-join would deadlock).
+  bool is_self_stop = thread_ && (thread_->get_id() == std::this_thread::get_id());
   {
     std::lock_guard<std::mutex> guard(mutex_);
     stopped_ = true;
@@ -68,8 +69,17 @@ int32_t Looper::stop() {
     condition_.notify_all();
   }
   if (thread_ != nullptr) {
-    thread_->join();
-    (void)thread_.release();
+    if (!is_self_stop) {
+      // Normal case: external thread joins the looper thread.
+      thread_->join();
+    } else {
+      // Called from within the looper thread (e.g. when ~Handler destroys the
+      // last shared_ptr to its owner while a message is being delivered).
+      // Joining self would deadlock; detach so the thread cleans up on exit.
+      // The 'self' shared_ptr in loop() keeps the Looper alive until exit.
+      thread_->detach();
+    }
+    thread_.reset();  // reset (not release) to avoid leaking the std::thread object
   }
   return static_cast<int32_t>(0);
 }
@@ -97,6 +107,10 @@ void Looper::post(const std::shared_ptr<Message>& message, int64_t delay_us) {
 }
 
 void Looper::loop() {
+  // Hold a strong self-reference so the Looper object is not destroyed while
+  // the loop is running, even if all external shared_ptr owners (e.g. player_
+  // in AvPlayer) release their references during message delivery.
+  auto self = shared_from_this();
   start_latch_.CountDown();
   while (keepRunning()) {
     std::shared_ptr<Message> message;
