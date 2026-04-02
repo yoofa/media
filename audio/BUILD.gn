@@ -158,6 +158,23 @@ ave_library("aaudio_audio_device") {
   libs = [ "aaudio" ]
 }
 
+## java audio device (JNI callback to Java AudioSink)
+ave_library("java_audio_device") {
+  sources = [
+    "android/java_audio_device.cc",
+    "android/java_audio_device.h",
+    "android/java_audio_track.cc",
+    "android/java_audio_track.h",
+  ]
+  deps = [
+    ":audio_device_base",
+    "//base:logging",
+    "//base/android:ave_jni",
+    "//sdk/android:generated_avp_jni",
+    "//third_party/jni_zero",
+  ]
+}
+
 # executable
 ave_executable("aplay") {
   testonly = true
