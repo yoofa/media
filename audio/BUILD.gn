@@ -158,7 +158,7 @@ ave_library("aaudio_audio_device") {
   libs = [ "aaudio" ]
 }
 
-## java audio device (JNI callback to Java AudioSink)
+## java audio device (JNI callback to Java AudioDevice)
 ave_library("java_audio_device") {
   sources = [
     "android/java_audio_device.cc",
@@ -170,7 +170,7 @@ ave_library("java_audio_device") {
     ":audio_device_base",
     "//base:logging",
     "//base/android:ave_jni",
-    "//sdk/android:generated_avp_jni",
+    "//media/android:generated_media_jni",
     "//third_party/jni_zero",
   ]
 }

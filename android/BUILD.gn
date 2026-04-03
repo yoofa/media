@@ -15,6 +15,10 @@ if (is_android) {
   ave_android_library("ave_media_java") {
     visibility = [ "*" ]
     sources = [
+      "java/io/github/yoofa/media/AndroidJavaAudioDevice.java",
+      "java/io/github/yoofa/media/AudioDevice.java",
+      "java/io/github/yoofa/media/AudioSink.java",
+      "java/io/github/yoofa/media/DefaultAudioSink.java",
       "java/io/github/yoofa/media/MediaFormat.java",
       "java/io/github/yoofa/media/VideoFrame.java",
       "java/io/github/yoofa/media/VideoRenderer.java",
@@ -24,6 +28,8 @@ if (is_android) {
 
   generate_jni("generated_media_jni") {
     sources = [
+      "java/io/github/yoofa/media/AudioDevice.java",
+      "java/io/github/yoofa/media/AudioSink.java",
       "java/io/github/yoofa/media/MediaFormat.java",
       "java/io/github/yoofa/media/VideoFrame.java",
     ]

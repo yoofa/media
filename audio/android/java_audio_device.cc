@@ -7,22 +7,27 @@
 
 #include "java_audio_device.h"
 
+#include "base/android/jni/jvm.h"
 #include "base/logging.h"
+#include "jni_headers/media/android/generated_media_jni/AudioDevice_jni.h"
 #include "media/audio/android/java_audio_track.h"
 
 namespace ave {
 namespace media {
 namespace android {
 
+using ave::jni::AttachCurrentThreadIfNeeded;
+using media::jni::Java_AudioDevice_createAudioSink;
+
 JavaAudioDevice::JavaAudioDevice(
-    const jni_zero::ScopedJavaGlobalRef<jobject>& j_audio_sink)
-    : j_audio_sink_(j_audio_sink) {}
+    const jni_zero::ScopedJavaGlobalRef<jobject>& j_audio_device)
+    : j_audio_device_(j_audio_device) {}
 
 JavaAudioDevice::~JavaAudioDevice() = default;
 
 status_t JavaAudioDevice::Init() {
-  if (!j_audio_sink_.obj()) {
-    AVE_LOG(LS_ERROR) << "JavaAudioDevice::Init: no AudioSink";
+  if (!j_audio_device_.obj()) {
+    AVE_LOG(LS_ERROR) << "JavaAudioDevice::Init: no AudioDevice";
     return INVALID_OPERATION;
   }
   AVE_LOG(LS_INFO) << "JavaAudioDevice::Init: OK";
@@ -31,7 +36,23 @@ status_t JavaAudioDevice::Init() {
 
 std::shared_ptr<AudioTrack> JavaAudioDevice::CreateAudioTrack() {
   AVE_LOG(LS_INFO) << "JavaAudioDevice::CreateAudioTrack";
-  return std::make_shared<JavaAudioTrack>(j_audio_sink_);
+  if (!j_audio_device_.obj()) {
+    AVE_LOG(LS_ERROR) << "JavaAudioDevice::CreateAudioTrack: no AudioDevice";
+    return nullptr;
+  }
+
+  JNIEnv* env = AttachCurrentThreadIfNeeded();
+  // Call Java AudioDevice.createAudioSink() → returns an AudioSink jobject.
+  auto j_audio_sink = Java_AudioDevice_createAudioSink(env, j_audio_device_);
+  if (!j_audio_sink.obj()) {
+    AVE_LOG(LS_ERROR)
+        << "JavaAudioDevice::CreateAudioTrack: createAudioSink returned null";
+    return nullptr;
+  }
+
+  // Wrap the Java AudioSink in a C++ JavaAudioTrack.
+  jni_zero::ScopedJavaGlobalRef<jobject> global_sink(env, j_audio_sink.obj());
+  return std::make_shared<JavaAudioTrack>(global_sink);
 }
 
 std::shared_ptr<AudioRecord> JavaAudioDevice::CreateAudioRecord() {

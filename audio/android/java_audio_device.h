@@ -18,14 +18,16 @@ namespace media {
 namespace android {
 
 /**
- * AudioDevice implementation that creates JavaAudioTrack instances.
- * Each JavaAudioTrack delegates to a Java AudioSink for actual audio output.
+ * AudioDevice implementation backed by a Java AudioDevice (factory).
+ *
+ * CreateAudioTrack() calls Java AudioDevice.createAudioSink() to obtain a
+ * Java AudioSink, then wraps it in a JavaAudioTrack for native use.
  */
 class JavaAudioDevice : public AudioDevice {
  public:
-  // |j_audio_sink| is a global reference to a Java AudioSink object.
+  // |j_audio_device| is a global reference to a Java AudioDevice object.
   explicit JavaAudioDevice(
-      const jni_zero::ScopedJavaGlobalRef<jobject>& j_audio_sink);
+      const jni_zero::ScopedJavaGlobalRef<jobject>& j_audio_device);
   ~JavaAudioDevice() override;
 
   // AudioDevice interface
@@ -39,7 +41,7 @@ class JavaAudioDevice : public AudioDevice {
   status_t SetAudioOutputDevice(int device_id) override;
 
  private:
-  jni_zero::ScopedJavaGlobalRef<jobject> j_audio_sink_;
+  jni_zero::ScopedJavaGlobalRef<jobject> j_audio_device_;
 };
 
 }  // namespace android

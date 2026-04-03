@@ -9,29 +9,29 @@
 
 #include "base/android/jni/jvm.h"
 #include "base/logging.h"
-#include "jni_headers/sdk/android/generated_avp_jni/AudioSink_jni.h"
+#include "jni_headers/media/android/generated_media_jni/AudioSink_jni.h"
 #include "media/audio/channel_layout.h"
 
 namespace ave {
 namespace media {
 namespace android {
 
-using jni::AttachCurrentThreadIfNeeded;
-using jni::Java_AudioSink_close;
-using jni::Java_AudioSink_flush;
-using jni::Java_AudioSink_getBufferDurationUs;
-using jni::Java_AudioSink_getBufferSize;
-using jni::Java_AudioSink_getChannelCount;
-using jni::Java_AudioSink_getFramesWritten;
-using jni::Java_AudioSink_getLatency;
-using jni::Java_AudioSink_getPosition;
-using jni::Java_AudioSink_getSampleRate;
-using jni::Java_AudioSink_isReady;
-using jni::Java_AudioSink_open;
-using jni::Java_AudioSink_pause;
-using jni::Java_AudioSink_start;
-using jni::Java_AudioSink_stop;
-using jni::Java_AudioSink_write;
+using ave::jni::AttachCurrentThreadIfNeeded;
+using media::jni::Java_AudioSink_close;
+using media::jni::Java_AudioSink_flush;
+using media::jni::Java_AudioSink_getBufferDurationUs;
+using media::jni::Java_AudioSink_getBufferSize;
+using media::jni::Java_AudioSink_getChannelCount;
+using media::jni::Java_AudioSink_getFramesWritten;
+using media::jni::Java_AudioSink_getLatency;
+using media::jni::Java_AudioSink_getPosition;
+using media::jni::Java_AudioSink_getSampleRate;
+using media::jni::Java_AudioSink_isReady;
+using media::jni::Java_AudioSink_open;
+using media::jni::Java_AudioSink_pause;
+using media::jni::Java_AudioSink_start;
+using media::jni::Java_AudioSink_stop;
+using media::jni::Java_AudioSink_write;
 
 JavaAudioTrack::JavaAudioTrack(
     const jni_zero::ScopedJavaGlobalRef<jobject>& j_audio_sink)
@@ -104,8 +104,7 @@ uint32_t JavaAudioTrack::latency() const {
     return 0;
   }
   JNIEnv* env = AttachCurrentThreadIfNeeded();
-  return static_cast<uint32_t>(
-      Java_AudioSink_getLatency(env, j_audio_sink_));
+  return static_cast<uint32_t>(Java_AudioSink_getLatency(env, j_audio_sink_));
 }
 
 float JavaAudioTrack::msecsPerFrame() const {
@@ -117,8 +116,8 @@ status_t JavaAudioTrack::GetPosition(uint32_t* position) const {
     return -EINVAL;
   }
   JNIEnv* env = AttachCurrentThreadIfNeeded();
-  *position = static_cast<uint32_t>(
-      Java_AudioSink_getPosition(env, j_audio_sink_));
+  *position =
+      static_cast<uint32_t>(Java_AudioSink_getPosition(env, j_audio_sink_));
   return 0;
 }
 
@@ -165,8 +164,7 @@ status_t JavaAudioTrack::Open(audio_config_t config,
   int encoding = ToAudioSinkEncoding(config.format);
 
   AVE_LOG(LS_INFO) << "JavaAudioTrack::Open: sampleRate=" << config.sample_rate
-                   << " channels=" << channel_count
-                   << " encoding=" << encoding;
+                   << " channels=" << channel_count << " encoding=" << encoding;
 
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   bool ok = Java_AudioSink_open(env, j_audio_sink_,
@@ -203,8 +201,7 @@ ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
                           static_cast<const jbyte*>(buffer));
 
   jint written = Java_AudioSink_write(
-      env, j_audio_sink_,
-      jni_zero::JavaParamRef<jbyteArray>(env, j_data), 0,
+      env, j_audio_sink_, jni_zero::JavaParamRef<jbyteArray>(env, j_data), 0,
       static_cast<int>(size));
 
   env->DeleteLocalRef(j_data);
