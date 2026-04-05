@@ -6,107 +6,126 @@
 
 package io.github.yoofa.media;
 
+import java.nio.ByteBuffer;
 import org.jni_zero.CalledByNative;
 
 /**
  * Audio sink interface called from native code via JNI.
  *
- * <p>This corresponds to the native C++ {@code AudioTrack} interface. The
- * native {@code JavaAudioTrack} calls these methods through JNI to control
- * audio output on Android.
+ * <p>This corresponds to the native C++ {@code AudioTrack} interface. The native {@code
+ * JavaAudioTrack} calls these methods through JNI to control audio output on Android.
  *
- * <p>Implementations should wrap a platform audio sink (e.g.,
- * {@link android.media.AudioTrack}) and handle PCM streaming. Future
- * implementations may support offload or tunnel audio modes.
+ * <p>Implementations should wrap a platform audio sink (e.g., {@link android.media.AudioTrack}) and
+ * handle PCM streaming. Future implementations may support offload or tunnel audio modes.
  *
  * @see DefaultAudioSink
  */
 public interface AudioSink {
 
-    /** Audio encoding constants matching native audio_format_t PCM sub-types. */
-    int ENCODING_PCM_16BIT = 1;
-    int ENCODING_PCM_FLOAT = 2;
-    int ENCODING_PCM_8BIT  = 3;
-    int ENCODING_PCM_32BIT = 4;
+  /** Audio encoding constants matching native audio_format_t PCM sub-types. */
+  int ENCODING_PCM_16BIT = 1;
 
-    /**
-     * Open an audio track with the given configuration.
-     *
-     * @param sampleRate   Sample rate in Hz.
-     * @param channelCount Number of audio channels.
-     * @param encoding     One of the ENCODING_PCM_* constants.
-     * @return true if the track was opened successfully.
-     */
-    @CalledByNative
-    boolean open(int sampleRate, int channelCount, int encoding);
+  int ENCODING_PCM_FLOAT = 2;
+  int ENCODING_PCM_8BIT = 3;
+  int ENCODING_PCM_32BIT = 4;
 
-    /**
-     * Write PCM audio data to the track.
-     *
-     * @param data   Audio data buffer.
-     * @param offset Byte offset into the buffer.
-     * @param size   Number of bytes to write.
-     * @return Number of bytes actually written, or negative on error.
-     */
-    @CalledByNative
-    int write(byte[] data, int offset, int size);
+  /** Compressed audio encoding constants for passthrough/offload. */
+  int ENCODING_AC3 = 10;
 
-    /** Start playback. */
-    @CalledByNative
-    void start();
+  int ENCODING_E_AC3 = 11;
+  int ENCODING_DTS = 12;
+  int ENCODING_DTS_HD = 13;
+  int ENCODING_AAC_LC = 14;
+  int ENCODING_DOLBY_TRUEHD = 15;
+  int ENCODING_E_AC3_JOC = 16;
+  int ENCODING_AC4 = 17;
 
-    /** Stop playback and reset position. */
-    @CalledByNative
-    void stop();
+  /**
+   * Open an audio track with the given configuration.
+   *
+   * @param sampleRate Sample rate in Hz.
+   * @param channelCount Number of audio channels.
+   * @param encoding One of the ENCODING_* constants.
+   * @return true if the track was opened successfully.
+   */
+  @CalledByNative
+  boolean open(int sampleRate, int channelCount, int encoding);
 
-    /** Flush buffered data. */
-    @CalledByNative
-    void flush();
+  /**
+   * Write audio data to the track.
+   *
+   * @param data Audio data buffer.
+   * @param size Number of bytes to write.
+   * @return Number of bytes actually written, or negative on error.
+   */
+  @CalledByNative
+  int write(ByteBuffer data, int size);
 
-    /** Pause playback. */
-    @CalledByNative
-    void pause();
+  /** Start playback. */
+  @CalledByNative
+  void start();
 
-    /** Close the track and release resources. */
-    @CalledByNative
-    void close();
+  /** Stop playback and reset position. */
+  @CalledByNative
+  void stop();
 
-    /** @return true if the track is open and ready to accept data. */
-    @CalledByNative
-    boolean isReady();
+  /** Flush buffered data. */
+  @CalledByNative
+  void flush();
 
-    /** @return Buffer size in bytes. */
-    @CalledByNative
-    int getBufferSize();
+  /** Pause playback. */
+  @CalledByNative
+  void pause();
 
-    /** @return Sample rate in Hz. */
-    @CalledByNative
-    int getSampleRate();
+  /** Close the track and release resources. */
+  @CalledByNative
+  void close();
 
-    /** @return Number of audio channels. */
-    @CalledByNative
-    int getChannelCount();
+  /**
+   * @return true if the track is open and ready to accept data.
+   */
+  @CalledByNative
+  boolean isReady();
 
-    /** @return Estimated latency in milliseconds. */
-    @CalledByNative
-    int getLatency();
+  /**
+   * @return Buffer size in bytes.
+   */
+  @CalledByNative
+  int getBufferSize();
 
-    /**
-     * @return Estimated duration of audio data buffered but not yet played,
-     *         in microseconds.
-     */
-    @CalledByNative
-    long getBufferDurationUs();
+  /**
+   * @return Sample rate in Hz.
+   */
+  @CalledByNative
+  int getSampleRate();
 
-    /**
-     * @return The number of frames written to the track since open.
-     */
-    @CalledByNative
-    long getFramesWritten();
+  /**
+   * @return Number of audio channels.
+   */
+  @CalledByNative
+  int getChannelCount();
 
-    /**
-     * @return Playback head position in frames since open.
-     */
-    @CalledByNative
-    int getPosition();
+  /**
+   * @return Estimated latency in milliseconds.
+   */
+  @CalledByNative
+  int getLatency();
+
+  /**
+   * @return Estimated duration of audio data buffered but not yet played, in microseconds.
+   */
+  @CalledByNative
+  long getBufferDurationUs();
+
+  /**
+   * @return The number of frames written to the track since open.
+   */
+  @CalledByNative
+  long getFramesWritten();
+
+  /**
+   * @return Playback head position in frames since open.
+   */
+  @CalledByNative
+  int getPosition();
 }

@@ -23,7 +23,7 @@ namespace android {
  * Lifecycle:
  *  1. Constructed with a Java AudioSink global reference.
  *  2. Open() → calls AudioSink.open(sampleRate, channels, encoding)
- *  3. Write() → calls AudioSink.write(byte[], offset, size)
+ *  3. Write() → calls AudioSink.write(ByteBuffer, size)
  *  4. Close() → calls AudioSink.close()
  */
 class JavaAudioTrack : public AudioTrack {

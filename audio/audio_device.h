@@ -13,6 +13,7 @@
 
 #include "base/errors.h"
 
+#include "media/audio/audio_format.h"
 #include "media/audio/audio_loopback.h"
 #include "media/audio/audio_record.h"
 #include "media/audio/audio_track.h"
@@ -75,6 +76,10 @@ class AudioDevice {
 
   // set audio output device
   virtual status_t SetAudioOutputDevice(int device_id) = 0;
+
+  // Query whether the device supports direct playback of the given format.
+  // Used by passthrough decision logic.
+  virtual bool IsFormatSupported(audio_format_t format) { return false; }
 };
 
 }  // namespace media

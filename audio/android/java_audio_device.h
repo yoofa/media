@@ -39,8 +39,12 @@ class JavaAudioDevice : public AudioDevice {
       override;
   status_t SetAudioInputDevice(int device_id) override;
   status_t SetAudioOutputDevice(int device_id) override;
+  bool IsFormatSupported(audio_format_t format) override;
 
  private:
+  // Convert audio_format_t to AudioSink.ENCODING_* constant for JNI call.
+  static int ToAudioSinkEncoding(audio_format_t format);
+
   jni_zero::ScopedJavaGlobalRef<jobject> j_audio_device_;
 };
 

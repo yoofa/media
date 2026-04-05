@@ -7,9 +7,14 @@
 
 #include "java_audio_track.h"
 
+#include <chrono>
+#include <thread>
+
 #include "base/android/jni/jvm.h"
 #include "base/logging.h"
+#include "base/time_utils.h"
 #include "jni_headers/media/android/generated_media_jni/AudioSink_jni.h"
+#include "media/audio/audio_format.h"
 #include "media/audio/channel_layout.h"
 
 namespace ave {
@@ -71,6 +76,12 @@ ssize_t JavaAudioTrack::channelCount() const {
 }
 
 ssize_t JavaAudioTrack::frameSize() const {
+  // Compressed formats: frame size is 1 (each buffer is one access unit).
+  uint32_t main_format = config_.format & AUDIO_FORMAT_MAIN_MASK;
+  if (main_format != AUDIO_FORMAT_PCM && main_format != AUDIO_FORMAT_DEFAULT) {
+    return 1;
+  }
+
   int bytes_per_sample = 2;
   switch (config_.format) {
     case AudioFormat::AUDIO_FORMAT_PCM_8_BIT:
@@ -180,8 +191,6 @@ status_t JavaAudioTrack::Open(audio_config_t config,
 }
 
 ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
-  (void)blocking;
-
   if (!opened_ || !j_audio_sink_.obj()) {
     return -EINVAL;
   }
@@ -191,22 +200,63 @@ ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
 
   JNIEnv* env = AttachCurrentThreadIfNeeded();
 
-  // Create Java byte[] and copy native data into it
-  jbyteArray j_data = env->NewByteArray(static_cast<jint>(size));
-  if (!j_data) {
-    AVE_LOG(LS_ERROR) << "JavaAudioTrack::Write: NewByteArray failed";
+  jobject j_buffer = env->NewDirectByteBuffer(const_cast<void*>(buffer),
+                                              static_cast<jlong>(size));
+  if (!j_buffer) {
+    AVE_LOG(LS_ERROR) << "JavaAudioTrack::Write: NewDirectByteBuffer failed";
     return -ENOMEM;
   }
-  env->SetByteArrayRegion(j_data, 0, static_cast<jint>(size),
-                          static_cast<const jbyte*>(buffer));
 
-  jint written = Java_AudioSink_write(
-      env, j_audio_sink_, jni_zero::JavaParamRef<jbyteArray>(env, j_data), 0,
-      static_cast<int>(size));
+  size_t total_written = 0;
+  const bool compressed =
+      (config_.format & AUDIO_FORMAT_MAIN_MASK) != AUDIO_FORMAT_PCM &&
+      (config_.format & AUDIO_FORMAT_MAIN_MASK) != AUDIO_FORMAT_DEFAULT;
+  const int64_t blocking_deadline_ms =
+      blocking ? base::TimeMillis() + (compressed ? 1000 : 200) : 0;
+  while (total_written < size) {
+    jint written = Java_AudioSink_write(
+        env, j_audio_sink_, jni_zero::JavaParamRef<jobject>(env, j_buffer),
+        static_cast<int>(size - total_written));
+    if (written == 0 && blocking && base::TimeMillis() < blocking_deadline_ms) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      continue;
+    }
+    if (written <= 0) {
+      env->DeleteLocalRef(j_buffer);
+      if (total_written > 0 && !blocking) {
+        return static_cast<ssize_t>(total_written);
+      }
+      if (total_written > 0 && blocking) {
+        AVE_LOG(LS_WARNING)
+            << "JavaAudioTrack::Write: blocking write incomplete, requested="
+            << size << " written=" << total_written
+            << " last_result=" << written;
+      }
+      return total_written > 0 ? static_cast<ssize_t>(total_written)
+                               : static_cast<ssize_t>(written);
+    }
 
-  env->DeleteLocalRef(j_data);
+    total_written += static_cast<size_t>(written);
+    if (compressed && total_written < size) {
+      env->DeleteLocalRef(j_buffer);
+      j_buffer = env->NewDirectByteBuffer(
+          const_cast<uint8_t*>(static_cast<const uint8_t*>(buffer) +
+                               total_written),
+          static_cast<jlong>(size - total_written));
+      if (!j_buffer) {
+        AVE_LOG(LS_ERROR)
+            << "JavaAudioTrack::Write: NewDirectByteBuffer retry failed";
+        return static_cast<ssize_t>(total_written);
+      }
+    }
+    if (!blocking) {
+      break;
+    }
+  }
 
-  return static_cast<ssize_t>(written);
+  env->DeleteLocalRef(j_buffer);
+
+  return static_cast<ssize_t>(total_written);
 }
 
 status_t JavaAudioTrack::Start() {
@@ -252,7 +302,7 @@ void JavaAudioTrack::Close() {
 }
 
 int JavaAudioTrack::ToAudioSinkEncoding(audio_format_t format) {
-  // Must match AudioSink.ENCODING_PCM_* constants
+  // Must match AudioSink.ENCODING_* constants in AudioSink.java
   switch (format) {
     case AUDIO_FORMAT_PCM_16_BIT:
       return 1;  // ENCODING_PCM_16BIT
@@ -262,8 +312,29 @@ int JavaAudioTrack::ToAudioSinkEncoding(audio_format_t format) {
       return 3;  // ENCODING_PCM_8BIT
     case AUDIO_FORMAT_PCM_32_BIT:
       return 4;  // ENCODING_PCM_32BIT
+    case AUDIO_FORMAT_AC3:
+      return 10;  // ENCODING_AC3
+    case AUDIO_FORMAT_E_AC3:
+    case AUDIO_FORMAT_E_AC3_JOC:
+      return 11;  // ENCODING_E_AC3
+    case AUDIO_FORMAT_DTS:
+      return 12;  // ENCODING_DTS
+    case AUDIO_FORMAT_DTS_HD:
+      return 13;  // ENCODING_DTS_HD
+    case AUDIO_FORMAT_AAC_LC:
+      return 14;  // ENCODING_AAC_LC
+    case AUDIO_FORMAT_DOLBY_TRUEHD:
+      return 15;  // ENCODING_DOLBY_TRUEHD
+    case AUDIO_FORMAT_AC4:
+      return 17;  // ENCODING_AC4
     default:
-      return 1;  // default to 16-bit
+      // For any AAC variant, use AAC_LC passthrough
+      if ((format & AUDIO_FORMAT_MAIN_MASK) == AUDIO_FORMAT_AAC ||
+          (format & AUDIO_FORMAT_MAIN_MASK) == AUDIO_FORMAT_AAC_ADTS ||
+          (format & AUDIO_FORMAT_MAIN_MASK) == AUDIO_FORMAT_AAC_LATM) {
+        return 14;  // ENCODING_AAC_LC
+      }
+      return 1;  // default to 16-bit PCM
   }
 }
 
