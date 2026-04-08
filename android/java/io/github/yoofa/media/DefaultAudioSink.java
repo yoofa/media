@@ -14,6 +14,7 @@ import android.media.AudioTrack;
 import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
+
 import java.nio.ByteBuffer;
 
 /**
@@ -25,9 +26,21 @@ import java.nio.ByteBuffer;
  */
 public class DefaultAudioSink implements AudioSink {
 
-  private static final String TAG = "DefaultAudioSink";
+    private static final String TAG = "DefaultAudioSink";
+    private static final int TIMESTAMP_STATE_INITIALIZING = 0;
+    private static final int TIMESTAMP_STATE_TIMESTAMP = 1;
+    private static final int TIMESTAMP_STATE_TIMESTAMP_ADVANCING = 2;
+    private static final int TIMESTAMP_STATE_NO_TIMESTAMP = 3;
+    private static final long FAST_TIMESTAMP_SAMPLE_INTERVAL_US = 10_000;
+    private static final long SLOW_TIMESTAMP_SAMPLE_INTERVAL_US = 10_000_000;
+    private static final long INITIALIZING_DURATION_US = 500_000;
+    private static final long WAIT_FOR_ADVANCING_TIMESTAMP_US = 2_000_000;
+    private static final long MAX_ADVANCING_TIMESTAMP_DRIFT_US = 1_000;
+    private static final long PLAYHEAD_OFFSET_SAMPLE_INTERVAL_US = 30_000;
+    private static final long RAW_PLAYHEAD_SAMPLE_INTERVAL_MS = 5;
+    private static final int MAX_PLAYHEAD_OFFSET_COUNT = 10;
 
-  private AudioTrack audioTrack;
+    private AudioTrack audioTrack;
   private int sampleRate;
   private int channelCount;
 
@@ -40,12 +53,28 @@ public class DefaultAudioSink implements AudioSink {
   /** Decoded PCM samples per compressed access unit (e.g. 1024 for AAC-LC). */
   private int samplesPerFrame;
 
-  private final AudioTimestamp audioTimestamp = new AudioTimestamp();
-  private long lastTimestampFramePosition = -1;
-  private long lastTimestampLogRealtimeMs;
+    private final AudioTimestamp audioTimestamp = new AudioTimestamp();
+    private long lastTimestampFramePosition = -1;
+    private long lastRawTimestampFramePosition = -1;
+    private long timestampWrapCount;
+    private long lastTimestampLogRealtimeMs;
+    private int timestampState;
+    private long initializeSystemTimeUs;
+    private long lastTimestampSampleTimeUs;
+    private long timestampSampleIntervalUs;
+    private long initialTimestampPositionFrames;
+    private long initialTimestampSystemTimeUs;
+    private final long[] playheadOffsetsUs = new long[MAX_PLAYHEAD_OFFSET_COUNT];
+    private int nextPlayheadOffsetIndex;
+    private int playheadOffsetCount;
+    private long smoothedPlayheadOffsetUs;
+    private long lastPlayheadSampleTimeUs;
+    private long rawPlaybackHeadPosition;
+    private long rawPlaybackHeadWrapCount;
+    private long lastRawPlaybackHeadSampleTimeMs;
 
-  @Override
-  public boolean open(int sampleRate, int channelCount, int encoding) {
+    @Override
+    public boolean open(int sampleRate, int channelCount, int encoding) {
     Log.i(
         TAG,
         "open: sampleRate=" + sampleRate + " channels=" + channelCount + " encoding=" + encoding);
@@ -53,12 +82,11 @@ public class DefaultAudioSink implements AudioSink {
 
     this.sampleRate = sampleRate;
     this.channelCount = channelCount;
-    this.framesWritten = 0;
-    this.isCompressed = isCompressedEncoding(encoding);
-    this.lastTimestampFramePosition = -1;
-    this.lastTimestampLogRealtimeMs = 0;
+        this.framesWritten = 0;
+        this.isCompressed = isCompressedEncoding(encoding);
+        resetPositionTracker();
 
-    int androidEncoding = toAndroidEncoding(encoding);
+        int androidEncoding = toAndroidEncoding(encoding);
     if (androidEncoding == AudioFormat.ENCODING_INVALID) {
       Log.e(TAG, "Unsupported encoding: " + encoding);
       return false;
@@ -189,8 +217,9 @@ public class DefaultAudioSink implements AudioSink {
 
   @Override
   public void start() {
-    if (audioTrack != null) {
-      Log.i(TAG, "start");
+        if (audioTrack != null) {
+            Log.i(TAG, "start");
+            resetPositionTracker();
             audioTrack.play();
         }
     }
@@ -205,6 +234,7 @@ public class DefaultAudioSink implements AudioSink {
                 Log.w(TAG, "stop failed", e);
             }
             framesWritten = 0;
+            resetPositionTracker();
         }
     }
 
@@ -214,6 +244,7 @@ public class DefaultAudioSink implements AudioSink {
             Log.i(TAG, "flush");
             audioTrack.flush();
             framesWritten = 0;
+            resetPositionTracker();
         }
     }
 
@@ -226,6 +257,7 @@ public class DefaultAudioSink implements AudioSink {
             } catch (IllegalStateException e) {
                 Log.w(TAG, "pause failed", e);
             }
+            resetPositionTracker();
         }
     }
 
@@ -241,6 +273,7 @@ public class DefaultAudioSink implements AudioSink {
             audioTrack = null;
             framesWritten = 0;
         }
+        resetPositionTracker();
     }
 
     @Override
@@ -323,65 +356,258 @@ public class DefaultAudioSink implements AudioSink {
    */
   private long getPlayedFrameCount() {
     if (audioTrack == null) {
-      return 0;
-    }
-    try {
-      if (audioTrack.getTimestamp(audioTimestamp)) {
-        // Extrapolate from the last known position to now.
-        long nowNs = System.nanoTime();
-        long elapsedNs = nowNs - audioTimestamp.nanoTime;
-        if (elapsedNs < 0) {
-          elapsedNs = 0;
+            return 0;
         }
-        long extrapolatedFrames = elapsedNs * sampleRate / 1_000_000_000L;
+        long systemTimeUs = System.nanoTime() / 1000;
+        maybeSamplePlayheadOffset(systemTimeUs);
+        maybePollTimestamp(systemTimeUs);
+
+        long playbackHeadFrames = getPlaybackHeadPosition();
+        long playedFrames =
+                hasAdvancingTimestamp()
+                        ? getTimestampPositionFrames(systemTimeUs)
+                        : getPlaybackHeadPositionEstimateFrames(systemTimeUs);
+
         if (isCompressed) {
-          long rawFramePosition = audioTimestamp.framePosition & 0xFFFFFFFFL;
-          long nowMs = SystemClock.elapsedRealtime();
-          if (lastTimestampFramePosition >= 0 && rawFramePosition < lastTimestampFramePosition) {
-            Log.w(
-                TAG,
-                "offload timestamp regressed: raw="
-                    + rawFramePosition
-                    + " last="
-                    + lastTimestampFramePosition
-                    + " framesWritten="
-                    + framesWritten);
-          } else if (nowMs - lastTimestampLogRealtimeMs >= 500) {
-            Log.i(
-                TAG,
-                "offload timestamp: raw="
-                    + rawFramePosition
-                    + " extrapolated="
-                    + (rawFramePosition + extrapolatedFrames)
-                    + " framesWritten="
-                    + framesWritten
-                    + " tsNs="
-                    + audioTimestamp.nanoTime);
-            lastTimestampLogRealtimeMs = nowMs;
-          }
-          lastTimestampFramePosition = rawFramePosition;
+            long nowMs = SystemClock.elapsedRealtime();
+            if (nowMs - lastTimestampLogRealtimeMs >= 500) {
+                Log.i(
+                        TAG,
+                        "offload position:"
+                                + " source="
+                                + (hasAdvancingTimestamp() ? "timestamp" : "playhead")
+                                + " played="
+                                + playedFrames
+                                + " playbackHead="
+                                + playbackHeadFrames
+                                + " timestamp="
+                                + lastTimestampFramePosition
+                                + " framesWritten="
+                                + framesWritten
+                                + " tsNs="
+                                + audioTimestamp.nanoTime);
+                lastTimestampLogRealtimeMs = nowMs;
+            }
         }
-        return Math.max(audioTimestamp.framePosition + extrapolatedFrames, 0);
-      }
-    } catch (Exception e) {
-      // getTimestamp can throw on some devices; fall through.
+
+        return Math.max(playedFrames, 0);
     }
-    // Fallback for PCM tracks or early playback before first timestamp.
-    if (isCompressed) {
-      long nowMs = SystemClock.elapsedRealtime();
-      if (nowMs - lastTimestampLogRealtimeMs >= 500) {
-        Log.w(
-            TAG,
-            "offload timestamp unavailable, using playback head fallback"
-                + " framesWritten="
-                + framesWritten
-                + " playbackHead="
-                + (audioTrack.getPlaybackHeadPosition() & 0xFFFFFFFFL));
-        lastTimestampLogRealtimeMs = nowMs;
-      }
+
+    private void resetPositionTracker() {
+        lastTimestampFramePosition = -1;
+        lastRawTimestampFramePosition = -1;
+        timestampWrapCount = 0;
+        lastTimestampLogRealtimeMs = 0;
+        rawPlaybackHeadPosition = 0;
+        rawPlaybackHeadWrapCount = 0;
+        lastRawPlaybackHeadSampleTimeMs = 0;
+        smoothedPlayheadOffsetUs = 0;
+        lastPlayheadSampleTimeUs = 0;
+        nextPlayheadOffsetIndex = 0;
+        playheadOffsetCount = 0;
+        initialTimestampPositionFrames = -1;
+        initialTimestampSystemTimeUs = 0;
+        updateTimestampState(TIMESTAMP_STATE_INITIALIZING);
     }
-    return audioTrack.getPlaybackHeadPosition() & 0xFFFFFFFFL;
-  }
+
+    private void maybeSamplePlayheadOffset(long systemTimeUs) {
+        if (sampleRate <= 0
+                || systemTimeUs - lastPlayheadSampleTimeUs < PLAYHEAD_OFFSET_SAMPLE_INTERVAL_US) {
+            return;
+        }
+
+        long playbackHeadPositionUs = getPlaybackHeadPositionUs();
+        if (playbackHeadPositionUs == 0) {
+            return;
+        }
+
+        playheadOffsetsUs[nextPlayheadOffsetIndex] = playbackHeadPositionUs - systemTimeUs;
+        nextPlayheadOffsetIndex = (nextPlayheadOffsetIndex + 1) % MAX_PLAYHEAD_OFFSET_COUNT;
+        if (playheadOffsetCount < MAX_PLAYHEAD_OFFSET_COUNT) {
+            playheadOffsetCount++;
+        }
+        smoothedPlayheadOffsetUs = 0;
+        for (int i = 0; i < playheadOffsetCount; i++) {
+            smoothedPlayheadOffsetUs += playheadOffsetsUs[i] / playheadOffsetCount;
+        }
+        lastPlayheadSampleTimeUs = systemTimeUs;
+    }
+
+    private void maybePollTimestamp(long systemTimeUs) {
+        if (audioTrack == null || sampleRate <= 0) {
+            return;
+        }
+        if ((systemTimeUs - lastTimestampSampleTimeUs) < timestampSampleIntervalUs) {
+            return;
+        }
+
+        lastTimestampSampleTimeUs = systemTimeUs;
+        boolean updatedTimestamp = false;
+        try {
+            updatedTimestamp = audioTrack.getTimestamp(audioTimestamp);
+        } catch (Exception e) {
+            updatedTimestamp = false;
+        }
+
+        if (updatedTimestamp) {
+            updateTimestampFramePosition();
+        }
+
+        switch (timestampState) {
+            case TIMESTAMP_STATE_INITIALIZING:
+                if (updatedTimestamp) {
+                    long timestampSystemTimeUs = audioTimestamp.nanoTime / 1000;
+                    if (timestampSystemTimeUs >= initializeSystemTimeUs) {
+                        initialTimestampPositionFrames = lastTimestampFramePosition;
+                        initialTimestampSystemTimeUs = timestampSystemTimeUs;
+                        updateTimestampState(TIMESTAMP_STATE_TIMESTAMP);
+                    }
+                } else if (systemTimeUs - initializeSystemTimeUs > INITIALIZING_DURATION_US) {
+                    updateTimestampState(TIMESTAMP_STATE_NO_TIMESTAMP);
+                }
+                break;
+            case TIMESTAMP_STATE_TIMESTAMP:
+                if (!updatedTimestamp) {
+                    resetPositionTracker();
+                    break;
+                }
+                if (isTimestampAdvancing(systemTimeUs)) {
+                    updateTimestampState(TIMESTAMP_STATE_TIMESTAMP_ADVANCING);
+                } else if (systemTimeUs - initializeSystemTimeUs
+                        > WAIT_FOR_ADVANCING_TIMESTAMP_US) {
+                    updateTimestampState(TIMESTAMP_STATE_NO_TIMESTAMP);
+                } else {
+                    initialTimestampPositionFrames = lastTimestampFramePosition;
+                    initialTimestampSystemTimeUs = audioTimestamp.nanoTime / 1000;
+                }
+                break;
+            case TIMESTAMP_STATE_TIMESTAMP_ADVANCING:
+                if (!updatedTimestamp) {
+                    resetPositionTracker();
+                }
+                break;
+            case TIMESTAMP_STATE_NO_TIMESTAMP:
+                if (updatedTimestamp) {
+                    resetPositionTracker();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void updateTimestampState(int state) {
+        timestampState = state;
+        switch (state) {
+            case TIMESTAMP_STATE_INITIALIZING:
+                initializeSystemTimeUs = System.nanoTime() / 1000;
+                lastTimestampSampleTimeUs = 0;
+                timestampSampleIntervalUs = FAST_TIMESTAMP_SAMPLE_INTERVAL_US;
+                initialTimestampPositionFrames = -1;
+                initialTimestampSystemTimeUs = 0;
+                break;
+            case TIMESTAMP_STATE_TIMESTAMP:
+                timestampSampleIntervalUs = FAST_TIMESTAMP_SAMPLE_INTERVAL_US;
+                break;
+            case TIMESTAMP_STATE_TIMESTAMP_ADVANCING:
+            case TIMESTAMP_STATE_NO_TIMESTAMP:
+                timestampSampleIntervalUs = SLOW_TIMESTAMP_SAMPLE_INTERVAL_US;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void updateTimestampFramePosition() {
+        long rawFramePosition = audioTimestamp.framePosition & 0xFFFFFFFFL;
+        if (lastRawTimestampFramePosition >= 0
+                && rawFramePosition < lastRawTimestampFramePosition) {
+            timestampWrapCount++;
+        }
+        lastRawTimestampFramePosition = rawFramePosition;
+        lastTimestampFramePosition = rawFramePosition + (timestampWrapCount << 32);
+    }
+
+    private boolean isTimestampAdvancing(long systemTimeUs) {
+        if (lastTimestampFramePosition <= initialTimestampPositionFrames) {
+            return false;
+        }
+        long positionEstimateUsingInitialTimestampUs =
+                computeTimestampPositionUs(
+                        initialTimestampPositionFrames, initialTimestampSystemTimeUs, systemTimeUs);
+        long positionEstimateUsingCurrentTimestampUs =
+                computeTimestampPositionUs(
+                        lastTimestampFramePosition, audioTimestamp.nanoTime / 1000, systemTimeUs);
+        return Math.abs(
+                        positionEstimateUsingCurrentTimestampUs
+                                - positionEstimateUsingInitialTimestampUs)
+                < MAX_ADVANCING_TIMESTAMP_DRIFT_US;
+    }
+
+    private boolean hasAdvancingTimestamp() {
+        return timestampState == TIMESTAMP_STATE_TIMESTAMP_ADVANCING;
+    }
+
+    private long getTimestampPositionFrames(long systemTimeUs) {
+        if (sampleRate <= 0 || lastTimestampFramePosition < 0) {
+            return 0;
+        }
+        long positionUs =
+                computeTimestampPositionUs(
+                        lastTimestampFramePosition, audioTimestamp.nanoTime / 1000, systemTimeUs);
+        return positionUs * sampleRate / 1_000_000L;
+    }
+
+    private long computeTimestampPositionUs(
+            long timestampPositionFrames, long timestampSystemTimeUs, long systemTimeUs) {
+        long timestampPositionUs = timestampPositionFrames * 1_000_000L / sampleRate;
+        long elapsedSinceTimestampUs = systemTimeUs - timestampSystemTimeUs;
+        if (elapsedSinceTimestampUs < 0) {
+            elapsedSinceTimestampUs = 0;
+        }
+        return timestampPositionUs + elapsedSinceTimestampUs;
+    }
+
+    private long getPlaybackHeadPositionEstimateFrames(long systemTimeUs) {
+        if (sampleRate <= 0) {
+            return 0;
+        }
+        long positionUs =
+                playheadOffsetCount == 0
+                        ? getPlaybackHeadPositionUs()
+                        : systemTimeUs + smoothedPlayheadOffsetUs;
+        if (positionUs < 0) {
+            positionUs = 0;
+        }
+        return positionUs * sampleRate / 1_000_000L;
+    }
+
+    private long getPlaybackHeadPositionUs() {
+        return getPlaybackHeadPosition() * 1_000_000L / sampleRate;
+    }
+
+    private long getPlaybackHeadPosition() {
+        if (audioTrack == null) {
+            return 0;
+        }
+        long currentTimeMs = SystemClock.elapsedRealtime();
+        if ((currentTimeMs - lastRawPlaybackHeadSampleTimeMs) >= RAW_PLAYHEAD_SAMPLE_INTERVAL_MS) {
+            updateRawPlaybackHeadPosition();
+            lastRawPlaybackHeadSampleTimeMs = currentTimeMs;
+        }
+        return rawPlaybackHeadPosition + (rawPlaybackHeadWrapCount << 32);
+    }
+
+    private void updateRawPlaybackHeadPosition() {
+        if (audioTrack == null || audioTrack.getPlayState() == AudioTrack.PLAYSTATE_STOPPED) {
+            return;
+        }
+        long playbackHeadPosition = audioTrack.getPlaybackHeadPosition() & 0xFFFFFFFFL;
+        if (rawPlaybackHeadPosition > playbackHeadPosition) {
+            rawPlaybackHeadWrapCount++;
+        }
+        rawPlaybackHeadPosition = playbackHeadPosition;
+    }
 
   /**
    * Returns the total hardware output latency in microseconds via AudioTrack.getLatency(). This
