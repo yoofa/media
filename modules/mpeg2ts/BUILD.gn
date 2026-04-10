@@ -1,0 +1,33 @@
+# Build file for MPEG2-TS module
+# Ported from Android MPEG2-TS module
+
+config("mpeg2ts_config") {
+  include_dirs = [ "../.." ]
+}
+
+source_set("mpeg2ts") {
+  sources = [
+    "es_queue.cc",
+    "es_queue.h",
+    "packet_source.cc",
+    "packet_source.h",
+    "ts_parser.cc",
+    "ts_parser.h",
+  ]
+
+  configs += [ ":mpeg2ts_config" ]
+
+  public_configs = [ ":mpeg2ts_config" ]
+
+  deps = [
+    "../../foundation:avc_util",
+    "../../foundation:bit_reader",
+    "../../foundation:handler",
+    "../../foundation:media_buffer",
+    "../../foundation:media_defs",
+    "../../foundation:media_frame",
+    "../../foundation:media_meta",
+    "../../foundation:media_source",
+    "//base:logging",
+  ]
+}

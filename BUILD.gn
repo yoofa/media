@@ -5,6 +5,7 @@ group("media") {
     #"audio",
     "codec",
     "foundation",
+    "modules/mpeg2ts",
   ]
   if (is_android) {
     deps += [ "android" ]
