@@ -97,11 +97,12 @@ int32_t ColorUtils::wrapColorAspectsIntoColorStandard(
   // check platform media limits
   uint32_t numPrimaries = ColorAspects::PrimariesBT2020 + 1;
   if (isDefined(primaries) && isDefined(coeffs)) {
-    return static_cast<int32_t>(kColorStandardExtendedStart + primaries +
-                                coeffs * numPrimaries);
+    return static_cast<int32_t>(
+        static_cast<uint32_t>(kColorStandardExtendedStart) + primaries +
+        coeffs * numPrimaries);
   }
-  return static_cast<int32_t>(kColorStandardVendorStart + primaries +
-                              coeffs * 0x100);
+  return static_cast<int32_t>(static_cast<uint32_t>(kColorStandardVendorStart) +
+                              primaries + coeffs * 0x100);
 }
 
 // static
@@ -155,7 +156,8 @@ int32_t ColorUtils::wrapColorAspectsIntoColorRange(ColorAspects::Range range) {
   }
   AVE_CHECK(!isDefined(range));
   // all platform values are in sRanges
-  return static_cast<int32_t>(kColorRangeVendorStart + range);
+  return static_cast<int32_t>(static_cast<uint32_t>(kColorRangeVendorStart) +
+                              range);
 }
 
 // static
@@ -197,10 +199,12 @@ int32_t ColorUtils::wrapColorAspectsIntoColorTransfer(
     return static_cast<int32_t>(kColorTransferUnspecified);
   }
   if (isDefined(transfer)) {
-    return static_cast<int32_t>(kColorTransferExtendedStart + transfer);
+    return static_cast<int32_t>(
+        static_cast<uint32_t>(kColorTransferExtendedStart) + transfer);
   }
   // all platform values are in sRanges
-  return static_cast<int32_t>(kColorTransferVendorStart + transfer);
+  return static_cast<int32_t>(static_cast<uint32_t>(kColorTransferVendorStart) +
+                              transfer);
 }
 
 // static
