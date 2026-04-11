@@ -126,53 +126,55 @@ ave_library("pulse_audio") {
 }
 
 # android
-## opensles
-ave_library("opensles_audio_device") {
-  sources = [
-    "android/opensles_audio_device.cc",
-    "android/opensles_audio_device.h",
-    "android/opensles_audio_track.cc",
-    "android/opensles_audio_track.h",
-  ]
-  deps = [
-    ":audio_device_base",
-    "//base:logging",
-  ]
-  libs = [ "OpenSLES" ]
-}
+if (is_android) {
+  ## opensles
+  ave_library("opensles_audio_device") {
+    sources = [
+      "android/opensles_audio_device.cc",
+      "android/opensles_audio_device.h",
+      "android/opensles_audio_track.cc",
+      "android/opensles_audio_track.h",
+    ]
+    deps = [
+      ":audio_device_base",
+      "//base:logging",
+    ]
+    libs = [ "OpenSLES" ]
+  }
 
-## aaudio
-ave_library("aaudio_audio_device") {
-  sources = [
-    "android/aaudio_audio_device.cc",
-    "android/aaudio_audio_device.h",
-    "android/aaudio_audio_record.cc",
-    "android/aaudio_audio_record.h",
-    "android/aaudio_audio_track.cc",
-    "android/aaudio_audio_track.h",
-  ]
-  deps = [
-    ":audio_device_base",
-    "//base:logging",
-  ]
-  libs = [ "aaudio" ]
-}
+  ## aaudio
+  ave_library("aaudio_audio_device") {
+    sources = [
+      "android/aaudio_audio_device.cc",
+      "android/aaudio_audio_device.h",
+      "android/aaudio_audio_record.cc",
+      "android/aaudio_audio_record.h",
+      "android/aaudio_audio_track.cc",
+      "android/aaudio_audio_track.h",
+    ]
+    deps = [
+      ":audio_device_base",
+      "//base:logging",
+    ]
+    libs = [ "aaudio" ]
+  }
 
-## java audio device (JNI callback to Java AudioDevice)
-ave_library("java_audio_device") {
-  sources = [
-    "android/java_audio_device.cc",
-    "android/java_audio_device.h",
-    "android/java_audio_track.cc",
-    "android/java_audio_track.h",
-  ]
-  deps = [
-    ":audio_device_base",
-    "//base:logging",
-    "//base/android:ave_jni",
-    "//media/android:generated_media_jni",
-    "//third_party/jni_zero",
-  ]
+  ## java audio device (JNI callback to Java AudioDevice)
+  ave_library("java_audio_device") {
+    sources = [
+      "android/java_audio_device.cc",
+      "android/java_audio_device.h",
+      "android/java_audio_track.cc",
+      "android/java_audio_track.h",
+    ]
+    deps = [
+      ":audio_device_base",
+      "//base:logging",
+      "//base/android:ave_jni",
+      "//media/android:generated_media_jni",
+      "//third_party/jni_zero",
+    ]
+  }
 }
 
 # executable

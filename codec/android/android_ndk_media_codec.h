@@ -104,6 +104,9 @@ class AndroidNdkMediaCodec : public Codec {
   int32_t output_height_ = 0;
   int32_t output_color_format_ = 0;
   int32_t output_stride_ = 0;
+  bool audio_output_pts_valid_ = false;
+  int64_t audio_output_pts_us_ = 0;
+  int64_t audio_output_buffer_duration_us_ = 0;
 
   // <index, CodecBuffer>
   std::unordered_map<size_t, std::shared_ptr<CodecBuffer>> input_buffers_;

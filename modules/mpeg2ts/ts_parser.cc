@@ -28,6 +28,41 @@ namespace mpeg2ts {
 
 static const size_t kTSPacketSize = 188;
 
+namespace {
+
+constexpr uint8_t kDescriptorIso639Language = 0x0A;
+constexpr uint8_t kAudioTypeUndefined = 0x00;
+constexpr uint8_t kAudioTypeVisualImpairedCommentary = 0x03;
+
+uint8_t ParseIso639AudioType(const uint8_t* data, size_t size) {
+  size_t offset = 0;
+  while (offset + 2 <= size) {
+    const uint8_t tag = data[offset];
+    const size_t descriptor_length = data[offset + 1];
+    offset += 2;
+
+    if (offset + descriptor_length > size) {
+      break;
+    }
+
+    if (tag == kDescriptorIso639Language && descriptor_length >= 4) {
+      const size_t entry_count = descriptor_length / 4;
+      for (size_t i = 0; i < entry_count; ++i) {
+        const uint8_t audio_type = data[offset + i * 4 + 3];
+        if (audio_type != kAudioTypeUndefined) {
+          return audio_type;
+        }
+      }
+    }
+
+    offset += descriptor_length;
+  }
+
+  return kAudioTypeUndefined;
+}
+
+}  // namespace
+
 // Internal classes
 class TSParser::PSISection {
  public:
@@ -82,9 +117,11 @@ class TSParser::PSISection {
 
 class TSParser::Stream {
  public:
-  Stream(unsigned pid, unsigned stream_type)
-      : elementary_pid_(pid),
+  Stream(TSParser* parser, unsigned pid, unsigned stream_type)
+      : parser_(parser),
+        elementary_pid_(pid),
         stream_type_(stream_type),
+        audio_type_(kAudioTypeUndefined),
         expected_continuity_counter_(-1),
         payload_started_(false),
         eos_reached_(false) {
@@ -100,6 +137,9 @@ class TSParser::Stream {
         break;
       case STREAMTYPE_MPEG2_AUDIO_ADTS:
         mode = ESQueue::Mode::AAC;
+        break;
+      case STREAMTYPE_MPEG4_AUDIO_LATM:
+        mode = ESQueue::Mode::LATM;
         break;
       case STREAMTYPE_AC3:
         mode = ESQueue::Mode::AC3;
@@ -136,8 +176,11 @@ class TSParser::Stream {
 
   unsigned Type() const { return stream_type_; }
   unsigned Pid() const { return elementary_pid_; }
+  uint8_t audio_type() const { return audio_type_; }
 
   std::shared_ptr<PacketSource> GetSource() { return source_; }
+
+  void SetAudioType(uint8_t audio_type) { audio_type_ = audio_type; }
 
   bool IsVideo() const {
     return stream_type_ == STREAMTYPE_H264 || stream_type_ == STREAMTYPE_H265 ||
@@ -150,6 +193,7 @@ class TSParser::Stream {
     return stream_type_ == STREAMTYPE_MPEG1_AUDIO ||
            stream_type_ == STREAMTYPE_MPEG2_AUDIO ||
            stream_type_ == STREAMTYPE_MPEG2_AUDIO_ADTS ||
+           stream_type_ == STREAMTYPE_MPEG4_AUDIO_LATM ||
            stream_type_ == STREAMTYPE_AC3 || stream_type_ == STREAMTYPE_EAC3;
   }
 
@@ -167,9 +211,8 @@ class TSParser::Stream {
     expected_continuity_counter_ = (continuity_counter + 1) & 0x0f;
 
     if (payload_unit_start_indicator) {
-      if (payload_started_) {
-        Flush(event);
-      }
+      // PES boundaries do not guarantee access-unit boundaries. Flushing here
+      // truncates video frames that span multiple PES payloads.
       payload_started_ = true;
     }
 
@@ -214,8 +257,10 @@ class TSParser::Stream {
   }
 
  private:
+  TSParser* parser_;
   unsigned elementary_pid_;
   unsigned stream_type_;
+  uint8_t audio_type_;
   int32_t expected_continuity_counter_;
 
   std::shared_ptr<PacketSource> source_;
@@ -231,7 +276,9 @@ class TSParser::Stream {
     uint32_t packet_start_code_prefix = br->getBits(24);
     if (packet_start_code_prefix != 1) {
       AVE_LOG(LS_VERBOSE) << "Not a valid PES start code";
-      // Just buffer the data for now
+      // Continuation TS payloads do not start with a PES header. Restore the
+      // probe bits so the full payload is forwarded to the ES queue.
+      br->putBits(packet_start_code_prefix, 24);
       size_t payload_size = br->numBitsLeft() / 8;
       const uint8_t* data_ptr = br->data();
 
@@ -317,27 +364,45 @@ class TSParser::Stream {
 
     if (queue_) {
       int64_t time_us = -1;
-      if (pts != 0) {
+      if (pts_dts_flags == 2 || pts_dts_flags == 3) {
         // Convert 90kHz PTS to microseconds
         time_us = (pts * 1000000LL) / 90000;
+        if (parser_ != nullptr &&
+            (parser_->flags_ & TS_TIMESTAMPS_ARE_ABSOLUTE) == 0) {
+          if (!parser_->time_offset_valid_) {
+            parser_->absolute_time_anchor_us_ = time_us;
+            parser_->time_offset_us_ = -time_us;
+            parser_->time_offset_valid_ = true;
+          }
+          time_us += parser_->time_offset_us_;
+          if (time_us < 0) {
+            time_us = 0;
+          }
+        }
       }
 
       queue_->AppendData(data_ptr, payload_size, time_us);
 
-      auto access_unit = queue_->DequeueAccessUnit();
+      auto access_unit = queue_->DequeueAccessUnit(false);
       while (access_unit) {
-        source_->QueueAccessUnit(access_unit);
+        auto format = queue_->GetFormat();
+        if (format) {
+          source_->SetFormat(format);
+        }
+        if (!IsVideo() || format) {
+          source_->QueueAccessUnit(access_unit);
+        }
 
         // Check if this is a sync frame
-        if (event && !event->HasReturnedData()) {
-          int64_t au_time_us = access_unit->pts().us();
+        if (event && !event->HasReturnedData() && (!IsVideo() || format)) {
+          int64_t au_time_us = access_unit->pts().us_or(-1);
           if (au_time_us >= 0) {
             event->Init(0, source_, au_time_us,
                         IsVideo() ? SourceType::VIDEO : SourceType::AUDIO);
           }
         }
 
-        access_unit = queue_->DequeueAccessUnit();
+        access_unit = queue_->DequeueAccessUnit(false);
       }
     }
 
@@ -346,10 +411,16 @@ class TSParser::Stream {
 
   status_t Flush(TSParser::SyncEvent* event) {
     if (queue_) {
-      auto access_unit = queue_->DequeueAccessUnit();
+      auto access_unit = queue_->DequeueAccessUnit(true);
       while (access_unit) {
-        source_->QueueAccessUnit(access_unit);
-        access_unit = queue_->DequeueAccessUnit();
+        auto format = queue_->GetFormat();
+        if (format) {
+          source_->SetFormat(format);
+        }
+        if (!IsVideo() || format) {
+          source_->QueueAccessUnit(access_unit);
+        }
+        access_unit = queue_->DequeueAccessUnit(true);
       }
     }
     return OK;
@@ -358,13 +429,28 @@ class TSParser::Stream {
 
 class TSParser::Program {
  public:
-  explicit Program(unsigned program_map_pid)
-      : program_map_pid_(program_map_pid) {}
+  Program(TSParser* parser, unsigned program_map_pid)
+      : parser_(parser), program_map_pid_(program_map_pid) {}
 
-  bool ParsePSISection(unsigned pid, BitReader* br, status_t* err) {
+  bool ParsePSISection(unsigned pid,
+                       unsigned payload_unit_start_indicator,
+                       BitReader* br,
+                       status_t* err) {
     *err = OK;
 
     if (pid == program_map_pid_) {
+      if (payload_unit_start_indicator) {
+        if (br->numBitsLeft() < 8) {
+          *err = ERROR_MALFORMED;
+          return true;
+        }
+        unsigned skip = br->getBits(8);
+        if (br->numBitsLeft() < skip * 8) {
+          *err = ERROR_MALFORMED;
+          return true;
+        }
+        br->skipBits(skip * 8);
+      }
       *err = ParseProgramMap(br);
       return true;
     }
@@ -406,14 +492,39 @@ class TSParser::Program {
   }
 
   std::shared_ptr<PacketSource> GetSource(TSParser::SourceType type) {
+    std::shared_ptr<PacketSource> best_source;
+    int best_priority = 4;
     for (auto& pair : streams_) {
-      if (type == TSParser::VIDEO && pair.second->IsVideo()) {
-        return pair.second->GetSource();
-      } else if (type == TSParser::AUDIO && pair.second->IsAudio()) {
-        return pair.second->GetSource();
+      const bool matches =
+          (type == TSParser::VIDEO && pair.second->IsVideo()) ||
+          (type == TSParser::AUDIO && pair.second->IsAudio());
+      if (!matches) {
+        continue;
+      }
+
+      auto source = pair.second->GetSource();
+      auto format = source ? source->GetFormat() : nullptr;
+      const bool is_ready = format && !format->mime().empty();
+
+      int priority = 3;
+      if (type == TSParser::VIDEO) {
+        priority = is_ready ? 0 : 1;
+      } else {
+        const bool is_visual_impaired =
+            pair.second->audio_type() == kAudioTypeVisualImpairedCommentary;
+        if (is_ready) {
+          priority = is_visual_impaired ? 2 : 0;
+        } else {
+          priority = is_visual_impaired ? 3 : 1;
+        }
+      }
+
+      if (priority < best_priority) {
+        best_priority = priority;
+        best_source = source;
       }
     }
-    return nullptr;
+    return best_source;
   }
 
   bool HasSource(TSParser::SourceType type) const {
@@ -428,6 +539,7 @@ class TSParser::Program {
   }
 
  private:
+  TSParser* parser_;
   unsigned program_map_pid_;
   std::map<unsigned, std::shared_ptr<Stream>> streams_;
 
@@ -476,14 +588,24 @@ class TSParser::Program {
       if (br->numBitsLeft() < es_info_length * 8) {
         return ERROR_MALFORMED;
       }
+
+      const uint8_t* es_info_data = br->data();
+      const uint8_t audio_type =
+          ParseIso639AudioType(es_info_data, es_info_length);
       br->skipBits(es_info_length * 8);
 
       // Create stream if not exists
-      if (streams_.find(elementary_pid) == streams_.end()) {
-        auto stream = std::make_shared<Stream>(elementary_pid, stream_type);
+      auto it = streams_.find(elementary_pid);
+      if (it == streams_.end()) {
+        auto stream =
+            std::make_shared<Stream>(parser_, elementary_pid, stream_type);
+        stream->SetAudioType(audio_type);
         streams_[elementary_pid] = stream;
         AVE_LOG(LS_INFO) << "Found stream: PID=" << elementary_pid
-                         << " type=" << stream_type;
+                         << " type=" << stream_type
+                         << " audio_type=" << static_cast<int>(audio_type);
+      } else {
+        it->second->SetAudioType(audio_type);
       }
 
       info_bytes_remaining -= 5 + es_info_length;
@@ -600,7 +722,7 @@ status_t TSParser::ParsePID(BitReader* br,
   // Check if this is a PMT or stream PID
   status_t err;
   for (auto& program : programs_) {
-    if (program->ParsePSISection(pid, br, &err)) {
+    if (program->ParsePSISection(pid, payload_unit_start_indicator, br, &err)) {
       return err;
     }
 
@@ -652,7 +774,7 @@ void TSParser::ParseProgramAssociationTable(BitReader* br) {
       }
 
       if (!found) {
-        auto program = std::make_shared<Program>(program_map_pid);
+        auto program = std::make_shared<Program>(this, program_map_pid);
         programs_.push_back(program);
         AVE_LOG(LS_INFO) << "Found program " << program_number
                          << " with PMT PID " << program_map_pid;
@@ -727,13 +849,11 @@ bool TSParser::HasSource(SourceType type) const {
 }
 
 bool TSParser::PTSTimeDeltaEstablished() {
-  // Simplified: just return true if we have at least parsed some packets
-  return num_ts_packets_parsed_ > 10;
+  return time_offset_valid_;
 }
 
 int64_t TSParser::GetFirstPTSTimeUs() {
-  // Simplified implementation
-  return 0;
+  return time_offset_valid_ ? absolute_time_anchor_us_ : 0;
 }
 
 void TSParser::UpdatePCR(unsigned pid,

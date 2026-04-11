@@ -34,6 +34,7 @@ class ESQueue {
     INVALID = 0,
     H264,
     AAC,
+    LATM,
     AC3,
     EAC3,
     AC4,
@@ -67,7 +68,7 @@ class ESQueue {
   void SignalEOS();
   void Clear(bool clear_format);
 
-  std::shared_ptr<MediaFrame> DequeueAccessUnit();
+  std::shared_ptr<MediaFrame> DequeueAccessUnit(bool force_flush = false);
 
   std::shared_ptr<MediaMeta> GetFormat();
 
@@ -94,14 +95,23 @@ class ESQueue {
   std::vector<uint8_t> cas_session_id_;
 
   std::shared_ptr<MediaMeta> format_;
+  std::shared_ptr<Buffer> avc_sps_;
+  std::shared_ptr<Buffer> avc_pps_;
+
+  bool latm_stream_mux_read_ = false;
+  uint32_t latm_num_subframes_ = 0;
+  uint32_t latm_frame_length_type_ = 0;
+  bool latm_other_data_present_ = false;
+  uint64_t latm_other_data_len_bits_ = 0;
 
   bool IsSampleEncrypted() const {
     return (flags_ & kFlag_SampleEncryptedData) != 0;
   }
 
-  std::shared_ptr<MediaFrame> DequeueAccessUnitH264();
-  std::shared_ptr<MediaFrame> DequeueAccessUnitHEVC();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitH264(bool force_flush);
+  std::shared_ptr<MediaFrame> DequeueAccessUnitHEVC(bool force_flush);
   std::shared_ptr<MediaFrame> DequeueAccessUnitAAC();
+  std::shared_ptr<MediaFrame> DequeueAccessUnitLATM();
   std::shared_ptr<MediaFrame> DequeueAccessUnitEAC3();
   std::shared_ptr<MediaFrame> DequeueAccessUnitAC3();
   std::shared_ptr<MediaFrame> DequeueAccessUnitAC4();

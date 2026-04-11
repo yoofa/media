@@ -237,7 +237,7 @@ ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
     }
 
     total_written += static_cast<size_t>(written);
-    if (compressed && total_written < size) {
+    if (total_written < size) {
       env->DeleteLocalRef(j_buffer);
       j_buffer = env->NewDirectByteBuffer(
           const_cast<uint8_t*>(static_cast<const uint8_t*>(buffer) +

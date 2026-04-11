@@ -13,6 +13,8 @@
 #include "base/logging.h"
 #include "foundation/media_frame.h"
 
+using namespace ave;
+using namespace ave::media;
 using namespace ave::media::mpeg2ts;
 
 int main(int argc, char** argv) {

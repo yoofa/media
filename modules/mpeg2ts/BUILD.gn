@@ -31,3 +31,8 @@ source_set("mpeg2ts") {
     "//base:logging",
   ]
 }
+
+executable("mpeg2ts_example") {
+  sources = [ "example.cc" ]
+  deps = [ ":mpeg2ts" ]
+}

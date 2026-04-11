@@ -101,7 +101,7 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& frame) {
 
     DiscontinuitySegment& seg = discontinuity_segments_.front();
 
-    int64_t time_us = frame->pts().us();
+    int64_t time_us = frame->pts().us_or(-1);
     latest_dequeued_meta_ = std::make_shared<MediaMeta>(*frame);
     if (time_us > seg.max_deque_time_us_) {
       seg.max_deque_time_us_ = time_us;
@@ -141,7 +141,7 @@ void PacketSource::QueueAccessUnit(std::shared_ptr<MediaFrame> frame) {
   queue_.push_back(QueueEntry{.frame_ = frame});
   condition_.notify_one();
 
-  int64_t last_queued_time_us = frame->pts().us();
+  int64_t last_queued_time_us = frame->pts().us_or(-1);
   if (last_queued_time_us >= 0) {
     last_queued_time_us_ = last_queued_time_us;
 
@@ -271,7 +271,7 @@ status_t PacketSource::NextBufferTime(int64_t* time_us) {
   }
 
   std::shared_ptr<MediaFrame> frame = queue_.front().frame_;
-  *time_us = frame->pts().us();
+  *time_us = frame->pts().us_or(-1);
 
   return OK;
 }

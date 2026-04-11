@@ -7,6 +7,9 @@
 
 #include "android_ndk_media_codec.h"
 
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 #include <android/native_window.h>
@@ -19,12 +22,57 @@
 #include "media/NdkMediaCodec.h"
 #include "media/audio/channel_layout.h"
 #include "media/foundation/media_errors.h"
+#include "media/foundation/media_mimes.h"
 #include "media/foundation/pixel_format.h"
 
 namespace ave {
 namespace media {
 
 namespace {
+
+#if defined(__ANDROID__)
+constexpr char kDebugVideoDumpPath[] =
+    "/data/user/0/io.github.yoofa.avpdemo/cache/avp_video_input.h264";
+constexpr size_t kDebugVideoDumpLimitBytes = 32 * 1024 * 1024;
+
+void DumpDebugVideoInput(MediaType media_type,
+                         const std::string& mime,
+                         const void* data,
+                         size_t size,
+                         uint32_t flags) {
+  if (media_type != MediaType::VIDEO || mime != MEDIA_MIMETYPE_VIDEO_AVC ||
+      !data || size == 0 ||
+      (flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
+    return;
+  }
+
+  static FILE* dump_file = nullptr;
+  static size_t dumped_bytes = 0;
+  static bool open_failed = false;
+
+  if (dumped_bytes >= kDebugVideoDumpLimitBytes || open_failed) {
+    return;
+  }
+
+  if (!dump_file) {
+    dump_file = std::fopen(kDebugVideoDumpPath, "wb");
+    if (!dump_file) {
+      open_failed = true;
+      AVE_LOG(LS_WARNING) << "Failed to open debug video dump: "
+                          << kDebugVideoDumpPath;
+      return;
+    }
+    dumped_bytes = 0;
+    AVE_LOG(LS_INFO) << "Debug video dump enabled: " << kDebugVideoDumpPath;
+  }
+
+  const size_t write_size =
+      std::min(size, kDebugVideoDumpLimitBytes - dumped_bytes);
+  const size_t written = std::fwrite(data, 1, write_size, dump_file);
+  std::fflush(dump_file);
+  dumped_bytes += written;
+}
+#endif
 
 // Map media_status_t to ave status_t
 status_t MapMediaStatus(media_status_t status) {
@@ -570,6 +618,9 @@ status_t AndroidNdkMediaCodec::Configure(
     output_sample_rate_ = static_cast<int32_t>(config->format->sample_rate());
     output_channel_count_ =
         ChannelLayoutToChannelCount(config->format->channel_layout());
+    audio_output_pts_valid_ = false;
+    audio_output_pts_us_ = 0;
+    audio_output_buffer_duration_us_ = 0;
   } else if (media_type_ == MediaType::VIDEO) {
     output_width_ = config->format->width();
     output_height_ = config->format->height();
@@ -629,6 +680,9 @@ status_t AndroidNdkMediaCodec::Stop() {
     input_buffers_.clear();
     output_buffers_.clear();
     output_buffer_infos_.clear();
+    audio_output_pts_valid_ = false;
+    audio_output_pts_us_ = 0;
+    audio_output_buffer_duration_us_ = 0;
 
     if (surface_) {
       ANativeWindow_release(surface_);
@@ -653,6 +707,9 @@ status_t AndroidNdkMediaCodec::Flush() {
   input_buffers_.clear();
   output_buffers_.clear();
   output_buffer_infos_.clear();
+  audio_output_pts_valid_ = false;
+  audio_output_pts_us_ = 0;
+  audio_output_buffer_duration_us_ = 0;
 
   return MapMediaStatus(status);
 }
@@ -805,12 +862,39 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
     meta->SetBitsPerSample(16);
     meta->SetCodec(CodecId::AVE_CODEC_ID_PCM_S16LE);
     // Compute samples per channel: data_size / (channels * 2 bytes)
+    int32_t samples_per_ch = 0;
     if (out_channel_count > 0) {
-      int32_t samples_per_ch = data_size / (out_channel_count * 2);
+      samples_per_ch = data_size / (out_channel_count * 2);
       meta->SetSamplesPerChannel(samples_per_ch);
     }
-    if (has_buf_info) {
-      meta->SetPts(base::Timestamp::Micros(buf_info.presentation_time_us));
+
+    int64_t audio_pts_us = has_buf_info ? buf_info.presentation_time_us : -1;
+    if (out_sample_rate > 0 && samples_per_ch > 0) {
+      const int64_t buffer_duration_us =
+          static_cast<int64_t>(samples_per_ch) * 1000000LL / out_sample_rate;
+      if (audio_output_pts_valid_) {
+        const int64_t expected_pts_us =
+            audio_output_pts_us_ + audio_output_buffer_duration_us_;
+        const int64_t tolerance_us =
+            std::max<int64_t>(100000, audio_output_buffer_duration_us_ * 2);
+        if (audio_pts_us <= 0 ||
+            std::llabs(audio_pts_us - expected_pts_us) > tolerance_us) {
+          AVE_LOG(LS_VERBOSE)
+              << "GetOutputBuffer[AUDIO]: replacing codec pts=" << audio_pts_us
+              << " with synthesized pts=" << expected_pts_us
+              << " expected=" << expected_pts_us
+              << " tolerance=" << tolerance_us;
+          audio_pts_us = expected_pts_us;
+        }
+      }
+      if (audio_pts_us >= 0) {
+        audio_output_pts_valid_ = true;
+        audio_output_pts_us_ = audio_pts_us;
+        audio_output_buffer_duration_us_ = buffer_duration_us;
+      }
+    }
+    if (audio_pts_us >= 0) {
+      meta->SetPts(base::Timestamp::Micros(audio_pts_us));
     }
     codec_buffer->format() = meta;
   } else if (mtype == MediaType::VIDEO) {
@@ -922,6 +1006,10 @@ status_t AndroidNdkMediaCodec::QueueInputBuffer(size_t index) {
   AVE_LOG(LS_VERBOSE) << "QueueInputBuffer: index=" << index
                       << ", offset=" << offset << ", size=" << size
                       << ", pts=" << pts << ", flags=" << flags;
+
+#if defined(__ANDROID__)
+  DumpDebugVideoInput(media_type_, mime_, input_buffer->data(), size, flags);
+#endif
 
   media_status_t ret = AMediaCodec_queueInputBuffer(android_media_codec_, index,
                                                     static_cast<off_t>(offset),
