@@ -126,6 +126,85 @@ bool StartsNewH264AccessUnit(unsigned nal_type, bool have_vcl) {
   return false;
 }
 
+bool FindAnnexBStartCode(const uint8_t* data,
+                         size_t size,
+                         size_t* offset,
+                         size_t* prefix_size) {
+  if (!data || size < 3 || !offset || !prefix_size) {
+    return false;
+  }
+
+  for (size_t i = 0; i + 3 <= size; ++i) {
+    if (i + 4 <= size && data[i] == 0x00 && data[i + 1] == 0x00 &&
+        data[i + 2] == 0x00 && data[i + 3] == 0x01) {
+      *offset = i;
+      *prefix_size = 4;
+      return true;
+    }
+    if (data[i] == 0x00 && data[i + 1] == 0x00 && data[i + 2] == 0x01) {
+      *offset = i;
+      *prefix_size = 3;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+status_t GetNextAnnexBNalUnit(const uint8_t** data,
+                              size_t* size,
+                              const uint8_t** nal_start,
+                              size_t* nal_size,
+                              bool start_code_follows) {
+  if (!data || !size || !nal_start || !nal_size) {
+    return BAD_VALUE;
+  }
+
+  *nal_start = nullptr;
+  *nal_size = 0;
+
+  const uint8_t* src = *data;
+  size_t remaining = *size;
+  if (!src || remaining < 3) {
+    return E_AGAIN;
+  }
+
+  size_t start_offset = 0;
+  size_t prefix_size = 0;
+  if (!FindAnnexBStartCode(src, remaining, &start_offset, &prefix_size)) {
+    return E_AGAIN;
+  }
+
+  const size_t nal_offset = start_offset + prefix_size;
+  if (nal_offset >= remaining) {
+    return E_AGAIN;
+  }
+
+  size_t next_offset = 0;
+  size_t next_prefix_size = 0;
+  const bool found_next =
+      FindAnnexBStartCode(src + nal_offset, remaining - nal_offset,
+                          &next_offset, &next_prefix_size);
+  (void)next_prefix_size;
+
+  size_t nal_end = remaining;
+  if (found_next) {
+    nal_end = nal_offset + next_offset;
+    *data = src + nal_end;
+    *size = remaining - nal_end;
+  } else {
+    if (!start_code_follows) {
+      return E_AGAIN;
+    }
+    *data = nullptr;
+    *size = 0;
+  }
+
+  *nal_start = src + nal_offset;
+  *nal_size = nal_end - nal_offset;
+  return OK;
+}
+
 size_t CurrentBitPosition(size_t total_bytes, const BitReader& br) {
   return total_bytes * 8 - br.numBitsLeft();
 }
@@ -786,7 +865,7 @@ std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitH264(bool force_flush) {
     const uint8_t* nal_start = nullptr;
     size_t nal_size = 0;
     status_t err =
-        getNextNALUnit(&scan, &remaining, &nal_start, &nal_size, true);
+        GetNextAnnexBNalUnit(&scan, &remaining, &nal_start, &nal_size, true);
     if (err != OK) {
       if ((force_flush || eos_reached_) && !nal_units.empty() && have_vcl) {
         return build_access_unit(buffer_size);
