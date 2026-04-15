@@ -31,11 +31,14 @@ public class DefaultAudioSink implements AudioSink {
     private static final int TIMESTAMP_STATE_TIMESTAMP = 1;
     private static final int TIMESTAMP_STATE_TIMESTAMP_ADVANCING = 2;
     private static final int TIMESTAMP_STATE_NO_TIMESTAMP = 3;
+    private static final int TIMESTAMP_STATE_ERROR = 4;
     private static final long FAST_TIMESTAMP_SAMPLE_INTERVAL_US = 10_000;
     private static final long SLOW_TIMESTAMP_SAMPLE_INTERVAL_US = 10_000_000;
+    private static final long ERROR_TIMESTAMP_SAMPLE_INTERVAL_US = 500_000;
     private static final long INITIALIZING_DURATION_US = 500_000;
     private static final long WAIT_FOR_ADVANCING_TIMESTAMP_US = 2_000_000;
     private static final long MAX_ADVANCING_TIMESTAMP_DRIFT_US = 1_000;
+    private static final long MAX_AUDIO_TIMESTAMP_OFFSET_US = 5_000_000;
     private static final long PLAYHEAD_OFFSET_SAMPLE_INTERVAL_US = 30_000;
     private static final long RAW_PLAYHEAD_SAMPLE_INTERVAL_MS = 5;
     private static final int MAX_PLAYHEAD_OFFSET_COUNT = 10;
@@ -442,6 +445,7 @@ public class DefaultAudioSink implements AudioSink {
         }
 
         lastTimestampSampleTimeUs = systemTimeUs;
+        long playbackHeadPositionEstimateUs = getPlaybackHeadPositionEstimateUs(systemTimeUs);
         boolean updatedTimestamp = false;
         try {
             updatedTimestamp = audioTrack.getTimestamp(audioTimestamp);
@@ -451,6 +455,7 @@ public class DefaultAudioSink implements AudioSink {
 
         if (updatedTimestamp) {
             updateTimestampFramePosition();
+            checkTimestampIsPlausibleAndUpdateState(systemTimeUs, playbackHeadPositionEstimateUs);
         }
 
         switch (timestampState) {
@@ -491,6 +496,8 @@ public class DefaultAudioSink implements AudioSink {
                     resetPositionTracker();
                 }
                 break;
+            case TIMESTAMP_STATE_ERROR:
+                break;
             default:
                 break;
         }
@@ -513,8 +520,42 @@ public class DefaultAudioSink implements AudioSink {
             case TIMESTAMP_STATE_NO_TIMESTAMP:
                 timestampSampleIntervalUs = SLOW_TIMESTAMP_SAMPLE_INTERVAL_US;
                 break;
+            case TIMESTAMP_STATE_ERROR:
+                timestampSampleIntervalUs = ERROR_TIMESTAMP_SAMPLE_INTERVAL_US;
+                break;
             default:
                 break;
+        }
+    }
+
+    private void checkTimestampIsPlausibleAndUpdateState(
+            long systemTimeUs, long playbackHeadPositionEstimateUs) {
+        long timestampSystemTimeUs = audioTimestamp.nanoTime / 1000;
+        long timestampPositionUs =
+                computeTimestampPositionUs(
+                        lastTimestampFramePosition, timestampSystemTimeUs, systemTimeUs);
+
+        if (Math.abs(timestampSystemTimeUs - systemTimeUs) > MAX_AUDIO_TIMESTAMP_OFFSET_US) {
+            Log.w(
+                    TAG,
+                    "Rejecting audio timestamp with stale system time:"
+                            + " tsUs="
+                            + timestampSystemTimeUs
+                            + " nowUs="
+                            + systemTimeUs);
+            updateTimestampState(TIMESTAMP_STATE_ERROR);
+        } else if (Math.abs(timestampPositionUs - playbackHeadPositionEstimateUs)
+                > MAX_AUDIO_TIMESTAMP_OFFSET_US) {
+            Log.w(
+                    TAG,
+                    "Rejecting audio timestamp with implausible position:"
+                            + " tsPositionUs="
+                            + timestampPositionUs
+                            + " playbackHeadEstimateUs="
+                            + playbackHeadPositionEstimateUs);
+            updateTimestampState(TIMESTAMP_STATE_ERROR);
+        } else if (timestampState == TIMESTAMP_STATE_ERROR) {
+            resetPositionTracker();
         }
     }
 
@@ -568,7 +609,7 @@ public class DefaultAudioSink implements AudioSink {
         return timestampPositionUs + elapsedSinceTimestampUs;
     }
 
-    private long getPlaybackHeadPositionEstimateFrames(long systemTimeUs) {
+    private long getPlaybackHeadPositionEstimateUs(long systemTimeUs) {
         if (sampleRate <= 0) {
             return 0;
         }
@@ -577,9 +618,13 @@ public class DefaultAudioSink implements AudioSink {
                         ? getPlaybackHeadPositionUs()
                         : systemTimeUs + smoothedPlayheadOffsetUs;
         if (positionUs < 0) {
-            positionUs = 0;
+            return 0;
         }
-        return positionUs * sampleRate / 1_000_000L;
+        return positionUs;
+    }
+
+    private long getPlaybackHeadPositionEstimateFrames(long systemTimeUs) {
+        return getPlaybackHeadPositionEstimateUs(systemTimeUs) * sampleRate / 1_000_000L;
     }
 
     private long getPlaybackHeadPositionUs() {
