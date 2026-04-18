@@ -206,6 +206,12 @@ status_t AAudioAudioTrack::Open(audio_config_t config,
     return INVALID_OPERATION;
   }
 
+  // Set buffer size to twice the burst size for optimal low latency
+  int32_t framesPerBurst = AAudioStream_getFramesPerBurst(stream_);
+  if (framesPerBurst > 0) {
+    AAudioStream_setBufferSizeInFrames(stream_, framesPerBurst * 2);
+  }
+
   return 0;
 }
 
