@@ -44,17 +44,17 @@ public class DefaultAudioSink implements AudioSink {
     private static final int MAX_PLAYHEAD_OFFSET_COUNT = 10;
 
     private AudioTrack audioTrack;
-  private int sampleRate;
-  private int channelCount;
+    private int sampleRate;
+    private int channelCount;
 
-  /** PCM-equivalent frames written (for compressed: access-units × samplesPerFrame). */
-  private long framesWritten;
+    /** PCM-equivalent frames written (for compressed: access-units × samplesPerFrame). */
+    private long framesWritten;
 
-  private int frameSize;
-  private boolean isCompressed;
+    private int frameSize;
+    private boolean isCompressed;
 
-  /** Decoded PCM samples per compressed access unit (e.g. 1024 for AAC-LC). */
-  private int samplesPerFrame;
+    /** Decoded PCM samples per compressed access unit (e.g. 1024 for AAC-LC). */
+    private int samplesPerFrame;
 
     private final AudioTimestamp audioTimestamp = new AudioTimestamp();
     private long lastTimestampFramePosition = -1;
@@ -78,148 +78,162 @@ public class DefaultAudioSink implements AudioSink {
 
     @Override
     public boolean open(int sampleRate, int channelCount, int encoding) {
-    Log.i(
-        TAG,
-        "open: sampleRate=" + sampleRate + " channels=" + channelCount + " encoding=" + encoding);
-    close();
+        Log.i(
+                TAG,
+                "open: sampleRate="
+                        + sampleRate
+                        + " channels="
+                        + channelCount
+                        + " encoding="
+                        + encoding);
+        close();
 
-    this.sampleRate = sampleRate;
-    this.channelCount = channelCount;
+        this.sampleRate = sampleRate;
+        this.channelCount = channelCount;
         this.framesWritten = 0;
         this.isCompressed = isCompressedEncoding(encoding);
         resetPositionTracker();
 
         int androidEncoding = toAndroidEncoding(encoding);
-    if (androidEncoding == AudioFormat.ENCODING_INVALID) {
-      Log.e(TAG, "Unsupported encoding: " + encoding);
-      return false;
-    }
-
-    int channelMask = channelCountToMask(channelCount);
-    if (isCompressed) {
-      // For compressed formats, frame size is per-access-unit (not per-sample).
-      this.frameSize = 1;
-      this.samplesPerFrame = getSamplesPerFrame(encoding);
-    } else {
-      int bytesPerSample = bytesPerSampleForEncoding(androidEncoding);
-      this.frameSize = channelCount * bytesPerSample;
-      this.samplesPerFrame = 0;
-    }
-
-    int minBufferSize = AudioTrack.getMinBufferSize(sampleRate, channelMask, androidEncoding);
-    if (minBufferSize <= 0) {
-      Log.e(TAG, "getMinBufferSize failed: " + minBufferSize);
-      return false;
-    }
-
-    // Use 4x min buffer for smooth streaming playback
-    int bufferSize = minBufferSize * 4;
-
-    try {
-      AudioAttributes attrs =
-          new AudioAttributes.Builder()
-              .setUsage(AudioAttributes.USAGE_MEDIA)
-              .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
-              .build();
-
-      AudioFormat format =
-          new AudioFormat.Builder()
-              .setSampleRate(sampleRate)
-              .setChannelMask(channelMask)
-              .setEncoding(androidEncoding)
-              .build();
-
-      AudioTrack.Builder builder =
-          new AudioTrack.Builder()
-              .setAudioAttributes(attrs)
-              .setAudioFormat(format)
-              .setBufferSizeInBytes(bufferSize)
-              .setTransferMode(AudioTrack.MODE_STREAM)
-              .setSessionId(AudioManager.AUDIO_SESSION_ID_GENERATE);
-      if (isCompressed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        builder.setOffloadedPlayback(true);
-      }
-
-      audioTrack = builder.build();
-
-      if (audioTrack.getState() != AudioTrack.STATE_INITIALIZED) {
-        Log.e(TAG, "AudioTrack failed to initialize");
-        audioTrack.release();
-        audioTrack = null;
-        return false;
-      }
-
-      boolean offloaded = false;
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        offloaded = audioTrack.isOffloadedPlayback();
-      }
-      Log.i(
-          TAG,
-          "AudioTrack created: bufferSize="
-              + bufferSize
-              + " minBufferSize="
-              + minBufferSize
-              + " sampleRate="
-              + audioTrack.getSampleRate()
-              + " offloaded="
-              + offloaded);
-      return true;
-    } catch (Exception e) {
-      Log.e(TAG, "Failed to create AudioTrack", e);
-      audioTrack = null;
-      return false;
-    }
-  }
-
-  @Override
-  public int write(ByteBuffer data, int size) {
-    if (audioTrack == null) {
-      return -1;
-    }
-    if (isCompressed) {
-      int startPosition = data.position();
-      int written = audioTrack.write(data, size, AudioTrack.WRITE_NON_BLOCKING);
-      data.position(startPosition);
-      if (written == size) {
-        // Count exactly one compressed access unit only after the full AU
-        // has been accepted by AudioTrack.
-        framesWritten += samplesPerFrame;
-      } else if (written > 0) {
-        Log.w(
-            TAG,
-            "write incomplete: requested=" + size + " written=" + written + " compressed=true");
-      }
-      return written;
-    }
-    int totalWritten = 0;
-    while (totalWritten < size) {
-      data.position(totalWritten);
-      int written = audioTrack.write(data, size - totalWritten, AudioTrack.WRITE_BLOCKING);
-      if (written <= 0) {
-        if (totalWritten > 0) {
-          Log.w(
-              TAG,
-              "write incomplete: requested="
-                  + size
-                  + " written="
-                  + totalWritten
-                  + " lastResult="
-                  + written
-                  + " compressed="
-                  + isCompressed);
-          return totalWritten;
+        if (androidEncoding == AudioFormat.ENCODING_INVALID) {
+            Log.e(TAG, "Unsupported encoding: " + encoding);
+            return false;
         }
-        return written;
-      }
-      totalWritten += written;
-    }
-    data.position(0);
-    framesWritten += totalWritten / frameSize;
-    return totalWritten;
-  }
 
-  @Override
-  public void start() {
+        int channelMask = channelCountToMask(channelCount);
+        if (isCompressed) {
+            // For compressed formats, frame size is per-access-unit (not per-sample).
+            this.frameSize = 1;
+            this.samplesPerFrame = getSamplesPerFrame(encoding);
+        } else {
+            int bytesPerSample = bytesPerSampleForEncoding(androidEncoding);
+            this.frameSize = channelCount * bytesPerSample;
+            this.samplesPerFrame = 0;
+        }
+
+        int minBufferSize = AudioTrack.getMinBufferSize(sampleRate, channelMask, androidEncoding);
+        if (minBufferSize <= 0) {
+            Log.e(TAG, "getMinBufferSize failed: " + minBufferSize);
+            return false;
+        }
+
+        // Use 4x min buffer for smooth streaming playback
+        int bufferSize = minBufferSize * 4;
+
+        try {
+            AudioAttributes attrs =
+                    new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                            .build();
+
+            AudioFormat format =
+                    new AudioFormat.Builder()
+                            .setSampleRate(sampleRate)
+                            .setChannelMask(channelMask)
+                            .setEncoding(androidEncoding)
+                            .build();
+
+            AudioTrack.Builder builder =
+                    new AudioTrack.Builder()
+                            .setAudioAttributes(attrs)
+                            .setAudioFormat(format)
+                            .setBufferSizeInBytes(bufferSize)
+                            .setTransferMode(AudioTrack.MODE_STREAM)
+                            .setSessionId(AudioManager.AUDIO_SESSION_ID_GENERATE);
+            if (isCompressed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                builder.setOffloadedPlayback(true);
+            }
+
+            audioTrack = builder.build();
+
+            if (audioTrack.getState() != AudioTrack.STATE_INITIALIZED) {
+                Log.e(TAG, "AudioTrack failed to initialize");
+                audioTrack.release();
+                audioTrack = null;
+                return false;
+            }
+
+            boolean offloaded = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                offloaded = audioTrack.isOffloadedPlayback();
+            }
+            if (offloaded) {
+                configureOffloadStartThreshold(audioTrack);
+            }
+            Log.i(
+                    TAG,
+                    "AudioTrack created: bufferSize="
+                            + bufferSize
+                            + " minBufferSize="
+                            + minBufferSize
+                            + " sampleRate="
+                            + audioTrack.getSampleRate()
+                            + " startThresholdFrames="
+                            + getOffloadStartThresholdFrames(audioTrack)
+                            + " offloaded="
+                            + offloaded);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to create AudioTrack", e);
+            audioTrack = null;
+            return false;
+        }
+    }
+
+    @Override
+    public int write(ByteBuffer data, int size, int frameCount) {
+        if (audioTrack == null) {
+            return -1;
+        }
+        if (isCompressed) {
+            int startPosition = data.position();
+            int written = audioTrack.write(data, size, AudioTrack.WRITE_NON_BLOCKING);
+            data.position(startPosition);
+            if (written == size) {
+                // Count the full PCM-equivalent duration represented by this compressed
+                // write only after AudioTrack has accepted the whole buffer.
+                framesWritten += frameCount > 0 ? frameCount : samplesPerFrame;
+            } else if (written > 0) {
+                Log.w(
+                        TAG,
+                        "write incomplete: requested="
+                                + size
+                                + " written="
+                                + written
+                                + " compressed=true");
+            }
+            return written;
+        }
+        int totalWritten = 0;
+        while (totalWritten < size) {
+            data.position(totalWritten);
+            int written = audioTrack.write(data, size - totalWritten, AudioTrack.WRITE_BLOCKING);
+            if (written <= 0) {
+                if (totalWritten > 0) {
+                    Log.w(
+                            TAG,
+                            "write incomplete: requested="
+                                    + size
+                                    + " written="
+                                    + totalWritten
+                                    + " lastResult="
+                                    + written
+                                    + " compressed="
+                                    + isCompressed);
+                    return totalWritten;
+                }
+                return written;
+            }
+            totalWritten += written;
+        }
+        data.position(0);
+        framesWritten += totalWritten / frameSize;
+        return totalWritten;
+    }
+
+    @Override
+    public void start() {
         if (audioTrack != null) {
             Log.i(TAG, "start");
             resetPositionTracker();
@@ -281,8 +295,7 @@ public class DefaultAudioSink implements AudioSink {
 
     @Override
     public boolean isReady() {
-        return audioTrack != null
-                && audioTrack.getState() == AudioTrack.STATE_INITIALIZED;
+        return audioTrack != null && audioTrack.getState() == AudioTrack.STATE_INITIALIZED;
     }
 
     @Override
@@ -310,55 +323,55 @@ public class DefaultAudioSink implements AudioSink {
         }
         int bufferFrames = audioTrack.getBufferSizeInFrames();
         return (int) ((long) bufferFrames * 1000 / sampleRate);
-  }
+    }
 
-  @Override
-  public long getBufferDurationUs() {
-    if (audioTrack == null || sampleRate == 0) {
-      return 0;
+    @Override
+    public long getBufferDurationUs() {
+        if (audioTrack == null || sampleRate == 0) {
+            return 0;
+        }
+        if (isCompressed) {
+            // For passthrough (compressed) audio, getTimestamp() on many Android
+            // HALs reports the write-pointer position (data accepted by the HAL),
+            // not the play-pointer (data actually presented to the transducer).
+            // This makes frame-count latency unreliable — it always evaluates to 0.
+            //
+            // Instead, use AudioTrack.getLatency() which queries the HAL for the
+            // total output latency including the hardware FIFO depth. This is the
+            // actual delay between writing a frame and hearing it.
+            return getHardwareLatencyUs();
+        }
+        long playedFrames = getPlayedFrameCount();
+        long buffered = framesWritten - playedFrames;
+        if (buffered <= 0) {
+            return 0;
+        }
+        return buffered * 1_000_000L / sampleRate;
     }
-    if (isCompressed) {
-      // For passthrough (compressed) audio, getTimestamp() on many Android
-      // HALs reports the write-pointer position (data accepted by the HAL),
-      // not the play-pointer (data actually presented to the transducer).
-      // This makes frame-count latency unreliable — it always evaluates to 0.
-      //
-      // Instead, use AudioTrack.getLatency() which queries the HAL for the
-      // total output latency including the hardware FIFO depth. This is the
-      // actual delay between writing a frame and hearing it.
-      return getHardwareLatencyUs();
-    }
-    long playedFrames = getPlayedFrameCount();
-    long buffered = framesWritten - playedFrames;
-    if (buffered <= 0) {
-      return 0;
-    }
-    return buffered * 1_000_000L / sampleRate;
-  }
 
     @Override
     public long getFramesWritten() {
         return framesWritten;
-  }
-
-  @Override
-  public int getPosition() {
-    if (audioTrack == null) {
-      return 0;
     }
-    return (int) getPlayedFrameCount();
-  }
 
-  // --- Private helpers ---
+    @Override
+    public int getPosition() {
+        if (audioTrack == null) {
+            return 0;
+        }
+        return (int) getPlayedFrameCount();
+    }
 
-  /**
-   * Returns the number of PCM-equivalent frames that have been played out. Prefers
-   * AudioTrack.getTimestamp() for accuracy (required for compressed formats where
-   * getPlaybackHeadPosition() is unreliable), with a fallback to getPlaybackHeadPosition() for PCM
-   * when getTimestamp() is unavailable.
-   */
-  private long getPlayedFrameCount() {
-    if (audioTrack == null) {
+    // --- Private helpers ---
+
+    /**
+     * Returns the number of PCM-equivalent frames that have been played out. Prefers
+     * AudioTrack.getTimestamp() for accuracy (required for compressed formats where
+     * getPlaybackHeadPosition() is unreliable), with a fallback to getPlaybackHeadPosition() for
+     * PCM when getTimestamp() is unavailable.
+     */
+    private long getPlayedFrameCount() {
+        if (audioTrack == null) {
             return 0;
         }
         long systemTimeUs = System.nanoTime() / 1000;
@@ -370,6 +383,14 @@ public class DefaultAudioSink implements AudioSink {
                 hasAdvancingTimestamp()
                         ? getTimestampPositionFrames(systemTimeUs)
                         : getPlaybackHeadPositionEstimateFrames(systemTimeUs);
+
+        // Cap played frames at what we have written. The timestamp API may
+        // extrapolate forward from a stale sample, producing values beyond the
+        // actual content length (especially on offload tracks where the HAL
+        // updates the timestamp infrequently).
+        if (framesWritten > 0 && playedFrames > framesWritten) {
+            playedFrames = framesWritten;
+        }
 
         if (isCompressed) {
             long nowMs = SystemClock.elapsedRealtime();
@@ -473,7 +494,9 @@ public class DefaultAudioSink implements AudioSink {
                 break;
             case TIMESTAMP_STATE_TIMESTAMP:
                 if (!updatedTimestamp) {
-                    resetPositionTracker();
+                    // Timestamp stopped (e.g. offload EOS). Fall back to playback
+                    // head position rather than wiping all position state.
+                    updateTimestampState(TIMESTAMP_STATE_NO_TIMESTAMP);
                     break;
                 }
                 if (isTimestampAdvancing(systemTimeUs)) {
@@ -488,7 +511,10 @@ public class DefaultAudioSink implements AudioSink {
                 break;
             case TIMESTAMP_STATE_TIMESTAMP_ADVANCING:
                 if (!updatedTimestamp) {
-                    resetPositionTracker();
+                    // Timestamp stopped — most likely the offload track finished draining.
+                    // Fall back to playback head position extrapolation instead of wiping
+                    // all position state (which would erroneously return played=0).
+                    updateTimestampState(TIMESTAMP_STATE_NO_TIMESTAMP);
                 }
                 break;
             case TIMESTAMP_STATE_NO_TIMESTAMP:
@@ -649,70 +675,112 @@ public class DefaultAudioSink implements AudioSink {
         }
         long playbackHeadPosition = audioTrack.getPlaybackHeadPosition() & 0xFFFFFFFFL;
         if (rawPlaybackHeadPosition > playbackHeadPosition) {
-            rawPlaybackHeadWrapCount++;
+            // Only count as a 32-bit counter wrap if the decrease is larger than half the
+            // 32-bit range (~27 hours of audio at 44100 Hz). A smaller decrease indicates
+            // a position reset (e.g. offload EOS drain) rather than a genuine overflow.
+            if (rawPlaybackHeadPosition - playbackHeadPosition >= 0x80000000L) {
+                rawPlaybackHeadWrapCount++;
+            }
+            // else: HAL position reset — do not increment wrap count
         }
         rawPlaybackHeadPosition = playbackHeadPosition;
     }
 
-  /**
-   * Returns the total hardware output latency in microseconds via AudioTrack.getLatency(). This
-   * includes the HAL pipeline and physical output buffer depth, making it more reliable than frame
-   * counting for passthrough (compressed) formats where the HAL may report write-pointer advances
-   * rather than true play-pointer advances.
-   *
-   * <p>AudioTrack.getLatency() has been present in Android since API 1 (though marked @hide in
-   * documentation). We access it reflectively so that the build does not depend on the hidden API
-   * directly.
-   */
-  private long getHardwareLatencyUs() {
-    if (audioTrack == null) {
-      return 100_000L; // 100 ms safe default
+    private void configureOffloadStartThreshold(AudioTrack audioTrack) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || samplesPerFrame <= 0) {
+            return;
+        }
+        int desiredThresholdFrames = 1;
+        int currentThresholdFrames = getOffloadStartThresholdFrames(audioTrack);
+        if (currentThresholdFrames > 0 && currentThresholdFrames <= desiredThresholdFrames) {
+            return;
+        }
+        try {
+            audioTrack.setStartThresholdInFrames(desiredThresholdFrames);
+            Log.i(
+                    TAG,
+                    "Configured offload start threshold:"
+                            + " previous="
+                            + currentThresholdFrames
+                            + " desired="
+                            + desiredThresholdFrames
+                            + " actual="
+                            + getOffloadStartThresholdFrames(audioTrack));
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to configure offload start threshold", e);
+        }
     }
-    try {
-      java.lang.reflect.Method m = AudioTrack.class.getDeclaredMethod("getLatency");
-      m.setAccessible(true);
-      int latencyMs = (Integer) m.invoke(audioTrack);
-      if (latencyMs > 0 && latencyMs < 2000) { // sanity: 0–2 s
-        return (long) latencyMs * 1000L;
-      }
-    } catch (Exception e) {
-      // Reflection failed or value out of range — use fallback.
-    }
-    return 100_000L; // 100 ms fallback
-  }
 
-  private static int toAndroidEncoding(int avpEncoding) {
-    switch (avpEncoding) {
-      case AudioSink.ENCODING_PCM_16BIT:
-        return AudioFormat.ENCODING_PCM_16BIT;
-      case AudioSink.ENCODING_PCM_FLOAT:
-        return AudioFormat.ENCODING_PCM_FLOAT;
-      case AudioSink.ENCODING_PCM_8BIT:
-        return AudioFormat.ENCODING_PCM_8BIT;
-      case AudioSink.ENCODING_PCM_32BIT:
-        return AudioFormat.ENCODING_PCM_32BIT;
-      case AudioSink.ENCODING_AC3:
-        return AudioFormat.ENCODING_AC3;
-      case AudioSink.ENCODING_E_AC3:
-        return AudioFormat.ENCODING_E_AC3;
-      case AudioSink.ENCODING_DTS:
-        return AudioFormat.ENCODING_DTS;
-      case AudioSink.ENCODING_DTS_HD:
-        return AudioFormat.ENCODING_DTS_HD;
-      case AudioSink.ENCODING_AAC_LC:
-        return AudioFormat.ENCODING_AAC_LC;
-      case AudioSink.ENCODING_DOLBY_TRUEHD:
-        return AudioFormat.ENCODING_DOLBY_TRUEHD;
-      case AudioSink.ENCODING_E_AC3_JOC:
-        return AudioFormat.ENCODING_E_AC3_JOC;
-      case AudioSink.ENCODING_AC4:
-        return AudioFormat.ENCODING_AC4;
-      default:
-        return AudioFormat.ENCODING_INVALID;
+    private int getOffloadStartThresholdFrames(AudioTrack audioTrack) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return -1;
+        }
+        try {
+            return audioTrack.getStartThresholdInFrames();
+        } catch (Exception e) {
+            return -1;
+        }
     }
-  }
 
-  private static int channelCountToMask(int channelCount) {
+    /**
+     * Returns the total hardware output latency in microseconds via AudioTrack.getLatency(). This
+     * includes the HAL pipeline and physical output buffer depth, making it more reliable than
+     * frame counting for passthrough (compressed) formats where the HAL may report write-pointer
+     * advances rather than true play-pointer advances.
+     *
+     * <p>AudioTrack.getLatency() has been present in Android since API 1 (though marked @hide in
+     * documentation). We access it reflectively so that the build does not depend on the hidden API
+     * directly.
+     */
+    private long getHardwareLatencyUs() {
+        if (audioTrack == null) {
+            return 100_000L; // 100 ms safe default
+        }
+        try {
+            java.lang.reflect.Method m = AudioTrack.class.getDeclaredMethod("getLatency");
+            m.setAccessible(true);
+            int latencyMs = (Integer) m.invoke(audioTrack);
+            if (latencyMs > 0 && latencyMs < 2000) { // sanity: 0–2 s
+                return (long) latencyMs * 1000L;
+            }
+        } catch (Exception e) {
+            // Reflection failed or value out of range — use fallback.
+        }
+        return 100_000L; // 100 ms fallback
+    }
+
+    private static int toAndroidEncoding(int avpEncoding) {
+        switch (avpEncoding) {
+            case AudioSink.ENCODING_PCM_16BIT:
+                return AudioFormat.ENCODING_PCM_16BIT;
+            case AudioSink.ENCODING_PCM_FLOAT:
+                return AudioFormat.ENCODING_PCM_FLOAT;
+            case AudioSink.ENCODING_PCM_8BIT:
+                return AudioFormat.ENCODING_PCM_8BIT;
+            case AudioSink.ENCODING_PCM_32BIT:
+                return AudioFormat.ENCODING_PCM_32BIT;
+            case AudioSink.ENCODING_AC3:
+                return AudioFormat.ENCODING_AC3;
+            case AudioSink.ENCODING_E_AC3:
+                return AudioFormat.ENCODING_E_AC3;
+            case AudioSink.ENCODING_DTS:
+                return AudioFormat.ENCODING_DTS;
+            case AudioSink.ENCODING_DTS_HD:
+                return AudioFormat.ENCODING_DTS_HD;
+            case AudioSink.ENCODING_AAC_LC:
+                return AudioFormat.ENCODING_AAC_LC;
+            case AudioSink.ENCODING_DOLBY_TRUEHD:
+                return AudioFormat.ENCODING_DOLBY_TRUEHD;
+            case AudioSink.ENCODING_E_AC3_JOC:
+                return AudioFormat.ENCODING_E_AC3_JOC;
+            case AudioSink.ENCODING_AC4:
+                return AudioFormat.ENCODING_AC4;
+            default:
+                return AudioFormat.ENCODING_INVALID;
+        }
+    }
+
+    private static int channelCountToMask(int channelCount) {
         switch (channelCount) {
             case 1:
                 return AudioFormat.CHANNEL_OUT_MONO;
@@ -735,42 +803,42 @@ public class DefaultAudioSink implements AudioSink {
                 return 1;
             case AudioFormat.ENCODING_PCM_16BIT:
                 return 2;
-      case AudioFormat.ENCODING_PCM_FLOAT:
-      case AudioFormat.ENCODING_PCM_32BIT:
-        return 4;
-      default:
-        return 2;
+            case AudioFormat.ENCODING_PCM_FLOAT:
+            case AudioFormat.ENCODING_PCM_32BIT:
+                return 4;
+            default:
+                return 2;
+        }
     }
-  }
 
-  private static boolean isCompressedEncoding(int avpEncoding) {
-    return avpEncoding >= AudioSink.ENCODING_AC3;
-  }
-
-  /**
-   * Returns the number of PCM samples per compressed access unit for the given AVP encoding
-   * constant. Used to convert access-unit counts into PCM-equivalent frame counts so that
-   * framesWritten and getTimestamp() positions are in the same unit.
-   */
-  private static int getSamplesPerFrame(int avpEncoding) {
-    switch (avpEncoding) {
-      case AudioSink.ENCODING_AAC_LC:
-        return 1024; // AAC-LC: 1024 samples per frame
-      case AudioSink.ENCODING_AC3:
-        return 1536; // AC-3: 256 samples × 6 blocks
-      case AudioSink.ENCODING_E_AC3:
-      case AudioSink.ENCODING_E_AC3_JOC:
-        return 1536; // E-AC-3: same as AC-3 per syncframe
-      case AudioSink.ENCODING_DTS:
-        return 512; // DTS: typically 512 samples per frame
-      case AudioSink.ENCODING_DTS_HD:
-        return 512;
-      case AudioSink.ENCODING_DOLBY_TRUEHD:
-        return 40; // TrueHD: 40 samples per frame (varies)
-      case AudioSink.ENCODING_AC4:
-        return 2048; // AC-4: typically 2048 samples per frame
-      default:
-        return 1024; // safe default
+    private static boolean isCompressedEncoding(int avpEncoding) {
+        return avpEncoding >= AudioSink.ENCODING_AC3;
     }
-  }
+
+    /**
+     * Returns the number of PCM samples per compressed access unit for the given AVP encoding
+     * constant. Used to convert access-unit counts into PCM-equivalent frame counts so that
+     * framesWritten and getTimestamp() positions are in the same unit.
+     */
+    private static int getSamplesPerFrame(int avpEncoding) {
+        switch (avpEncoding) {
+            case AudioSink.ENCODING_AAC_LC:
+                return 1024; // AAC-LC: 1024 samples per frame
+            case AudioSink.ENCODING_AC3:
+                return 1536; // AC-3: 256 samples × 6 blocks
+            case AudioSink.ENCODING_E_AC3:
+            case AudioSink.ENCODING_E_AC3_JOC:
+                return 1536; // E-AC-3: same as AC-3 per syncframe
+            case AudioSink.ENCODING_DTS:
+                return 512; // DTS: typically 512 samples per frame
+            case AudioSink.ENCODING_DTS_HD:
+                return 512;
+            case AudioSink.ENCODING_DOLBY_TRUEHD:
+                return 40; // TrueHD: 40 samples per frame (varies)
+            case AudioSink.ENCODING_AC4:
+                return 2048; // AC-4: typically 2048 samples per frame
+            default:
+                return 1024; // safe default
+        }
+    }
 }

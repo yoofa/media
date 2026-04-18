@@ -23,7 +23,7 @@ namespace android {
  * Lifecycle:
  *  1. Constructed with a Java AudioSink global reference.
  *  2. Open() → calls AudioSink.open(sampleRate, channels, encoding)
- *  3. Write() → calls AudioSink.write(ByteBuffer, size)
+ *  3. Write() → calls AudioSink.write(ByteBuffer, size, frameCount)
  *  4. Close() → calls AudioSink.close()
  */
 class JavaAudioTrack : public AudioTrack {
@@ -50,6 +50,10 @@ class JavaAudioTrack : public AudioTrack {
 
   status_t Open(audio_config_t config, AudioCallback cb, void* cookie) override;
   ssize_t Write(const void* buffer, size_t size, bool blocking) override;
+  ssize_t Write(const void* buffer,
+                size_t size,
+                bool blocking,
+                uint32_t frame_count) override;
   status_t Start() override;
   void Stop() override;
   void Flush() override;

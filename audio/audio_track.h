@@ -68,6 +68,13 @@ class AudioTrack {
    * prematurely stopped.
    */
   virtual ssize_t Write(const void* buffer, size_t size, bool blocking) = 0;
+  virtual ssize_t Write(const void* buffer,
+                        size_t size,
+                        bool blocking,
+                        uint32_t frame_count) {
+    (void)frame_count;
+    return Write(buffer, size, blocking);
+  }
 
   // Write() with blocking
   ssize_t Write(const void* buffer, size_t size) {

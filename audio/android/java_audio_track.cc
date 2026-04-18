@@ -191,6 +191,13 @@ status_t JavaAudioTrack::Open(audio_config_t config,
 }
 
 ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
+  return Write(buffer, size, blocking, 0);
+}
+
+ssize_t JavaAudioTrack::Write(const void* buffer,
+                              size_t size,
+                              bool blocking,
+                              uint32_t frame_count) {
   if (!opened_ || !j_audio_sink_.obj()) {
     return -EINVAL;
   }
@@ -211,12 +218,15 @@ ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
   const bool compressed =
       (config_.format & AUDIO_FORMAT_MAIN_MASK) != AUDIO_FORMAT_PCM &&
       (config_.format & AUDIO_FORMAT_MAIN_MASK) != AUDIO_FORMAT_DEFAULT;
+  // Compressed/offload writes are retried via cached_frame_ and a short
+  // renderer reschedule. Do not spin here for long periods when the sink
+  // applies back-pressure, or startup position polling and video sync stall.
   const int64_t blocking_deadline_ms =
-      blocking ? base::TimeMillis() + (compressed ? 1000 : 200) : 0;
+      blocking ? base::TimeMillis() + (compressed ? 20 : 200) : 0;
   while (total_written < size) {
     jint written = Java_AudioSink_write(
         env, j_audio_sink_, jni_zero::JavaParamRef<jobject>(env, j_buffer),
-        static_cast<int>(size - total_written));
+        static_cast<int>(size - total_written), static_cast<int>(frame_count));
     if (written == 0 && blocking && base::TimeMillis() < blocking_deadline_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(2));
       continue;
