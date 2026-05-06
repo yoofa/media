@@ -27,7 +27,7 @@ CaptureClockOffsetUpdater::AdjustEstimatedCaptureClockOffset(
     return std::nullopt;
   }
 
-  // Do calculations as "unsigned" to make overflows deterministic.
+  // Do calculations as "uint32_t" to make overflows deterministic.
   return static_cast<uint64_t>(*remote_capture_clock_offset) +
          static_cast<uint64_t>(*remote_to_local_clock_offset_);
 }

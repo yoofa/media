@@ -87,7 +87,7 @@ std::optional<VideoRtpDepacketizer::ParsedRtpPayload> ProcessStapAOrSingleNalu(
   parsed_payload->video_header.frame_type = VideoFrameType::kVideoFrameDelta;
 
   for (const std::span<const uint8_t>& nal_unit : nal_units) {
-    NaluInfo nalu;
+    NaluInfo nalu{};
     nalu.type = nal_unit[0] & kH264TypeMask;
     nalu.sps_id = -1;
     nalu.pps_id = -1;
@@ -148,7 +148,7 @@ std::optional<VideoRtpDepacketizer::ParsedRtpPayload> ParseFuaNalu(
   uint8_t original_nal_type = rtp_payload.cdata()[1] & kH264TypeMask;
   bool first_fragment = (rtp_payload.cdata()[1] & kH264SBit) > 0;
   bool is_first_packet_in_frame = false;
-  NaluInfo nalu;
+  NaluInfo nalu{};
   nalu.type = original_nal_type;
   nalu.sps_id = -1;
   nalu.pps_id = -1;
@@ -199,7 +199,7 @@ std::optional<VideoRtpDepacketizer::ParsedRtpPayload> ParseFuaNalu(
 
 std::optional<VideoRtpDepacketizer::ParsedRtpPayload>
 VideoRtpDepacketizerH264::Parse(base::CopyOnWriteBuffer rtp_payload) {
-  if (rtp_payload.size() == 0) {
+  if (rtp_payload.empty()) {
     AVE_LOG(LS_ERROR) << "Empty payload.";
     return std::nullopt;
   }
@@ -209,11 +209,9 @@ VideoRtpDepacketizerH264::Parse(base::CopyOnWriteBuffer rtp_payload) {
   if (nal_type == H264::NaluType::kFuA) {
     // Fragmented NAL units (FU-A).
     return ParseFuaNalu(std::move(rtp_payload));
-  } else {
-    // We handle STAP-A and single NALU's the same way here. The jitter buffer
-    // will depacketize the STAP-A into NAL units later.
-    return ProcessStapAOrSingleNalu(std::move(rtp_payload));
-  }
+  }  // We handle STAP-A and single NALU's the same way here. The jitter buffer
+  // will depacketize the STAP-A into NAL units later.
+  return ProcessStapAOrSingleNalu(std::move(rtp_payload));
 }
 
 }  // namespace rtp_rtcp

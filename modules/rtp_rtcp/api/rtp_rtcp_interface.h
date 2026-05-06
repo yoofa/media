@@ -94,7 +94,7 @@ class RtpRtcpInterface : public RtcpFeedbackSenderInterface {
     RateLimiter* retransmission_rate_limiter = nullptr;
     StreamDataCountersCallback* rtp_stats_callback = nullptr;
 
-    int rtcp_report_interval_ms = 0;
+    int32_t rtcp_report_interval_ms = 0;
 
     // Update network2 instead of pacer_exit field of video timing extension.
     bool populate_network2_timestamp = false;
@@ -161,7 +161,7 @@ class RtpRtcpInterface : public RtcpFeedbackSenderInterface {
   struct NonSenderRttStats {
     std::optional<base::TimeDelta> round_trip_time;
     base::TimeDelta total_round_trip_time = base::TimeDelta::Zero();
-    int round_trip_time_measurements = 0;
+    int32_t round_trip_time_measurements = 0;
   };
 
   // Receiver functions
@@ -181,8 +181,8 @@ class RtpRtcpInterface : public RtcpFeedbackSenderInterface {
   // Returns max RTP packet size.
   virtual size_t MaxRtpPacketSize() const = 0;
 
-  virtual void RegisterSendPayloadFrequency(int payload_type,
-                                            int payload_frequency) = 0;
+  virtual void RegisterSendPayloadFrequency(int32_t payload_type,
+                                            int32_t payload_frequency) = 0;
 
   // Unregisters a send payload.
   virtual int32_t DeRegisterSendPayload(int8_t payload_type) = 0;
@@ -190,7 +190,7 @@ class RtpRtcpInterface : public RtcpFeedbackSenderInterface {
   virtual void SetExtmapAllowMixed(bool extmap_allow_mixed) = 0;
 
   // Register extension by uri, triggers CHECK on failure.
-  virtual void RegisterRtpHeaderExtension(std::string_view uri, int id) = 0;
+  virtual void RegisterRtpHeaderExtension(std::string_view uri, int32_t id) = 0;
 
   virtual void DeregisterSendRtpHeaderExtension(std::string_view uri) = 0;
 
@@ -226,17 +226,17 @@ class RtpRtcpInterface : public RtcpFeedbackSenderInterface {
   virtual void SetMid(std::string_view mid) = 0;
 
   // Turns on/off sending RTX (RFC 4588).
-  virtual void SetRtxSendStatus(int modes) = 0;
+  virtual void SetRtxSendStatus(int32_t modes) = 0;
 
   // Returns status of sending RTX (RFC 4588).
-  virtual int RtxSendStatus() const = 0;
+  virtual int32_t RtxSendStatus() const = 0;
 
   // Returns the SSRC used for RTX if set, otherwise a nullopt.
   virtual std::optional<uint32_t> RtxSsrc() const = 0;
 
   // Sets the payload type to use when sending RTX packets.
-  virtual void SetRtxSendPayloadType(int payload_type,
-                                     int associated_payload_type) = 0;
+  virtual void SetRtxSendPayloadType(int32_t payload_type,
+                                     int32_t associated_payload_type) = 0;
 
   // Returns the FlexFEC SSRC, if there is one.
   virtual std::optional<uint32_t> FlexfecSsrc() const = 0;
@@ -269,7 +269,7 @@ class RtpRtcpInterface : public RtcpFeedbackSenderInterface {
   // Record that a frame is about to be sent.
   virtual bool OnSendingRtpFrame(uint32_t timestamp,
                                  int64_t capture_time_ms,
-                                 int payload_type,
+                                 int32_t payload_type,
                                  bool force_sender_report) = 0;
 
   // Try to send the provided packet.

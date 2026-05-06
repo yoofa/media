@@ -44,12 +44,12 @@ struct RtcpPacketTypeCounter {
     unique_nack_requests -= other.unique_nack_requests;
   }
 
-  int UniqueNackRequestsInPercent() const {
+  int32_t UniqueNackRequestsInPercent() const {
     if (nack_requests == 0) {
       return 0;
     }
-    return static_cast<int>((unique_nack_requests * 100.0f / nack_requests) +
-                            0.5f);
+    return static_cast<int32_t>(
+        (unique_nack_requests * 100.0f / nack_requests) + 0.5f);
   }
 
   uint32_t nack_packets;          // Number of RTCP NACK packets.

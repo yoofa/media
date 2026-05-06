@@ -8,9 +8,9 @@
 #include "media/modules/rtp_rtcp/src/video/video_rtp_depacketizer_av1.h"
 #include <span>
 
-#include <stddef.h>
-#include <stdint.h>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 
 #include <optional>
 #include <utility>
@@ -80,7 +80,7 @@ class ArrayOfArrayViews {
   void CopyTo(uint8_t* destination, const_iterator first) const;
 
   void Append(const uint8_t* data, size_t size) {
-    data_.push_back(std::span<const uint8_t>(data, size));
+    data_.emplace_back(data, size);
     size_ += size;
   }
 
@@ -116,15 +116,15 @@ class ArrayOfArrayViews::const_iterator {
       : outer_(outer), inner_(inner) {}
 
   Storage::const_iterator outer_;
-  size_t inner_;
+  size_t inner_{};
 };
 
 ArrayOfArrayViews::const_iterator ArrayOfArrayViews::begin() const {
-  return const_iterator(data_.begin(), 0);
+  return {data_.begin(), 0};
 }
 
 ArrayOfArrayViews::const_iterator ArrayOfArrayViews::end() const {
-  return const_iterator(data_.end(), 0);
+  return {data_.end(), 0};
 }
 
 void ArrayOfArrayViews::CopyTo(uint8_t* destination,
@@ -147,7 +147,7 @@ struct ObuInfo {
   size_t prefix_size = 0;
   // obu_header() and obu_size (leb128 encoded payload_size).
   // obu_header can be up to 2 bytes, obu_size - up to 5.
-  std::array<uint8_t, 7> prefix;
+  std::array<uint8_t, 7> prefix{};
   // Size of the obu payload in the output frame, i.e. excluding header
   size_t payload_size = 0;
   // iterator pointing to the beginning of the obu payload.
@@ -176,10 +176,10 @@ bool RtpStartsWithFragment(uint8_t aggregation_header) {
 bool RtpEndsWithFragment(uint8_t aggregation_header) {
   return aggregation_header & 0b0100'0000u;
 }
-int RtpNumObus(uint8_t aggregation_header) {  // 0 for any number of obus.
+int32_t RtpNumObus(uint8_t aggregation_header) {  // 0 for any number of obus.
   return (aggregation_header & 0b0011'0000u) >> 4;
 }
-int RtpStartsNewCodedVideoSequence(uint8_t aggregation_header) {
+int32_t RtpStartsNewCodedVideoSequence(uint8_t aggregation_header) {
   return aggregation_header & 0b0000'1000u;
 }
 
@@ -192,7 +192,7 @@ VectorObuInfo ParseObus(
   bool expect_continues_obu = false;
   for (std::span<const uint8_t> rtp_payload : rtp_payloads) {
     base::ByteBufferReader payload(rtp_payload);
-    uint8_t aggregation_header;
+    uint8_t aggregation_header = 0;
     if (!payload.ReadUInt8(&aggregation_header)) {
       AVE_LOG(LS_WARNING) << "Failed to find aggregation header in the packet.";
       return {};
@@ -204,7 +204,7 @@ VectorObuInfo ParseObus(
       AVE_LOG(LS_WARNING) << "Unexpected Z-bit " << continues_obu;
       return {};
     }
-    int num_expected_obus = RtpNumObus(aggregation_header);
+    int32_t num_expected_obus = RtpNumObus(aggregation_header);
     if (payload.Length() == 0) {
       // rtp packet has just the aggregation header. That may be valid only when
       // there is exactly one fragment in the packet of size 0.
@@ -221,11 +221,11 @@ VectorObuInfo ParseObus(
       continue;
     }
 
-    for (int obu_index = 1; payload.Length() > 0; ++obu_index) {
+    for (int32_t obu_index = 1; payload.Length() > 0; ++obu_index) {
       ObuInfo& obu_info = (obu_index == 1 && continues_obu)
                               ? obu_infos.back()
                               : obu_infos.emplace_back();
-      uint64_t fragment_size;
+      uint64_t fragment_size = 0;
       // When num_expected_obus > 0, last OBU (fragment) is not preceeded by
       // the size field. See W field in
       // https://aomediacodec.github.io/av1-rtp-spec/#43-av1-aggregation-header
@@ -292,8 +292,8 @@ bool CalculateObuSizes(ObuInfo* obu_info) {
     // Read leb128 encoded field obu_size.
     uint64_t obu_size_bytes = 0;
     // Number of bytes obu_size field occupy in the bitstream.
-    int size_of_obu_size_bytes = 0;
-    uint8_t leb128_byte;
+    int32_t size_of_obu_size_bytes = 0;
+    uint8_t leb128_byte = 0;
     do {
       if (it == obu_info->data.end() || size_of_obu_size_bytes >= 8) {
         AVE_LOG(LS_WARNING)
@@ -360,7 +360,7 @@ std::shared_ptr<EncodedImageBuffer> VideoRtpDepacketizerAv1::AssembleFrame(
 
 std::optional<VideoRtpDepacketizer::ParsedRtpPayload>
 VideoRtpDepacketizerAv1::Parse(base::CopyOnWriteBuffer rtp_payload) {
-  if (rtp_payload.size() == 0) {
+  if (rtp_payload.empty()) {
     AVE_LOG(LS_ERROR) << "Empty rtp payload.";
     return std::nullopt;
   }

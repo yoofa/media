@@ -16,7 +16,7 @@ namespace media {
 constexpr int16_t kNoPictureId = -1;
 constexpr int16_t kNoTl0PicIdx = -1;
 constexpr uint8_t kNoTemporalIdx = 0xFF;
-constexpr int kNoKeyIdx = -1;
+constexpr int32_t kNoKeyIdx = -1;
 
 // Note: kMaxSpatialLayers is defined in video_codec_constants.h
 

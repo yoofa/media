@@ -13,7 +13,7 @@
 
 #include "media/modules/rtp_rtcp/src/util/rtp_to_ntp_estimator.h"
 
-#include <stddef.h>
+#include <cstddef>
 
 #include <cmath>
 #include <vector>
@@ -37,8 +37,9 @@ constexpr uint64_t kMaxAllowedRtcpNtpInterval = uint64_t{60 * 60} << 32;
 
 void RtpToNtpEstimator::UpdateParameters() {
   size_t n = measurements_.size();
-  if (n < 2)
+  if (n < 2) {
     return;
+  }
 
   // Run linear regression:
   // Given x[] and y[] writes out such k and b that line y=k*x+b approximates
@@ -68,8 +69,9 @@ void RtpToNtpEstimator::UpdateParameters() {
     covariance_xy += normalized_x * normalized_y;
   }
 
-  if (std::fabs(variance_x) < 1e-8)
+  if (std::fabs(variance_x) < 1e-8) {
     return;
+  }
 
   double k = covariance_xy / variance_x;
   double b = avg_y - k * avg_x;
@@ -92,14 +94,15 @@ RtpToNtpEstimator::UpdateResult RtpToNtpEstimator::UpdateMeasurements(
     }
   }
 
-  if (!new_measurement.ntp_time.Valid())
+  if (!new_measurement.ntp_time.Valid()) {
     return kInvalidMeasurement;
+  }
 
-  uint64_t ntp_new = static_cast<uint64_t>(new_measurement.ntp_time);
+  auto ntp_new = static_cast<uint64_t>(new_measurement.ntp_time);
   bool invalid_sample = false;
   if (!measurements_.empty()) {
     int64_t old_rtp_timestamp = measurements_.front().unwrapped_rtp_timestamp;
-    uint64_t old_ntp = static_cast<uint64_t>(measurements_.front().ntp_time);
+    auto old_ntp = static_cast<uint64_t>(measurements_.front().ntp_time);
     if (ntp_new <= old_ntp || ntp_new > old_ntp + kMaxAllowedRtcpNtpInterval) {
       invalid_sample = true;
     } else if (unwrapped_rtp_timestamp <= old_rtp_timestamp) {
@@ -125,8 +128,9 @@ RtpToNtpEstimator::UpdateResult RtpToNtpEstimator::UpdateMeasurements(
   consecutive_invalid_samples_ = 0;
 
   // Insert new RTCP SR report.
-  if (measurements_.size() == kNumRtcpReportsToUse)
+  if (measurements_.size() == kNumRtcpReportsToUse) {
     measurements_.pop_back();
+  }
 
   measurements_.push_front(new_measurement);
 
@@ -136,8 +140,9 @@ RtpToNtpEstimator::UpdateResult RtpToNtpEstimator::UpdateMeasurements(
 }
 
 NtpTime RtpToNtpEstimator::Estimate(uint32_t rtp_timestamp) const {
-  if (!params_)
-    return NtpTime();
+  if (!params_) {
+    return {};
+  }
 
   double estimated =
       static_cast<double>(unwrapper_.Unwrap(rtp_timestamp)) * params_->slope +

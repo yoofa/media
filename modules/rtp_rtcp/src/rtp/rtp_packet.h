@@ -49,7 +49,7 @@ class RtpPacket {
   bool Parse(std::span<const uint8_t> packet);
 
   // Parse and move given buffer into Packet.
-  bool Parse(base::CopyOnWriteBuffer packet);
+  bool Parse(base::CopyOnWriteBuffer buffer);
 
   // Maps extensions id to their types.
   void IdentifyExtensions(ExtensionManager extensions);
@@ -152,7 +152,7 @@ class RtpPacket {
   // Same as SetPayloadSize but doesn't guarantee to keep current payload.
   uint8_t* AllocatePayload(size_t size_bytes);
 
-  bool SetPadding(size_t padding_size);
+  bool SetPadding(size_t padding_bytes);
 
   // Returns debug string of RTP packet.
   std::string ToString() const;
@@ -169,11 +169,11 @@ class RtpPacket {
 
   bool ParseBuffer(const uint8_t* buffer, size_t size);
 
-  const ExtensionInfo* FindExtensionInfo(int id) const;
+  const ExtensionInfo* FindExtensionInfo(int32_t id) const;
 
-  ExtensionInfo& FindOrCreateExtensionInfo(int id);
+  ExtensionInfo& FindOrCreateExtensionInfo(int32_t id);
 
-  std::span<uint8_t> AllocateRawExtension(int id, size_t length);
+  std::span<uint8_t> AllocateRawExtension(int32_t id, size_t length);
 
   void PromoteToTwoByteHeaderExtension();
 
@@ -186,14 +186,14 @@ class RtpPacket {
   const uint8_t* ReadAt(size_t offset) const { return buffer_.data() + offset; }
 
   // Header.
-  bool marker_;
-  uint8_t payload_type_;
-  uint8_t padding_size_;
-  uint16_t sequence_number_;
-  uint32_t timestamp_;
-  uint32_t ssrc_;
-  size_t payload_offset_;
-  size_t payload_size_;
+  bool marker_{};
+  uint8_t payload_type_{};
+  uint8_t padding_size_{};
+  uint16_t sequence_number_{};
+  uint32_t timestamp_{};
+  uint32_t ssrc_{};
+  size_t payload_offset_{};
+  size_t payload_size_{};
 
   ExtensionManager extensions_;
   std::vector<ExtensionInfo> extension_entries_;

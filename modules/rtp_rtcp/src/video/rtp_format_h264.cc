@@ -6,9 +6,10 @@
  */
 
 #include "media/modules/rtp_rtcp/src/video/rtp_format_h264.h"
+#include <algorithm>
 #include <span>
 
-#include <string.h>
+#include <cstring>
 
 #include <algorithm>
 #include <cstddef>
@@ -47,11 +48,10 @@ RtpPacketizerH264::RtpPacketizerH264(std::span<const uint8_t> payload,
     input_fragments_.push_back(
         payload.subspan(nalu.payload_start_offset, nalu.payload_size));
   }
-  bool has_empty_fragments =
-      std::any_of(input_fragments_.begin(), input_fragments_.end(),
-                  [](const std::span<const uint8_t>& fragment) {
-                    return fragment.empty();
-                  });
+  bool has_empty_fragments = std::ranges::any_of(
+      input_fragments_, [](const std::span<const uint8_t>& fragment) {
+        return fragment.empty();
+      });
   if (has_empty_fragments || !GeneratePackets(packetization_mode)) {
     // If empty fragments were found or we failed to generate all the packets,
     // discard already generated packets in case the caller would ignore the
@@ -75,23 +75,26 @@ bool RtpPacketizerH264::GeneratePackets(
     AVE_DCHECK(!input_fragments_[i].empty());
     switch (packetization_mode) {
       case H264PacketizationMode::SingleNalUnit:
-        if (!PacketizeSingleNalu(i))
+        if (!PacketizeSingleNalu(i)) {
           return false;
+        }
         ++i;
         break;
       case H264PacketizationMode::NonInterleaved:
-        int fragment_len = input_fragments_[i].size();
-        int single_packet_capacity = limits_.max_payload_len;
-        if (input_fragments_.size() == 1)
+        int32_t fragment_len = input_fragments_[i].size();
+        int32_t single_packet_capacity = limits_.max_payload_len;
+        if (input_fragments_.size() == 1) {
           single_packet_capacity -= limits_.single_packet_reduction_len;
-        else if (i == 0)
+        } else if (i == 0) {
           single_packet_capacity -= limits_.first_packet_reduction_len;
-        else if (i + 1 == input_fragments_.size())
+        } else if (i + 1 == input_fragments_.size()) {
           single_packet_capacity -= limits_.last_packet_reduction_len;
+        }
 
         if (fragment_len > single_packet_capacity) {
-          if (!PacketizeFuA(i))
+          if (!PacketizeFuA(i)) {
             return false;
+          }
           ++i;
         } else {
           i = PacketizeStapA(i);
@@ -122,26 +125,29 @@ bool RtpPacketizerH264::PacketizeFuA(size_t fragment_index) {
       limits.single_packet_reduction_len = 0;
     }
   }
-  if (fragment_index != 0)
+  if (fragment_index != 0) {
     limits.first_packet_reduction_len = 0;
-  if (fragment_index != input_fragments_.size() - 1)
+  }
+  if (fragment_index != input_fragments_.size() - 1) {
     limits.last_packet_reduction_len = 0;
+  }
 
   // Strip out the original header.
   size_t payload_left = fragment.size() - kNalHeaderSize;
-  int offset = kNalHeaderSize;
+  int32_t offset = kNalHeaderSize;
 
-  std::vector<int> payload_sizes = SplitAboutEqually(payload_left, limits);
-  if (payload_sizes.empty())
+  std::vector<int32_t> payload_sizes = SplitAboutEqually(payload_left, limits);
+  if (payload_sizes.empty()) {
     return false;
+  }
 
   for (size_t i = 0; i < payload_sizes.size(); ++i) {
-    int packet_length = payload_sizes[i];
+    int32_t packet_length = payload_sizes[i];
     AVE_CHECK_GT(packet_length, 0);
-    packets_.push(PacketUnit(fragment.subspan(offset, packet_length),
-                             /*first_fragment=*/i == 0,
-                             /*last_fragment=*/i == payload_sizes.size() - 1,
-                             false, fragment[0]));
+    packets_.emplace(fragment.subspan(offset, packet_length),
+                     /*first_fragment=*/i == 0,
+                     /*last_fragment=*/i == payload_sizes.size() - 1, false,
+                     fragment[0]);
     offset += packet_length;
     payload_left -= packet_length;
   }
@@ -153,7 +159,7 @@ bool RtpPacketizerH264::PacketizeFuA(size_t fragment_index) {
 size_t RtpPacketizerH264::PacketizeStapA(size_t fragment_index) {
   // Aggregate fragments into one packet (STAP-A).
   size_t payload_size_left = limits_.max_payload_len;
-  int aggregated_fragments = 0;
+  int32_t aggregated_fragments = 0;
   size_t fragment_headers_length = 0;
   std::span<const uint8_t> fragment = input_fragments_[fragment_index];
   AVE_CHECK_GE(payload_size_left, fragment.size());
@@ -165,9 +171,11 @@ size_t RtpPacketizerH264::PacketizeStapA(size_t fragment_index) {
     bool has_last_fragment = fragment_index == input_fragments_.size() - 1;
     if (has_first_fragment && has_last_fragment) {
       return fragment_size + limits_.single_packet_reduction_len;
-    } else if (has_first_fragment) {
+    }
+    if (has_first_fragment) {
       return fragment_size + limits_.first_packet_reduction_len;
-    } else if (has_last_fragment) {
+    }
+    if (has_last_fragment) {
       return fragment_size + limits_.last_packet_reduction_len;
     } else {
       return fragment_size;
@@ -176,8 +184,8 @@ size_t RtpPacketizerH264::PacketizeStapA(size_t fragment_index) {
   while (payload_size_left >= payload_size_needed()) {
     AVE_CHECK_GT(fragment.size(), 0u);
 
-    packets_.push(PacketUnit(fragment, /*first=*/aggregated_fragments == 0,
-                             /*last=*/false, /*aggregated=*/true, fragment[0]));
+    packets_.emplace(fragment, /*first=*/aggregated_fragments == 0,
+                     /*last=*/false, /*aggregated=*/true, fragment[0]);
     payload_size_left -= fragment.size();
     payload_size_left -= fragment_headers_length;
 
@@ -185,14 +193,16 @@ size_t RtpPacketizerH264::PacketizeStapA(size_t fragment_index) {
     // If we are going to try to aggregate more fragments into this packet
     // we need to add the STAP-A NALU header and a length field for the first
     // NALU of this packet.
-    if (aggregated_fragments == 0)
+    if (aggregated_fragments == 0) {
       fragment_headers_length += kNalHeaderSize + kLengthFieldSize;
+    }
     ++aggregated_fragments;
 
     // Next fragment.
     ++fragment_index;
-    if (fragment_index == input_fragments_.size())
+    if (fragment_index == input_fragments_.size()) {
       break;
+    }
     fragment = input_fragments_[fragment_index];
   }
   AVE_CHECK_GT(aggregated_fragments, 0);
@@ -203,12 +213,13 @@ size_t RtpPacketizerH264::PacketizeStapA(size_t fragment_index) {
 bool RtpPacketizerH264::PacketizeSingleNalu(size_t fragment_index) {
   // Add a single NALU to the queue, no aggregation.
   size_t payload_size_left = limits_.max_payload_len;
-  if (input_fragments_.size() == 1)
+  if (input_fragments_.size() == 1) {
     payload_size_left -= limits_.single_packet_reduction_len;
-  else if (fragment_index == 0)
+  } else if (fragment_index == 0) {
     payload_size_left -= limits_.first_packet_reduction_len;
-  else if (fragment_index + 1 == input_fragments_.size())
+  } else if (fragment_index + 1 == input_fragments_.size()) {
     payload_size_left -= limits_.last_packet_reduction_len;
+  }
   std::span<const uint8_t> fragment = input_fragments_[fragment_index];
   if (payload_size_left < fragment.size()) {
     AVE_LOG(LS_ERROR) << "Failed to fit a fragment to packet in SingleNalu "
@@ -219,8 +230,8 @@ bool RtpPacketizerH264::PacketizeSingleNalu(size_t fragment_index) {
     return false;
   }
   AVE_CHECK(!fragment.empty());
-  packets_.push(PacketUnit(fragment, /*first=*/true, /*last=*/true,
-                           /*aggregated=*/false, fragment[0]));
+  packets_.emplace(fragment, /*first=*/true, /*last=*/true,
+                   /*aggregated=*/false, fragment[0]);
   ++num_packets_left_;
   return true;
 }
@@ -273,8 +284,9 @@ void RtpPacketizerH264::NextAggregatePacket(RtpPacketToSend* rtp_packet) {
     index += fragment.size();
     packets_.pop();
     input_fragments_.pop_front();
-    if (is_last_fragment)
+    if (is_last_fragment) {
       break;
+    }
     packet = &packets_.front();
     is_last_fragment = packet->last_fragment;
   }
@@ -302,8 +314,9 @@ void RtpPacketizerH264::NextFragmentPacket(RtpPacketToSend* rtp_packet) {
   buffer[0] = fu_indicator;
   buffer[1] = fu_header;
   memcpy(buffer + kFuAHeaderSize, fragment.data(), fragment.size());
-  if (packet->last_fragment)
+  if (packet->last_fragment) {
     input_fragments_.pop_front();
+  }
   packets_.pop();
 }
 

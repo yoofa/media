@@ -7,7 +7,7 @@
 
 #include "media/modules/rtp_rtcp/api/flexfec_receiver.h"
 
-#include <string.h>
+#include <cstring>
 
 #include <memory>
 #include <span>
@@ -61,13 +61,15 @@ void FlexfecReceiver::OnRtpPacket(const RtpPacketReceived& packet) {
   // `recovered_packets_`, we therefore break the cycle here.
   // This might reduce decoding efficiency a bit, since we can't disambiguate
   // recovered packets by RTX from recovered packets by FlexFEC.
-  if (packet.recovered())
+  if (packet.recovered()) {
     return;
+  }
 
   std::unique_ptr<ForwardErrorCorrection::ReceivedPacket> received_packet =
       AddReceivedPacket(packet);
-  if (!received_packet)
+  if (!received_packet) {
     return;
+  }
 
   ProcessReceivedPacket(*received_packet);
 }
@@ -86,8 +88,8 @@ FlexfecReceiver::AddReceivedPacket(const RtpPacketReceived& packet) {
   AVE_DCHECK(packet.size() >= kRtpHeaderSize);
 
   // Demultiplex based on SSRC, and insert into erasure code decoder.
-  std::unique_ptr<ForwardErrorCorrection::ReceivedPacket> received_packet(
-      new ForwardErrorCorrection::ReceivedPacket());
+  std::unique_ptr<ForwardErrorCorrection::ReceivedPacket> received_packet =
+      std::make_unique<ForwardErrorCorrection::ReceivedPacket>();
   received_packet->seq_num = packet.SequenceNumber();
   received_packet->ssrc = packet.Ssrc();
   received_packet->extensions = packet.extension_manager();
@@ -101,8 +103,7 @@ FlexfecReceiver::AddReceivedPacket(const RtpPacketReceived& packet) {
     ++packet_counter_.num_fec_packets;
 
     // Insert packet payload into erasure code.
-    received_packet->pkt = std::shared_ptr<ForwardErrorCorrection::Packet>(
-        new ForwardErrorCorrection::Packet());
+    received_packet->pkt = std::make_shared<ForwardErrorCorrection::Packet>();
     received_packet->pkt->data =
         packet.Buffer().Slice(packet.headers_size(), packet.payload_size());
   } else {
@@ -115,8 +116,7 @@ FlexfecReceiver::AddReceivedPacket(const RtpPacketReceived& packet) {
 
     // Insert entire packet into erasure code.
     // Create a copy and fill with zeros all mutable extensions.
-    received_packet->pkt = std::shared_ptr<ForwardErrorCorrection::Packet>(
-        new ForwardErrorCorrection::Packet());
+    received_packet->pkt = std::make_shared<ForwardErrorCorrection::Packet>();
     RtpPacketReceived packet_copy(packet);
     packet_copy.ZeroMutableExtensions();
     received_packet->pkt->data = packet_copy.Buffer();

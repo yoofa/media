@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <utility>
 #include <vector>
 
 #include "base/buffer/bitstream_reader.h"
@@ -62,10 +63,10 @@
 
 namespace {
 
-constexpr int kMaxAbsQpDeltaValue = 51;
-constexpr int kMinQpValue = 0;
-constexpr int kMaxQpValue = 51;
-constexpr int kMaxRefIdxActive = 15;
+constexpr int32_t kMaxAbsQpDeltaValue = 51;
+constexpr int32_t kMinQpValue = 0;
+constexpr int32_t kMaxQpValue = 51;
+constexpr int32_t kMaxRefIdxActive = 15;
 
 }  // namespace
 
@@ -84,8 +85,9 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
   last_slice_qp_delta_ = std::nullopt;
   last_slice_pps_id_ = std::nullopt;
   const std::vector<uint8_t> slice_rbsp = H265::ParseRbsp(source);
-  if (slice_rbsp.size() < H265::kNaluHeaderSize)
+  if (slice_rbsp.size() < H265::kNaluHeaderSize) {
     return kInvalidStream;
+  }
 
   base::BitstreamReader slice_reader(
       std::span<const uint8_t>(slice_rbsp.data(), slice_rbsp.size()));
@@ -106,7 +108,7 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
   TRUE_OR_RETURN(pps);
   const H265SpsParser::SpsState* sps = GetSPS(pps->sps_id);
   TRUE_OR_RETURN(sps);
-  bool dependent_slice_segment_flag = 0;
+  bool dependent_slice_segment_flag = false;
   if (!first_slice_segment_in_pic_flag) {
     if (pps->dependent_slice_segments_enabled_flag) {
       // dependent_slice_segment_flag: u(1)
@@ -114,17 +116,19 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
     }
 
     // slice_segment_address: u(v)
-    int32_t log2_ctb_size_y = sps->log2_min_luma_coding_block_size_minus3 + 3 +
-                              sps->log2_diff_max_min_luma_coding_block_size;
+    auto log2_ctb_size_y = sps->log2_min_luma_coding_block_size_minus3 + 3 +
+                           sps->log2_diff_max_min_luma_coding_block_size;
     uint32_t ctb_size_y = 1 << log2_ctb_size_y;
     uint32_t pic_width_in_ctbs_y = sps->pic_width_in_luma_samples / ctb_size_y;
-    if (sps->pic_width_in_luma_samples % ctb_size_y)
+    if (sps->pic_width_in_luma_samples % ctb_size_y) {
       pic_width_in_ctbs_y++;
+    }
 
     uint32_t pic_height_in_ctbs_y =
         sps->pic_height_in_luma_samples / ctb_size_y;
-    if (sps->pic_height_in_luma_samples % ctb_size_y)
+    if (sps->pic_height_in_luma_samples % ctb_size_y) {
       pic_height_in_ctbs_y++;
+    }
 
     uint32_t slice_segment_address_bits =
         H265::Log2Ceiling(pic_height_in_ctbs_y * pic_width_in_ctbs_y);
@@ -155,7 +159,7 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
     bool short_term_ref_pic_set_sps_flag = false;
     uint32_t short_term_ref_pic_set_idx = 0;
     H265SpsParser::ShortTermRefPicSet short_term_ref_pic_set;
-    bool slice_temporal_mvp_enabled_flag = 0;
+    bool slice_temporal_mvp_enabled_flag = false;
     if (nalu_type != H265::NaluType::kIdrWRadl &&
         nalu_type != H265::NaluType::kIdrNLp) {
       // slice_pic_order_cnt_lsb: u(v)
@@ -179,13 +183,13 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
         // short_term_ref_pic_set_idx: u(v)
         uint32_t short_term_ref_pic_set_idx_bits =
             H265::Log2Ceiling(sps->num_short_term_ref_pic_sets);
-        if ((1 << short_term_ref_pic_set_idx_bits) <
-            sps->num_short_term_ref_pic_sets) {
+        if (std::cmp_less((1 << short_term_ref_pic_set_idx_bits),
+                          sps->num_short_term_ref_pic_sets)) {
           short_term_ref_pic_set_idx_bits++;
         }
         if (short_term_ref_pic_set_idx_bits > 0) {
-          short_term_ref_pic_set_idx =
-              slice_reader.ReadBits(short_term_ref_pic_set_idx_bits);
+          short_term_ref_pic_set_idx = static_cast<uint32_t>(
+              slice_reader.ReadBits(short_term_ref_pic_set_idx_bits));
           IN_RANGE_OR_RETURN(short_term_ref_pic_set_idx, 0,
                              sps->num_short_term_ref_pic_sets - 1);
         }
@@ -202,7 +206,7 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
         IN_RANGE_OR_RETURN(num_long_term_pics, 0,
                            kH265MaxLongTermRefPicSets - num_long_term_sps);
         used_by_curr_pic_lt_flag.resize(num_long_term_sps + num_long_term_pics,
-                                        0);
+                                        false);
         for (uint32_t i = 0; i < num_long_term_sps + num_long_term_pics; i++) {
           if (i < num_long_term_sps) {
             uint32_t lt_idx_sps = 0;
@@ -210,7 +214,8 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
               // lt_idx_sps: u(v)
               uint32_t lt_idx_sps_bits =
                   H265::Log2Ceiling(sps->num_long_term_ref_pics_sps);
-              lt_idx_sps = slice_reader.ReadBits(lt_idx_sps_bits);
+              lt_idx_sps =
+                  static_cast<uint32_t>(slice_reader.ReadBits(lt_idx_sps_bits));
               IN_RANGE_OR_RETURN(lt_idx_sps, 0,
                                  sps->num_long_term_ref_pics_sps - 1);
             }
@@ -228,7 +233,8 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
           bool delta_poc_msb_present_flag = slice_reader.Read<bool>();
           if (delta_poc_msb_present_flag) {
             // delta_poc_msb_cycle_lt: ue(v)
-            int delta_poc_msb_cycle_lt = slice_reader.ReadExponentialGolomb();
+            int32_t delta_poc_msb_cycle_lt =
+                slice_reader.ReadExponentialGolomb();
             IN_RANGE_OR_RETURN(
                 delta_poc_msb_cycle_lt, 0,
                 std::pow(2, 32 - sps->log2_max_pic_order_cnt_lsb_minus4 - 4));
@@ -281,7 +287,7 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
         curr_rps_idx = sps->num_short_term_ref_pic_sets;
       }
 
-      const H265SpsParser::ShortTermRefPicSet* ref_pic_set;
+      const H265SpsParser::ShortTermRefPicSet* ref_pic_set = nullptr;
       if (curr_rps_idx < sps->short_term_ref_pic_set.size()) {
         ref_pic_set = &(sps->short_term_ref_pic_set[curr_rps_idx]);
       } else {
@@ -312,7 +318,7 @@ H265BitstreamParser::Result H265BitstreamParser::ParseNonParameterSetNalu(
       if (pps->lists_modification_present_flag && num_pic_total_curr > 1) {
         // ref_pic_lists_modification()
         uint32_t list_entry_bits = H265::Log2Ceiling(num_pic_total_curr);
-        if ((1 << list_entry_bits) < num_pic_total_curr) {
+        if (std::cmp_less((1 << list_entry_bits), num_pic_total_curr)) {
           list_entry_bits++;
         }
         // ref_pic_list_modification_flag_l0: u(1)
@@ -538,19 +544,21 @@ std::optional<bool> H265BitstreamParser::IsFirstSliceSegmentInPic(
 
 void H265BitstreamParser::ParseBitstream(std::span<const uint8_t> bitstream) {
   std::vector<H265::NaluIndex> nalu_indices = H265::FindNaluIndices(bitstream);
-  for (const H265::NaluIndex& index : nalu_indices)
+  for (const H265::NaluIndex& index : nalu_indices) {
     ParseSlice(
         bitstream.subspan(index.payload_start_offset, index.payload_size));
+  }
 }
 
-std::optional<int> H265BitstreamParser::GetLastSliceQp() const {
+std::optional<int32_t> H265BitstreamParser::GetLastSliceQp() const {
   if (!last_slice_qp_delta_ || !last_slice_pps_id_) {
     return std::nullopt;
   }
   const H265PpsParser::PpsState* pps = GetPPS(last_slice_pps_id_.value());
-  if (!pps)
+  if (!pps) {
     return std::nullopt;
-  const int parsed_qp = 26 + pps->init_qp_minus26 + *last_slice_qp_delta_;
+  }
+  const int32_t parsed_qp = 26 + pps->init_qp_minus26 + *last_slice_qp_delta_;
   if (parsed_qp < kMinQpValue || parsed_qp > kMaxQpValue) {
     AVE_LOG(LS_ERROR) << "Parsed invalid QP from bitstream.";
     return std::nullopt;

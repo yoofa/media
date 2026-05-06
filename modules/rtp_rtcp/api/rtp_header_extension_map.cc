@@ -12,6 +12,7 @@
 #include <span>
 
 #include <cstdint>
+#include <utility>
 
 #include "base/checks.h"
 #include "base/logging.h"
@@ -29,30 +30,40 @@ struct ExtensionInfo {
 
 // List of known extensions
 constexpr ExtensionInfo kExtensions[] = {
-    {kRtpExtensionTransmissionTimeOffset, RtpExtension::kTimestampOffsetUri},
-    {kRtpExtensionAudioLevel, RtpExtension::kAudioLevelUri},
-    {kRtpExtensionCsrcAudioLevel, RtpExtension::kCsrcAudioLevelsUri},
-    {kRtpExtensionAbsoluteSendTime, RtpExtension::kAbsSendTimeUri},
-    {kRtpExtensionAbsoluteCaptureTime, RtpExtension::kAbsoluteCaptureTimeUri},
-    {kRtpExtensionVideoRotation, RtpExtension::kVideoRotationUri},
-    {kRtpExtensionTransportSequenceNumber,
-     RtpExtension::kTransportSequenceNumberUri},
-    {kRtpExtensionTransportSequenceNumber02,
-     RtpExtension::kTransportSequenceNumberV2Uri},
-    {kRtpExtensionPlayoutDelay, RtpExtension::kPlayoutDelayUri},
-    {kRtpExtensionVideoContentType, RtpExtension::kVideoContentTypeUri},
-    {kRtpExtensionVideoLayersAllocation,
-     RtpExtension::kVideoLayersAllocationUri},
-    {kRtpExtensionVideoTiming, RtpExtension::kVideoTimingUri},
-    {kRtpExtensionRtpStreamId, RtpExtension::kRidUri},
-    {kRtpExtensionRepairedRtpStreamId, RtpExtension::kRepairedRidUri},
-    {kRtpExtensionMid, RtpExtension::kMidUri},
-    {kRtpExtensionGenericFrameDescriptor,
-     RtpExtension::kGenericFrameDescriptorUri00},
-    {kRtpExtensionDependencyDescriptor, RtpExtension::kDependencyDescriptorUri},
-    {kRtpExtensionColorSpace, RtpExtension::kColorSpaceUri},
-    {kRtpExtensionVideoFrameTrackingId, RtpExtension::kVideoFrameTrackingIdUri},
-    {kRtpExtensionCorruptionDetection, RtpExtension::kCorruptionDetectionUri},
+    {.type = kRtpExtensionTransmissionTimeOffset,
+     .uri = RtpExtension::kTimestampOffsetUri},
+    {.type = kRtpExtensionAudioLevel, .uri = RtpExtension::kAudioLevelUri},
+    {.type = kRtpExtensionCsrcAudioLevel,
+     .uri = RtpExtension::kCsrcAudioLevelsUri},
+    {.type = kRtpExtensionAbsoluteSendTime,
+     .uri = RtpExtension::kAbsSendTimeUri},
+    {.type = kRtpExtensionAbsoluteCaptureTime,
+     .uri = RtpExtension::kAbsoluteCaptureTimeUri},
+    {.type = kRtpExtensionVideoRotation,
+     .uri = RtpExtension::kVideoRotationUri},
+    {.type = kRtpExtensionTransportSequenceNumber,
+     .uri = RtpExtension::kTransportSequenceNumberUri},
+    {.type = kRtpExtensionTransportSequenceNumber02,
+     .uri = RtpExtension::kTransportSequenceNumberV2Uri},
+    {.type = kRtpExtensionPlayoutDelay, .uri = RtpExtension::kPlayoutDelayUri},
+    {.type = kRtpExtensionVideoContentType,
+     .uri = RtpExtension::kVideoContentTypeUri},
+    {.type = kRtpExtensionVideoLayersAllocation,
+     .uri = RtpExtension::kVideoLayersAllocationUri},
+    {.type = kRtpExtensionVideoTiming, .uri = RtpExtension::kVideoTimingUri},
+    {.type = kRtpExtensionRtpStreamId, .uri = RtpExtension::kRidUri},
+    {.type = kRtpExtensionRepairedRtpStreamId,
+     .uri = RtpExtension::kRepairedRidUri},
+    {.type = kRtpExtensionMid, .uri = RtpExtension::kMidUri},
+    {.type = kRtpExtensionGenericFrameDescriptor,
+     .uri = RtpExtension::kGenericFrameDescriptorUri00},
+    {.type = kRtpExtensionDependencyDescriptor,
+     .uri = RtpExtension::kDependencyDescriptorUri},
+    {.type = kRtpExtensionColorSpace, .uri = RtpExtension::kColorSpaceUri},
+    {.type = kRtpExtensionVideoFrameTrackingId,
+     .uri = RtpExtension::kVideoFrameTrackingIdUri},
+    {.type = kRtpExtensionCorruptionDetection,
+     .uri = RtpExtension::kCorruptionDetectionUri},
 };
 
 }  // namespace
@@ -61,47 +72,55 @@ RtpHeaderExtensionMap::RtpHeaderExtensionMap() : RtpHeaderExtensionMap(false) {}
 
 RtpHeaderExtensionMap::RtpHeaderExtensionMap(bool extmap_allow_mixed)
     : extmap_allow_mixed_(extmap_allow_mixed) {
-  for (auto& id : ids_)
+  for (auto& id : ids_) {
     id = kInvalidId;
+  }
 }
 
 RtpHeaderExtensionMap::RtpHeaderExtensionMap(
     std::span<const RtpExtension> extensions)
     : RtpHeaderExtensionMap(false) {
-  for (const RtpExtension& extension : extensions)
+  for (const RtpExtension& extension : extensions) {
     RegisterByUri(extension.id, extension.uri);
+  }
 }
 
 void RtpHeaderExtensionMap::Reset(std::span<const RtpExtension> extensions) {
-  for (auto& id : ids_)
+  for (auto& id : ids_) {
     id = kInvalidId;
-  for (const RtpExtension& extension : extensions)
+  }
+  for (const RtpExtension& extension : extensions) {
     RegisterByUri(extension.id, extension.uri);
+  }
 }
 
-bool RtpHeaderExtensionMap::RegisterByType(int id, RTPExtensionType type) {
-  for (const ExtensionInfo& extension : kExtensions)
-    if (type == extension.type)
+bool RtpHeaderExtensionMap::RegisterByType(int32_t id, RTPExtensionType type) {
+  for (const ExtensionInfo& extension : kExtensions) {
+    if (type == extension.type) {
       return Register(id, extension.type, extension.uri);
+    }
+  }
   AVE_DCHECK(false);
   return false;
 }
 
-bool RtpHeaderExtensionMap::RegisterByUri(int id, std::string_view uri) {
-  for (const ExtensionInfo& extension : kExtensions)
-    if (uri == extension.uri)
+bool RtpHeaderExtensionMap::RegisterByUri(int32_t id, std::string_view uri) {
+  for (const ExtensionInfo& extension : kExtensions) {
+    if (uri == extension.uri) {
       return Register(id, extension.type, extension.uri);
+    }
+  }
   AVE_LOG(LS_WARNING) << "Unknown extension uri:'" << uri << "', id: " << id
                       << '.';
   return false;
 }
 
-RTPExtensionType RtpHeaderExtensionMap::GetType(int id) const {
+RTPExtensionType RtpHeaderExtensionMap::GetType(int32_t id) const {
   AVE_DCHECK_GE(id, RtpExtension::kMinId);
   AVE_DCHECK_LE(id, RtpExtension::kMaxId);
-  for (int type = kRtpExtensionNone + 1; type < kRtpExtensionNumberOfExtensions;
-       ++type) {
-    if (ids_[type] == id) {
+  for (int32_t type = kRtpExtensionNone + 1;
+       type < kRtpExtensionNumberOfExtensions; ++type) {
+    if (std::cmp_equal(ids_[type], id)) {
       return static_cast<RTPExtensionType>(type);
     }
   }
@@ -117,7 +136,7 @@ void RtpHeaderExtensionMap::Deregister(std::string_view uri) {
   }
 }
 
-bool RtpHeaderExtensionMap::Register(int id,
+bool RtpHeaderExtensionMap::Register(int32_t id,
                                      RTPExtensionType type,
                                      std::string_view uri) {
   AVE_DCHECK_GT(type, kRtpExtensionNone);
@@ -141,7 +160,7 @@ bool RtpHeaderExtensionMap::Register(int id,
     AVE_LOG(LS_WARNING) << "Failed to register extension uri:'" << uri
                         << "', id:" << id
                         << ". Id already in use by extension type "
-                        << static_cast<int>(registered_type);
+                        << static_cast<int32_t>(registered_type);
     return false;
   }
   if (IsRegistered(type)) {

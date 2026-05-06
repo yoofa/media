@@ -54,7 +54,7 @@ std::unique_ptr<RtpPacketizer> RtpPacketizer::Create(
     case VideoCodecType::kVideoCodecVP8: {
       const auto* vp8_header =
           std::get_if<RTPVideoHeaderVP8>(&rtp_video_header.video_type_header);
-      RTPVideoHeaderVP8 header_info;
+      RTPVideoHeaderVP8 header_info{};
       if (vp8_header) {
         header_info = *vp8_header;
       }
@@ -63,7 +63,7 @@ std::unique_ptr<RtpPacketizer> RtpPacketizer::Create(
     case VideoCodecType::kVideoCodecVP9: {
       const auto* vp9_header =
           std::get_if<RTPVideoHeaderVP9>(&rtp_video_header.video_type_header);
-      RTPVideoHeaderVP9 header_info;
+      RTPVideoHeaderVP9 header_info{};
       if (vp9_header) {
         header_info = *vp9_header;
       }

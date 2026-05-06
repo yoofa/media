@@ -48,7 +48,7 @@ void Looper::unregisterHandler(handler_id handler_id) {
 }
 
 int32_t Looper::start(int32_t priority AVE_MAYBE_UNUSED) {
-  std::lock_guard<std::mutex> guard(mutex_);
+  std::scoped_lock guard(mutex_);
   if (thread_ != nullptr) {
     return static_cast<int32_t>(-1);
   }
@@ -65,7 +65,7 @@ int32_t Looper::stop() {
   bool is_self_stop =
       thread_ && (thread_->get_id() == std::this_thread::get_id());
   {
-    std::lock_guard<std::mutex> guard(mutex_);
+    std::scoped_lock guard(mutex_);
     stopped_ = true;
     looping_ = false;
     condition_.notify_all();
@@ -88,7 +88,7 @@ int32_t Looper::stop() {
 }
 
 void Looper::post(const std::shared_ptr<Message>& message, int64_t delay_us) {
-  std::lock_guard<std::mutex> guard(mutex_);
+  std::scoped_lock guard(mutex_);
   if (stopped_) {
     return;
   }
@@ -147,7 +147,7 @@ void Looper::loop() {
 }
 
 bool Looper::keepRunning() {
-  std::lock_guard<std::mutex> l(mutex_);
+  std::scoped_lock l(mutex_);
   return looping_ || !event_queue_.empty();
 }
 
@@ -168,7 +168,7 @@ status_t Looper::awaitResponse(const std::shared_ptr<ReplyToken>& replyToken,
 
 status_t Looper::postReply(const std::shared_ptr<ReplyToken>& replyToken,
                            const std::shared_ptr<Message>& reply) {
-  std::lock_guard<std::mutex> guard(mutex_);
+  std::scoped_lock guard(mutex_);
   status_t err = replyToken->setReply(reply);
   if (err == 0) {
     replies_condition_.notify_all();

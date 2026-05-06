@@ -18,7 +18,7 @@ namespace rtp_rtcp {
 
 AudioLevel::AudioLevel() : voice_activity_(false), audio_level_(0) {}
 
-AudioLevel::AudioLevel(bool voice_activity, int audio_level)
+AudioLevel::AudioLevel(bool voice_activity, int32_t audio_level)
     : voice_activity_(voice_activity), audio_level_(audio_level) {
   AVE_CHECK_GE(audio_level, 0);
   AVE_CHECK_LE(audio_level, 127);
@@ -52,8 +52,7 @@ RTPHeader::RTPHeader()
       numCSRCs(0),
       arrOfCSRCs(),
       paddingLength(0),
-      headerLength(0),
-      extension() {}
+      headerLength(0) {}
 
 RTPHeader::RTPHeader(const RTPHeader& other) = default;
 

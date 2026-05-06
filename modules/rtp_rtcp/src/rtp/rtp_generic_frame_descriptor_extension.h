@@ -33,7 +33,7 @@ class RtpGenericFrameDescriptorExtension00 {
   static constexpr std::string_view Uri() {
     return RtpExtension::kGenericFrameDescriptorUri00;
   }
-  static constexpr int kMaxSizeBytes = 16;
+  static constexpr int32_t kMaxSizeBytes = 16;
 
   static bool Parse(std::span<const uint8_t> data,
                     RtpGenericFrameDescriptor* descriptor);

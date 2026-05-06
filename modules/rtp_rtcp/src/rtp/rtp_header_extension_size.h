@@ -22,14 +22,15 @@ namespace rtp_rtcp {
 
 struct RtpExtensionSize {
   RTPExtensionType type;
-  int value_size;
+  int32_t value_size;
 };
 
 // Calculates rtp header extension size in bytes assuming packet contain
 // all `extensions` with provided `value_size`.
 // Counts only extensions present among `registered_extensions`.
-int RtpHeaderExtensionSize(std::span<const RtpExtensionSize> extensions,
-                           const RtpHeaderExtensionMap& registered_extensions);
+int32_t RtpHeaderExtensionSize(
+    std::span<const RtpExtensionSize> extensions,
+    const RtpHeaderExtensionMap& registered_extensions);
 
 }  // namespace rtp_rtcp
 }  // namespace media

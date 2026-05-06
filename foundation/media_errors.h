@@ -141,8 +141,8 @@ enum {
   // from -20000 (0xFFFFB1E0 - 0xFFFFB1D7)
 
   // Codec errors are permitted from 0x80001000 through 0x9000FFFF
-  ERROR_CODEC_MAX = (signed)0x9000FFFF,
-  ERROR_CODEC_MIN = (signed)0x80001000,
+  ERROR_CODEC_MAX = (int32_t)0x9000FFFF,
+  ERROR_CODEC_MIN = (int32_t)0x80001000,
 
   // System unknown errors from 0x80000000 - 0x80000007 (INT32_MIN + 7)
   // See system/core/include/utils/Errors.h

@@ -95,8 +95,9 @@ bool Nack::Create(uint8_t* packet,
   for (size_t nack_index = 0; nack_index < packed_.size();) {
     size_t bytes_left_in_buffer = max_length - *index;
     if (bytes_left_in_buffer < kNackHeaderLength + kNackItemLength) {
-      if (!OnBufferFull(packet, index, callback))
+      if (!OnBufferFull(packet, index, callback)) {
         return false;
+      }
       continue;
     }
     size_t num_nack_fields =
@@ -144,12 +145,12 @@ void Nack::Pack() {
   auto it = packet_ids_.begin();
   const auto end = packet_ids_.end();
   while (it != end) {
-    PackedNack item;
+    PackedNack item{};
     item.first_pid = *it++;
     // Bitmask specifies losses in any of the 16 packets following the pid.
     item.bitmask = 0;
     while (it != end) {
-      uint16_t shift = static_cast<uint16_t>(*it - item.first_pid - 1);
+      auto shift = static_cast<uint16_t>(*it - item.first_pid - 1);
       if (shift <= 15) {
         item.bitmask |= (1 << shift);
         ++it;
@@ -168,8 +169,9 @@ void Nack::Unpack() {
     packet_ids_.push_back(item.first_pid);
     uint16_t pid = item.first_pid + 1;
     for (uint16_t bitmask = item.bitmask; bitmask != 0; bitmask >>= 1, ++pid) {
-      if (bitmask & 1)
+      if (bitmask & 1) {
         packet_ids_.push_back(pid);
+      }
     }
   }
 }

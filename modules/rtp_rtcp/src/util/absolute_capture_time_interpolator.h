@@ -57,7 +57,7 @@ class AbsoluteCaptureTimeInterpolator {
   std::optional<AbsoluteCaptureTime> OnReceivePacket(
       uint32_t source,
       uint32_t rtp_timestamp,
-      int rtp_clock_frequency_hz,
+      int32_t rtp_clock_frequency_hz,
       const std::optional<AbsoluteCaptureTime>& received_extension);
 
  private:
@@ -65,14 +65,14 @@ class AbsoluteCaptureTimeInterpolator {
 
   static uint64_t InterpolateAbsoluteCaptureTimestamp(
       uint32_t rtp_timestamp,
-      int rtp_clock_frequency_hz,
+      int32_t rtp_clock_frequency_hz,
       uint32_t last_rtp_timestamp,
       uint64_t last_absolute_capture_timestamp);
 
   bool ShouldInterpolateExtension(base::Timestamp receive_time,
                                   uint32_t source,
                                   uint32_t rtp_timestamp,
-                                  int rtp_clock_frequency_hz) const
+                                  int32_t rtp_clock_frequency_hz) const
       REQUIRES(mutex_);
 
   base::Clock* const clock_;
@@ -85,9 +85,9 @@ class AbsoluteCaptureTimeInterpolator {
   base::Timestamp last_receive_time_ GUARDED_BY(mutex_) =
       base::Timestamp::MinusInfinity();
 
-  uint32_t last_source_ GUARDED_BY(mutex_);
-  uint32_t last_rtp_timestamp_ GUARDED_BY(mutex_);
-  int last_rtp_clock_frequency_hz_ GUARDED_BY(mutex_);
+  uint32_t last_source_ GUARDED_BY(mutex_) = 0;
+  uint32_t last_rtp_timestamp_ GUARDED_BY(mutex_) = 0;
+  int32_t last_rtp_clock_frequency_hz_ GUARDED_BY(mutex_) = 0;
   AbsoluteCaptureTime last_received_extension_ GUARDED_BY(mutex_);
   // Variables used for statistics generation
   std::optional<base::Timestamp> first_packet_time_;

@@ -50,7 +50,8 @@ void PacketSequencer::Sequence(RtpPacketToSend& packet) {
     if (packet.packet_type() == RtpPacketMediaType::kRetransmission) {
       // Retransmission of an already sequenced packet, ignore.
       return;
-    } else if (packet.packet_type() == RtpPacketMediaType::kPadding) {
+    }
+    if (packet.packet_type() == RtpPacketMediaType::kPadding) {
       PopulatePaddingFields(packet);
     }
     packet.SetSequenceNumber(media_sequence_number_++);

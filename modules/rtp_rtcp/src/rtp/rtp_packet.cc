@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -209,19 +210,20 @@ void RtpPacket::SetCsrcs(std::span<const uint32_t> csrcs) {
   buffer_.SetSize(payload_offset_);
 }
 
-std::span<uint8_t> RtpPacket::AllocateRawExtension(int id, size_t length) {
+std::span<uint8_t> RtpPacket::AllocateRawExtension(int32_t id, size_t length) {
   AVE_DCHECK_GE(id, RtpExtension::kMinId);
   AVE_DCHECK_LE(id, RtpExtension::kMaxId);
   AVE_DCHECK_GE(length, 1u);
   AVE_DCHECK_LE(length, static_cast<size_t>(RtpExtension::kMaxValueSize));
   const ExtensionInfo* extension_entry = FindExtensionInfo(id);
   if (extension_entry != nullptr) {
-    if (extension_entry->length == length)
-      return std::span(WriteAt(extension_entry->offset), length);
+    if (extension_entry->length == length) {
+      return {WriteAt(extension_entry->offset), length};
+    }
 
     AVE_LOG(LS_ERROR) << "Length mismatch for extension id " << id
                       << ": expected "
-                      << static_cast<int>(extension_entry->length)
+                      << static_cast<int32_t>(extension_entry->length)
                       << ". received " << length;
     return {};
   }
@@ -243,7 +245,7 @@ std::span<uint8_t> RtpPacket::AllocateRawExtension(int id, size_t length) {
       length > RtpExtension::kOneByteHeaderExtensionMaxValueSize || length == 0;
   AVE_CHECK(!two_byte_header_required || extensions_.ExtmapAllowMixed());
 
-  uint16_t profile_id;
+  uint16_t profile_id = 0;
   if (extensions_size_ > 0) {
     profile_id =
         ByteReader<uint16_t>::ReadBigEndian(data() + extensions_offset - 4);
@@ -287,15 +289,15 @@ std::span<uint8_t> RtpPacket::AllocateRawExtension(int id, size_t length) {
     one_byte_header |= base::dchecked_cast<uint8_t>(length - 1);
     WriteAt(extensions_offset + extensions_size_, one_byte_header);
   } else {
-    uint8_t extension_id = base::dchecked_cast<uint8_t>(id);
+    auto extension_id = base::dchecked_cast<uint8_t>(id);
     WriteAt(extensions_offset + extensions_size_, extension_id);
-    uint8_t extension_length = base::dchecked_cast<uint8_t>(length);
+    auto extension_length = base::dchecked_cast<uint8_t>(length);
     WriteAt(extensions_offset + extensions_size_ + 1, extension_length);
   }
 
-  const uint16_t extension_info_offset = base::dchecked_cast<uint16_t>(
+  const auto extension_info_offset = base::dchecked_cast<uint16_t>(
       extensions_offset + extensions_size_ + extension_header_size);
-  const uint8_t extension_info_length = base::dchecked_cast<uint8_t>(length);
+  const auto extension_info_length = base::dchecked_cast<uint8_t>(length);
   extension_entries_.emplace_back(id, extension_info_length,
                                   extension_info_offset);
 
@@ -305,7 +307,7 @@ std::span<uint8_t> RtpPacket::AllocateRawExtension(int id, size_t length) {
       SetExtensionLengthMaybeAddZeroPadding(extensions_offset);
   payload_offset_ = extensions_offset + extensions_size_padded;
   buffer_.SetSize(payload_offset_);
-  return std::span(WriteAt(extension_info_offset), extension_info_length);
+  return {WriteAt(extension_info_offset), extension_info_length};
 }
 
 void RtpPacket::PromoteToTwoByteHeaderExtension() {
@@ -317,14 +319,13 @@ void RtpPacket::PromoteToTwoByteHeaderExtension() {
   AVE_CHECK_EQ(kOneByteExtensionProfileId, ByteReader<uint16_t>::ReadBigEndian(
                                                data() + extensions_offset - 4));
   size_t write_read_delta = extension_entries_.size();
-  for (auto extension_entry = extension_entries_.rbegin();
-       extension_entry != extension_entries_.rend(); ++extension_entry) {
-    size_t read_index = extension_entry->offset;
+  for (auto& extension_entrie : std::views::reverse(extension_entries_)) {
+    size_t read_index = extension_entrie.offset;
     size_t write_index = read_index + write_read_delta;
-    extension_entry->offset = base::dchecked_cast<uint16_t>(write_index);
-    memmove(WriteAt(write_index), data() + read_index, extension_entry->length);
-    WriteAt(--write_index, extension_entry->length);
-    WriteAt(--write_index, extension_entry->id);
+    extension_entrie.offset = base::dchecked_cast<uint16_t>(write_index);
+    memmove(WriteAt(write_index), data() + read_index, extension_entrie.length);
+    WriteAt(--write_index, extension_entrie.length);
+    WriteAt(--write_index, extension_entrie.id);
     --write_read_delta;
   }
 
@@ -339,7 +340,7 @@ void RtpPacket::PromoteToTwoByteHeaderExtension() {
 
 uint16_t RtpPacket::SetExtensionLengthMaybeAddZeroPadding(
     size_t extensions_offset) {
-  uint16_t extensions_words =
+  auto extensions_words =
       base::dchecked_cast<uint16_t>((extensions_size_ + 3) / 4);
   ByteWriter<uint16_t>::WriteBigEndian(WriteAt(extensions_offset - 2),
                                        extensions_words);
@@ -453,13 +454,13 @@ bool RtpPacket::ParseBuffer(const uint8_t* buffer, size_t size) {
           extensions_size_++;
           continue;
         }
-        int id;
-        uint8_t length;
+        int32_t id = 0;
+        uint8_t length = 0;
         if (profile == kOneByteExtensionProfileId) {
           id = buffer[extension_offset + extensions_size_] >> 4;
           length = 1 + (buffer[extension_offset + extensions_size_] & 0xf);
-          if (id == kOneByteHeaderExtensionReservedId ||
-              (id == kPaddingId && length != 1)) {
+          if (std::cmp_equal(id, kOneByteHeaderExtensionReservedId) ||
+              (std::cmp_equal(id, kPaddingId) && length != 1)) {
             break;
           }
         } else {
@@ -510,18 +511,18 @@ bool RtpPacket::ParseBuffer(const uint8_t* buffer, size_t size) {
   return true;
 }
 
-const RtpPacket::ExtensionInfo* RtpPacket::FindExtensionInfo(int id) const {
+const RtpPacket::ExtensionInfo* RtpPacket::FindExtensionInfo(int32_t id) const {
   for (const ExtensionInfo& extension : extension_entries_) {
-    if (extension.id == id) {
+    if (std::cmp_equal(extension.id, id)) {
       return &extension;
     }
   }
   return nullptr;
 }
 
-RtpPacket::ExtensionInfo& RtpPacket::FindOrCreateExtensionInfo(int id) {
+RtpPacket::ExtensionInfo& RtpPacket::FindOrCreateExtensionInfo(int32_t id) {
   for (ExtensionInfo& extension : extension_entries_) {
-    if (extension.id == id) {
+    if (std::cmp_equal(extension.id, id)) {
       return extension;
     }
   }
@@ -538,7 +539,7 @@ std::span<const uint8_t> RtpPacket::FindExtension(ExtensionType type) const {
   if (extension_info == nullptr) {
     return {};
   }
-  return std::span(data() + extension_info->offset, extension_info->length);
+  return {data() + extension_info->offset, extension_info->length};
 }
 
 std::span<uint8_t> RtpPacket::AllocateExtension(ExtensionType type,

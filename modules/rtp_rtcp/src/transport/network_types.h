@@ -85,9 +85,9 @@ struct NetworkRouteChange {
 
 struct PacedPacketInfo {
   PacedPacketInfo() = default;
-  PacedPacketInfo(int probe_cluster_id,
-                  int probe_cluster_min_probes,
-                  int probe_cluster_min_bytes)
+  PacedPacketInfo(int32_t probe_cluster_id,
+                  int32_t probe_cluster_min_probes,
+                  int32_t probe_cluster_min_bytes)
       : probe_cluster_id(probe_cluster_id),
         probe_cluster_min_probes(probe_cluster_min_probes),
         probe_cluster_min_bytes(probe_cluster_min_bytes) {}
@@ -100,12 +100,12 @@ struct PacedPacketInfo {
            probe_cluster_bytes_sent == rhs.probe_cluster_bytes_sent;
   }
 
-  static constexpr int kNotAProbe = -1;
+  static constexpr int32_t kNotAProbe = -1;
   DataRate send_bitrate = DataRate::BitsPerSec(0);
-  int probe_cluster_id = kNotAProbe;
-  int probe_cluster_min_probes = -1;
-  int probe_cluster_min_bytes = -1;
-  int probe_cluster_bytes_sent = 0;
+  int32_t probe_cluster_id = kNotAProbe;
+  int32_t probe_cluster_min_probes = -1;
+  int32_t probe_cluster_min_bytes = -1;
+  int32_t probe_cluster_bytes_sent = 0;
 };
 
 struct SentPacket {

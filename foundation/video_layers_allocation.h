@@ -27,8 +27,8 @@ using DataRate = ::ave::base::DataRate;
 // This struct contains additional stream-level information needed by a
 // Selective Forwarding Middlebox to make relay decisions of RTP streams.
 struct VideoLayersAllocation {
-  static constexpr int kMaxSpatialIds = 4;
-  static constexpr int kMaxTemporalIds = 4;
+  static constexpr int32_t kMaxSpatialIds = 4;
+  static constexpr int32_t kMaxTemporalIds = 4;
 
   friend bool operator==(const VideoLayersAllocation& lhs,
                          const VideoLayersAllocation& rhs) {
@@ -56,9 +56,9 @@ struct VideoLayersAllocation {
     friend bool operator!=(const SpatialLayer& lhs, const SpatialLayer& rhs) {
       return !(lhs == rhs);
     }
-    int rtp_stream_index = 0;
+    int32_t rtp_stream_index = 0;
     // Index of the spatial layer per `rtp_stream_index`.
-    int spatial_id = 0;
+    int32_t spatial_id = 0;
     // Target bitrate per decode target.
     std::vector<DataRate> target_bitrate_per_temporal_layer;
 
@@ -72,7 +72,7 @@ struct VideoLayersAllocation {
 
   // Index of the rtp stream this allocation is sent on. Used for mapping
   // a SpatialLayer to a rtp stream.
-  int rtp_stream_index = 0;
+  int32_t rtp_stream_index = 0;
   bool resolution_and_frame_rate_is_valid = false;
   std::vector<SpatialLayer> active_spatial_layers;
 };

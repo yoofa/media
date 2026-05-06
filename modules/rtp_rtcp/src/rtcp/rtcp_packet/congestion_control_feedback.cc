@@ -148,8 +148,9 @@ bool CongestionControlFeedback::Create(uint8_t* buffer,
                                        PacketReadyCallback callback) const {
   // Ensure there is enough room for this packet.
   while (*position + BlockLength() > max_length) {
-    if (!OnBufferFull(buffer, position, callback))
+    if (!OnBufferFull(buffer, position, callback)) {
       return false;
+    }
   }
   const size_t position_end = *position + BlockLength();
 
@@ -251,7 +252,7 @@ size_t CongestionControlFeedback::BlockLength() const {
     return total_size;
   }
 
-  auto increase_size_per_ssrc = [](int number_of_packets_for_ssrc) {
+  auto increase_size_per_ssrc = [](int32_t number_of_packets_for_ssrc) {
     // Each packet report needs two bytes.
     size_t packet_block_size = number_of_packets_for_ssrc * 2;
     // 32 bit aligned.
@@ -307,7 +308,7 @@ bool CongestionControlFeedback::Parse(const rtcp::CommonHeader& packet) {
       return false;
     }
 
-    for (int i = 0; i < num_reports; ++i) {
+    for (int32_t i = 0; std::cmp_less(i, num_reports); ++i) {
       uint16_t packet_info = ByteReader<uint16_t>::ReadBigEndian(payload);
       payload += 2;
 

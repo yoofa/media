@@ -25,9 +25,9 @@ namespace rtp_rtcp {
 namespace rtcp {
 namespace {
 
-static constexpr int kFieldValueSize = 3;
-static constexpr int kFieldSize = 1 + kFieldValueSize;
-static constexpr DataRate kDataRateResolution = DataRate::KilobitsPerSec(1);
+constexpr int32_t kFieldValueSize = 3;
+constexpr int32_t kFieldSize = 1 + kFieldValueSize;
+constexpr DataRate kDataRateResolution = DataRate::KilobitsPerSec(1);
 constexpr int64_t kMaxEncoded = (1 << (kFieldValueSize * 8)) - 1;
 
 class DataRateSerializer {
@@ -35,7 +35,7 @@ class DataRateSerializer {
   DataRateSerializer(
       uint8_t id,
       std::function<DataRate*(NetworkStateEstimate*)> field_getter)
-      : id_(id), field_getter_(field_getter) {}
+      : id_(id), field_getter_(std::move(field_getter)) {}
 
   uint8_t id() const { return id_; }
 
@@ -55,7 +55,7 @@ class DataRateSerializer {
       return false;
     }
     ByteWriter<uint8_t>::WriteBigEndian(target++, id_);
-    int64_t scaled;
+    int64_t scaled = 0;
     if (value.IsPlusInfinity()) {
       scaled = kMaxEncoded;
     } else {
@@ -79,7 +79,7 @@ class DataRateSerializer {
 class RemoteEstimateSerializerImpl : public RemoteEstimateSerializer {
  public:
   explicit RemoteEstimateSerializerImpl(std::vector<DataRateSerializer> fields)
-      : fields_(fields) {}
+      : fields_(std::move(fields)) {}
 
   base::Buffer Serialize(const NetworkStateEstimate& src) const override {
     size_t max_size = fields_.size() * kFieldSize;
@@ -96,8 +96,9 @@ class RemoteEstimateSerializerImpl : public RemoteEstimateSerializer {
 
   bool Parse(std::span<const uint8_t> src,
              NetworkStateEstimate* target) const override {
-    if (src.size() % kFieldSize != 0)
+    if (src.size() % kFieldSize != 0) {
       return false;
+    }
     AVE_DCHECK_EQ(src.size() % kFieldSize, 0u);
     for (const uint8_t* data_ptr = src.data();
          data_ptr < src.data() + src.size(); data_ptr += kFieldSize) {

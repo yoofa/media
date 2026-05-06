@@ -140,7 +140,7 @@ void Message::setRect(const char* name,
                       int32_t top,
                       int32_t right,
                       int32_t bottom) {
-  Rect rect{left, top, right, bottom};
+  Rect rect{.left_ = left, .top_ = top, .right_ = right, .bottom_ = bottom};
   setObject(name, rect);
 }
 

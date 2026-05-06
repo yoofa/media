@@ -56,9 +56,9 @@ class RtpPacketHistory {
   // Don't remove packets within max(1 second, 3x RTT).
   static constexpr base::TimeDelta kMinPacketDuration =
       base::TimeDelta::Seconds(1);
-  static constexpr int kMinPacketDurationRtt = 3;
+  static constexpr int32_t kMinPacketDurationRtt = 3;
   // With kStoreAndCull, always remove packets after 3x max(1000ms, 3x rtt).
-  static constexpr int kPacketCullingDelayFactor = 3;
+  static constexpr int32_t kPacketCullingDelayFactor = 3;
 
   RtpPacketHistory(base::Clock* clock, PaddingMode padding_mode);
 
@@ -168,8 +168,8 @@ class RtpPacketHistory {
   void CullOldPackets();
   // Removes the packet from the history, and context/mapping that has been
   // stored. Returns the RTP packet instance contained within the StoredPacket.
-  std::unique_ptr<RtpPacketToSend> RemovePacket(int packet_index);
-  int GetPacketIndex(uint16_t sequence_number) const;
+  std::unique_ptr<RtpPacketToSend> RemovePacket(int32_t packet_index);
+  int32_t GetPacketIndex(uint16_t sequence_number) const;
   StoredPacket* GetStoredPacket(uint16_t sequence_number);
 
   base::Clock* const clock_;

@@ -18,7 +18,7 @@ namespace media {
 namespace rtp_rtcp {
 
 UlpfecReceiver::UlpfecReceiver(uint32_t ssrc,
-                               int ulpfec_payload_type,
+                               int32_t ulpfec_payload_type,
                                RecoveredPacketReceiver* callback,
                                base::Clock* clock)
     : ssrc_(ssrc),
@@ -60,7 +60,7 @@ FecPacketCounter UlpfecReceiver::GetPacketCounter() const {
 //    block PT: 7 bits RTP payload type for this block.
 //
 //    timestamp offset:  14 bits Unsigned offset of timestamp of this block
-//        relative to timestamp given in RTP header.  The use of an unsigned
+//        relative to timestamp given in RTP header.  The use of an uint32_t
 //        offset implies that redundant data must be sent after the primary
 //        data, and is hence a time to be subtracted from the current
 //        timestamp to determine the timestamp of the data for which this
@@ -94,12 +94,11 @@ bool UlpfecReceiver::AddReceivedRedPacket(const RtpPacketReceived& rtp_packet) {
   // Remove RED header of incoming packet and store as a virtual RTP packet.
   auto received_packet =
       std::make_unique<ForwardErrorCorrection::ReceivedPacket>();
-  received_packet->pkt = std::shared_ptr<ForwardErrorCorrection::Packet>(
-      new ForwardErrorCorrection::Packet());
+  received_packet->pkt = std::make_shared<ForwardErrorCorrection::Packet>();
 
   // Get payload type from RED header and sequence number from RTP header.
   uint8_t payload_type = rtp_packet.payload()[0] & 0x7f;
-  received_packet->is_fec = payload_type == ulpfec_payload_type_;
+  received_packet->is_fec = std::cmp_equal(payload_type, ulpfec_payload_type_);
   received_packet->is_recovered = rtp_packet.recovered();
   received_packet->ssrc = rtp_packet.Ssrc();
   received_packet->seq_num = rtp_packet.SequenceNumber();
@@ -140,7 +139,7 @@ bool UlpfecReceiver::AddReceivedRedPacket(const RtpPacketReceived& rtp_packet) {
         rtp_packet.size() - rtp_packet.headers_size() - kRedHeaderLength);
   }
 
-  if (received_packet->pkt->data.size() > 0) {
+  if (!received_packet->pkt->data.empty()) {
     received_packets_.push_back(std::move(received_packet));
   }
   return true;

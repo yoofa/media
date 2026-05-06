@@ -62,7 +62,7 @@ class ReportBlockData {
   // where the number of packets received includes any which are late or
   // duplicates. Thus, packets that arrive late are not counted as lost, and the
   // loss may be negative if there are duplicates.
-  int cumulative_lost() const { return cumulative_lost_; }
+  int32_t cumulative_lost() const { return cumulative_lost_; }
 
   // The low 16 bits contain the highest sequence number received in an RTP data
   // packet from 'source_ssrc()', and the most significant 16 bits extend that
@@ -79,7 +79,7 @@ class ReportBlockData {
   uint32_t jitter() const { return jitter_; }
 
   // Jitter converted to common time units.
-  TimeDelta jitter(int rtp_clock_rate_hz) const;
+  TimeDelta jitter(int32_t rtp_clock_rate_hz) const;
 
   // Time in utc epoch (Jan 1st, 1970) the report block was received.
   Timestamp report_block_timestamp_utc() const {
@@ -99,7 +99,7 @@ class ReportBlockData {
   void set_sender_ssrc(uint32_t ssrc) { sender_ssrc_ = ssrc; }
   void set_source_ssrc(uint32_t ssrc) { source_ssrc_ = ssrc; }
   void set_fraction_lost_raw(uint8_t lost) { fraction_lost_raw_ = lost; }
-  void set_cumulative_lost(int lost) { cumulative_lost_ = lost; }
+  void set_cumulative_lost(int32_t lost) { cumulative_lost_ = lost; }
   void set_extended_highest_sequence_number(uint32_t sn) {
     extended_highest_sequence_number_ = sn;
   }

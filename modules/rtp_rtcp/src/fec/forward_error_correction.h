@@ -74,8 +74,8 @@ class ForwardErrorCorrection {
     ReceivedPacket();
     ~ReceivedPacket();
 
-    bool is_fec;  // Set to true if this is an FEC packet.
-    bool is_recovered;
+    bool is_fec{};  // Set to true if this is an FEC packet.
+    bool is_recovered{};
     RtpHeaderExtensionMap extensions;
     std::shared_ptr<Packet> pkt;  // Pointer to the packet storage.
   };
@@ -86,8 +86,8 @@ class ForwardErrorCorrection {
     RecoveredPacket();
     ~RecoveredPacket();
 
-    bool was_recovered;  // Will be true if this packet was recovered by FEC.
-    bool returned;       // True when the packet already has been returned.
+    bool was_recovered{};  // Will be true if this packet was recovered by FEC.
+    bool returned{};       // True when the packet already has been returned.
     std::shared_ptr<Packet> pkt;  // Pointer to the packet storage.
   };
 
@@ -120,11 +120,11 @@ class ForwardErrorCorrection {
     // List of media packets that this FEC packet protects.
     ProtectedPacketList protected_packets;
     // RTP header fields.
-    uint32_t ssrc;
+    uint32_t ssrc{};
     // FEC header fields.
-    size_t fec_header_size;
+    size_t fec_header_size{};
     std::vector<ProtectedStream> protected_streams;
-    size_t protection_length;
+    size_t protection_length{};
     // Raw data.
     std::shared_ptr<ForwardErrorCorrection::Packet> pkt;
   };
@@ -142,12 +142,12 @@ class ForwardErrorCorrection {
       uint32_t protected_media_ssrc);
 
   // Generates a list of FEC packets from supplied media packets.
-  int EncodeFec(const PacketList& media_packets,
-                uint8_t protection_factor,
-                int num_important_packets,
-                bool use_unequal_protection,
-                FecMaskType fec_mask_type,
-                std::list<Packet*>* fec_packets);
+  int32_t EncodeFec(const PacketList& media_packets,
+                    uint8_t protection_factor,
+                    int32_t num_important_packets,
+                    bool use_unequal_protection,
+                    FecMaskType fec_mask_type,
+                    std::list<Packet*>* fec_packets);
 
   // Decodes a list of received media and FEC packets.
   struct DecodeFecResult {
@@ -158,7 +158,8 @@ class ForwardErrorCorrection {
                             RecoveredPacketList* recovered_packets);
 
   // Get the number of generated FEC packets.
-  static int NumFecPackets(int num_media_packets, int protection_factor);
+  static int32_t NumFecPackets(int32_t num_media_packets,
+                               int32_t protection_factor);
 
   // Gets the maximum size of the FEC headers in bytes.
   size_t MaxPacketOverhead() const;
@@ -177,8 +178,8 @@ class ForwardErrorCorrection {
                          uint32_t protected_media_ssrc);
 
  private:
-  int InsertZerosInPacketMasks(const PacketList& media_packets,
-                               size_t num_fec_packets);
+  int32_t InsertZerosInPacketMasks(const PacketList& media_packets,
+                                   size_t num_fec_packets);
 
   void GenerateFecPayloads(const PacketList& media_packets,
                            size_t num_fec_packets);
@@ -220,12 +221,12 @@ class ForwardErrorCorrection {
   static bool RecoverPacket(const ReceivedFecPacket& fec_packet,
                             RecoveredPacket* recovered_packet);
 
-  static int NumCoveredPacketsMissing(const ReceivedFecPacket& fec_packet);
+  static int32_t NumCoveredPacketsMissing(const ReceivedFecPacket& fec_packet);
 
   void DiscardOldRecoveredPackets(RecoveredPacketList* recovered_packets);
 
-  bool IsOldFecPacket(const ReceivedFecPacket& fec_packet,
-                      const RecoveredPacketList* recovered_packets);
+  static bool IsOldFecPacket(const ReceivedFecPacket& fec_packet,
+                             const RecoveredPacketList* recovered_packets);
 
   [[maybe_unused]] const uint32_t ssrc_;
   const uint32_t protected_media_ssrc_;
@@ -236,8 +237,9 @@ class ForwardErrorCorrection {
   std::vector<Packet> generated_fec_packets_;
   ReceivedFecPacketList received_fec_packets_;
 
-  uint8_t packet_masks_[kUlpfecMaxMediaPackets * kUlpfecMaxPacketMaskSize];
-  uint8_t tmp_packet_masks_[kUlpfecMaxMediaPackets * kUlpfecMaxPacketMaskSize];
+  uint8_t packet_masks_[kUlpfecMaxMediaPackets * kUlpfecMaxPacketMaskSize]{};
+  uint8_t
+      tmp_packet_masks_[kUlpfecMaxMediaPackets * kUlpfecMaxPacketMaskSize]{};
   size_t packet_mask_size_;
 };
 

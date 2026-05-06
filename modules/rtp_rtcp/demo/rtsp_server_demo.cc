@@ -31,28 +31,27 @@ using ave::base::net::SocketDispatcher;
 using ave::media::rtp_rtcp::kVideoPayloadTypeFrequency;
 
 constexpr uint16_t kDefaultRtspPort = 8554;
-constexpr int kPayloadType = 96;
+constexpr int32_t kPayloadType = 96;
 constexpr uint16_t kServerRtpPort = 9000;
 constexpr uint16_t kServerRtcpPort = 9001;
 
 std::string Trim(const std::string& value) {
   size_t start = 0;
   while (start < value.size() &&
-         std::isspace(static_cast<unsigned char>(value[start]))) {
+         std::isspace(static_cast<uint8_t>(value[start]))) {
     ++start;
   }
   size_t end = value.size();
-  while (end > start &&
-         std::isspace(static_cast<unsigned char>(value[end - 1]))) {
+  while (end > start && std::isspace(static_cast<uint8_t>(value[end - 1]))) {
     --end;
   }
   return value.substr(start, end - start);
 }
 
 std::string ToLower(std::string value) {
-  std::transform(
-      value.begin(), value.end(), value.begin(),
-      [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  std::ranges::transform(value, value.begin(), [](uint8_t ch) {
+    return static_cast<char>(std::tolower(ch));
+  });
   return value;
 }
 
@@ -74,7 +73,7 @@ std::vector<std::string> SplitLines(const std::string& message) {
 struct RtspRequest {
   std::string method;
   std::string uri;
-  int cseq = 0;
+  int32_t cseq = 0;
   std::map<std::string, std::string> headers;
 };
 
@@ -146,12 +145,12 @@ std::string BuildSdp() {
                 "m=video 0 RTP/AVP %d\r\n"
                 "a=rtpmap:%d H264/%d\r\n",
                 kPayloadType, kPayloadType, kVideoPayloadTypeFrequency);
-  return std::string(buffer);
+  return {buffer};
 }
 
-std::string BuildResponse(int code,
+std::string BuildResponse(int32_t code,
                           const std::string& status,
-                          int cseq,
+                          int32_t cseq,
                           const std::vector<std::string>& headers,
                           const std::string& body) {
   std::string response =
@@ -289,19 +288,19 @@ void RtspConnection::OnClose(AsyncPacketSocket* /* socket */,
 
 void RtspConnection::HandleRequest(const RtspRequest& request) {
   const std::string method = request.method;
-  const int cseq = request.cseq;
+  const int32_t cseq = request.cseq;
   std::vector<std::string> headers;
   std::string body;
 
   if (method == "OPTIONS") {
-    headers.push_back("Public: OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN");
+    headers.emplace_back("Public: OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN");
     Send(BuildResponse(200, "OK", cseq, headers, body));
     return;
   }
 
   if (method == "DESCRIBE") {
     body = BuildSdp();
-    headers.push_back("Content-Type: application/sdp");
+    headers.emplace_back("Content-Type: application/sdp");
     headers.push_back("Content-Base: " + request.uri);
     Send(BuildResponse(200, "OK", cseq, headers, body));
     return;
@@ -345,7 +344,7 @@ void RtspConnection::HandleRequest(const RtspRequest& request) {
 
 }  // namespace
 
-int main(int argc, char* argv[]) {
+int main(int32_t argc, char* argv[]) {
   uint16_t port = kDefaultRtspPort;
   if (argc > 1) {
     port = static_cast<uint16_t>(std::atoi(argv[1]));

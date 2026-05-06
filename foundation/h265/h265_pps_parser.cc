@@ -48,9 +48,9 @@
   } while (0)
 
 namespace {
-constexpr int kMaxNumTileColumnWidth = 19;
-constexpr int kMaxNumTileRowHeight = 21;
-constexpr int kMaxRefIdxActive = 15;
+constexpr int32_t kMaxNumTileColumnWidth = 19;
+constexpr int32_t kMaxNumTileRowHeight = 21;
+constexpr int32_t kMaxRefIdxActive = 15;
 }  // namespace
 
 namespace ave {
@@ -107,7 +107,7 @@ std::optional<H265PpsParser::PpsState> H265PpsParser::ParseInternal(
   // output_flag_present_flag: u(1)
   pps.output_flag_present_flag = reader.Read<bool>();
   // num_extra_slice_header_bits: u(3)
-  pps.num_extra_slice_header_bits = reader.ReadBits(3);
+  pps.num_extra_slice_header_bits = static_cast<uint32_t>(reader.ReadBits(3));
   IN_RANGE_OR_RETURN_NULL(pps.num_extra_slice_header_bits, 0, 2);
   // sign_data_hiding_enabled_flag: u(1)
   reader.ConsumeBits(1);
@@ -212,10 +212,10 @@ std::optional<H265PpsParser::PpsState> H265PpsParser::ParseInternal(
     bool pps_deblocking_filter_disabled_flag = reader.Read<bool>();
     if (!pps_deblocking_filter_disabled_flag) {
       // pps_beta_offset_div2: se(v)
-      int pps_beta_offset_div2 = reader.ReadSignedExponentialGolomb();
+      int32_t pps_beta_offset_div2 = reader.ReadSignedExponentialGolomb();
       IN_RANGE_OR_RETURN_NULL(pps_beta_offset_div2, -6, 6);
       // pps_tc_offset_div2: se(v)
-      int pps_tc_offset_div2 = reader.ReadSignedExponentialGolomb();
+      int32_t pps_tc_offset_div2 = reader.ReadSignedExponentialGolomb();
       IN_RANGE_OR_RETURN_NULL(pps_tc_offset_div2, -6, 6);
     }
   }

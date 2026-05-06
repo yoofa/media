@@ -48,13 +48,13 @@ class TestClockCallback : public MediaClock::Callback {
   int64_t last_anchor_media_us() const { return last_anchor_media_us_; }
   int64_t last_anchor_real_us() const { return last_anchor_real_us_; }
   float last_playback_rate() const { return last_playback_rate_; }
-  int callback_count() const { return callback_count_; }
+  int32_t callback_count() const { return callback_count_; }
 
  private:
   int64_t last_anchor_media_us_ = -1;
   int64_t last_anchor_real_us_ = -1;
   float last_playback_rate_ = 1.0f;
-  int callback_count_ = 0;
+  int32_t callback_count_ = 0;
 };
 }  // namespace
 
@@ -175,7 +175,7 @@ TEST_F(MediaClockTest, RealTimeConversion) {
 TEST_F(MediaClockTest, TimerEvents) {
   media_clock_->UpdateAnchor(1000000);
 
-  int timer_count = 0;
+  int32_t timer_count = 0;
   TimerReason last_reason = TimerReason::TIMER_REASON_REACHED;
 
   // 添加定时器

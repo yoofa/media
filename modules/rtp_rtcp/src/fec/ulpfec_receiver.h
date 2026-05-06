@@ -39,12 +39,12 @@ struct FecPacketCounter {
 class UlpfecReceiver {
  public:
   UlpfecReceiver(uint32_t ssrc,
-                 int ulpfec_payload_type,
+                 int32_t ulpfec_payload_type,
                  RecoveredPacketReceiver* callback,
                  base::Clock* clock);
   ~UlpfecReceiver();
 
-  int ulpfec_payload_type() const { return ulpfec_payload_type_; }
+  int32_t ulpfec_payload_type() const { return ulpfec_payload_type_; }
 
   bool AddReceivedRedPacket(const RtpPacketReceived& rtp_packet);
 
@@ -54,7 +54,7 @@ class UlpfecReceiver {
 
  private:
   const uint32_t ssrc_;
-  const int ulpfec_payload_type_;
+  const int32_t ulpfec_payload_type_;
   base::Clock* const clock_;
 
   RecoveredPacketReceiver* const recovered_packet_callback_;

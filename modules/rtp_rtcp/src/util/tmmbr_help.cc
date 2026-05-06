@@ -10,7 +10,7 @@
 
 #include "media/modules/rtp_rtcp/src/util/tmmbr_help.h"
 
-#include <stddef.h>
+#include <cstddef>
 
 #include <algorithm>
 #include <limits>
@@ -25,22 +25,24 @@ std::vector<rtcp::TmmbItem> TMMBRHelp::FindBoundingSet(
     std::vector<rtcp::TmmbItem> candidates) {
   // Filter out candidates with 0 bitrate.
   for (auto it = candidates.begin(); it != candidates.end();) {
-    if (!it->bitrate_bps())
+    if (!it->bitrate_bps()) {
       it = candidates.erase(it);
-    else
+    } else {
       ++it;
+    }
   }
 
-  if (candidates.size() <= 1)
+  if (candidates.size() <= 1) {
     return candidates;
+  }
 
   size_t num_candidates = candidates.size();
 
   // 1. Sort by increasing packet overhead.
-  std::sort(candidates.begin(), candidates.end(),
-            [](const rtcp::TmmbItem& lhs, const rtcp::TmmbItem& rhs) {
-              return lhs.packet_overhead() < rhs.packet_overhead();
-            });
+  std::ranges::sort(candidates,
+                    [](const rtcp::TmmbItem& lhs, const rtcp::TmmbItem& rhs) {
+                      return lhs.packet_overhead() < rhs.packet_overhead();
+                    });
 
   // 2. For tuples with same overhead, keep the one with the lowest bitrate.
   for (auto it = candidates.begin(); it != candidates.end();) {
@@ -104,10 +106,10 @@ std::vector<rtcp::TmmbItem> TMMBRHelp::FindBoundingSet(
 
   // 4. Discard from candidate list all tuple with lower overhead
   // (next tuple must be steeper).
-  for (auto it = candidates.begin(); it != candidates.end(); ++it) {
-    if (it->bitrate_bps() &&
-        it->packet_overhead() < bounding_set.front().packet_overhead()) {
-      it->set_bitrate_bps(0);
+  for (auto& candidate : candidates) {
+    if (candidate.bitrate_bps() &&
+        candidate.packet_overhead() < bounding_set.front().packet_overhead()) {
+      candidate.set_bitrate_bps(0);
       --num_candidates;
     }
   }
@@ -117,10 +119,10 @@ std::vector<rtcp::TmmbItem> TMMBRHelp::FindBoundingSet(
   while (num_candidates > 0) {
     if (get_new_candidate) {
       // 5. Remove first remaining tuple from candidate list.
-      for (auto it = candidates.begin(); it != candidates.end(); ++it) {
-        if (it->bitrate_bps()) {
-          cur_candidate = *it;
-          it->set_bitrate_bps(0);
+      for (auto& candidate : candidates) {
+        if (candidate.bitrate_bps()) {
+          cur_candidate = candidate;
+          candidate.set_bitrate_bps(0);
           break;
         }
       }
@@ -179,9 +181,11 @@ uint64_t TMMBRHelp::CalcMinBitrateBps(
     const std::vector<rtcp::TmmbItem>& candidates) {
   AVE_DCHECK(!candidates.empty());
   uint64_t min_bitrate_bps = std::numeric_limits<uint64_t>::max();
-  for (const rtcp::TmmbItem& item : candidates)
-    if (item.bitrate_bps() < min_bitrate_bps)
+  for (const rtcp::TmmbItem& item : candidates) {
+    if (item.bitrate_bps() < min_bitrate_bps) {
       min_bitrate_bps = item.bitrate_bps();
+    }
+  }
   return min_bitrate_bps;
 }
 

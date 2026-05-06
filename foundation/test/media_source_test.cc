@@ -47,7 +47,7 @@ class TestSource : public MediaSource {
 }  // namespace media
 }  // namespace ave
 
-int main(int argc, char* argv[]) {
+int main(int32_t argc, char* argv[]) {
   ave::media::TestSource test_source;
   test_source.AddOrUpdateSink(nullptr, ave::media::MediaSinkWants());
   return 0;

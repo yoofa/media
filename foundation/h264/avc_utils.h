@@ -13,7 +13,7 @@
 namespace ave {
 namespace media {
 
-#define NELEM(x) ((int)(sizeof(x) / sizeof((x)[0])))
+#define NELEM(x) ((int32_t)(sizeof(x) / sizeof((x)[0])))
 
 class BitReader;
 
@@ -100,10 +100,10 @@ bool ExtractDimensionsFromVOLHeader(const uint8_t* data,
 
 bool GetMPEGAudioFrameSize(uint32_t header,
                            size_t* frame_size,
-                           int* out_sampling_rate = nullptr,
-                           int* out_channels = nullptr,
-                           int* out_bitrate = nullptr,
-                           int* out_num_samples = nullptr);
+                           int32_t* out_sampling_rate = nullptr,
+                           int32_t* out_channels = nullptr,
+                           int32_t* out_bitrate = nullptr,
+                           int32_t* out_num_samples = nullptr);
 }  // namespace media
 } /* namespace ave */
 

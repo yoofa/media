@@ -12,23 +12,23 @@
 #define AVE_MODULES_RTP_RTCP_SOURCE_BYTE_IO_H_
 
 // This file contains classes for reading and writing integer types from/to
-// byte array representations. Signed/unsigned, partial (whole byte) sizes,
+// byte array representations. Signed/uint32_t, partial (whole byte) sizes,
 // and big/little endian byte order is all supported.
 //
 // Usage examples:
 //
 // uint8_t* buffer = ...;
 //
-// // Read an unsigned 4 byte integer in big endian format
+// // Read an uint32_t 4 byte integer in big endian format
 // uint32_t val = ByteReader<uint32_t>::ReadBigEndian(buffer);
 //
-// // Read a signed 24-bit (3 byte) integer in little endian format
+// // Read a int32_t 24-bit (3 byte) integer in little endian format
 // int32_t val = ByteReader<int32_t, 3>::ReadLittle(buffer);
 //
-// // Write an unsigned 8 byte integer in little endian format
+// // Write an uint32_t 8 byte integer in little endian format
 // ByteWriter<uint64_t>::WriteLittleEndian(buffer, val);
 //
-// Write an unsigned 40-bit (5 byte) integer in big endian format
+// Write an uint32_t 40-bit (5 byte) integer in big endian format
 // ByteWriter<uint64_t, 5>::WriteBigEndian(buffer, val);
 //
 // These classes are implemented as recursive templetizations, intended to make
@@ -43,7 +43,7 @@ namespace media {
 namespace rtp_rtcp {
 
 // According to ISO C standard ISO/IEC 9899, section 6.2.6.2 (2), the three
-// representations of signed integers allowed are two's complement, one's
+// representations of int32_t integers allowed are two's complement, one's
 // complement and sign/magnitude. We can detect which is used by looking at
 // the two last bits of -1, which will be 11 in two's complement, 10 in one's
 // complement and 01 in sign/magnitude.
@@ -51,29 +51,29 @@ namespace rtp_rtcp {
 // platform that doesn't use two's complement, implement conversion to/from
 // wire format.
 
-// Assume the if any one signed integer type is two's complement, then all
+// Assume the if any one int32_t integer type is two's complement, then all
 // other will be too.
 static_assert(
     (-1 & 0x03) == 0x03,
-    "Only two's complement representation of signed integers supported.");
+    "Only two's complement representation of int32_t integers supported.");
 
 // Plain const char* won't work for static_assert, use #define instead.
 #define kSizeErrorMsg "Byte size must be less than or equal to data type size."
 
-// Utility class for getting the unsigned equivalent of a signed type.
+// Utility class for getting the uint32_t equivalent of a int32_t type.
 template <typename T>
 struct UnsignedOf;
 
 // Class for reading integers from a sequence of bytes.
-// T = type of integer, B = bytes to read, is_signed = true if signed integer.
+// T = type of integer, B = bytes to read, is_signed = true if int32_t integer.
 // If is_signed is true and B < sizeof(T), sign extension might be needed.
 template <typename T,
-          unsigned int B = sizeof(T),
+          uint32_t B = sizeof(T),
           bool is_signed = std::numeric_limits<T>::is_signed>
 class ByteReader;
 
-// Specialization of ByteReader for unsigned types.
-template <typename T, unsigned int B>
+// Specialization of ByteReader for uint32_t types.
+template <typename T, uint32_t B>
 class ByteReader<T, B, false> {
  public:
   static T ReadBigEndian(const uint8_t* data) {
@@ -89,21 +89,21 @@ class ByteReader<T, B, false> {
  private:
   static T InternalReadBigEndian(const uint8_t* data) {
     T val(0);
-    for (unsigned int i = 0; i < B; ++i)
+    for (uint32_t i = 0; i < B; ++i)
       val |= static_cast<T>(data[i]) << ((B - 1 - i) * 8);
     return val;
   }
 
   static T InternalReadLittleEndian(const uint8_t* data) {
     T val(0);
-    for (unsigned int i = 0; i < B; ++i)
+    for (uint32_t i = 0; i < B; ++i)
       val |= static_cast<T>(data[i]) << (i * 8);
     return val;
   }
 };
 
-// Specialization of ByteReader for signed types.
-template <typename T, unsigned int B>
+// Specialization of ByteReader for int32_t types.
+template <typename T, uint32_t B>
 class ByteReader<T, B, true> {
  public:
   typedef typename UnsignedOf<T>::Type U;
@@ -124,21 +124,21 @@ class ByteReader<T, B, true> {
 
  private:
   // As a hack to avoid implementation-specific or undefined behavior when
-  // bit-shifting or casting signed integers, read as a signed equivalent
-  // instead and convert to signed. This is safe since we have asserted that
+  // bit-shifting or casting int32_t integers, read as a int32_t equivalent
+  // instead and convert to int32_t. This is safe since we have asserted that
   // two's complement for is used.
   static T ReinterpretAsSigned(U unsigned_val) {
-    // An unsigned value with only the highest order bit set (ex 0x80).
+    // An uint32_t value with only the highest order bit set (ex 0x80).
     const U kUnsignedHighestBitMask = static_cast<U>(1)
                                       << ((sizeof(U) * 8) - 1);
-    // A signed value with only the highest bit set. Since this is two's
+    // A int32_t value with only the highest bit set. Since this is two's
     // complement form, we can use the min value from std::numeric_limits.
     const T kSignedHighestBitMask = std::numeric_limits<T>::min();
 
     T val;
     if ((unsigned_val & kUnsignedHighestBitMask) != 0) {
-      // Casting is only safe when unsigned value can be represented in the
-      // signed target type, so mask out highest bit and mask it back manually.
+      // Casting is only safe when uint32_t value can be represented in the
+      // int32_t target type, so mask out highest bit and mask it back manually.
       val = static_cast<T>(unsigned_val & ~kUnsignedHighestBitMask);
       val |= kSignedHighestBitMask;
     } else {
@@ -170,31 +170,31 @@ class ByteReader<T, B, true> {
 // Class for writing integers to a sequence of bytes
 // T = type of integer, B = bytes to write
 template <typename T,
-          unsigned int B = sizeof(T),
+          uint32_t B = sizeof(T),
           bool is_signed = std::numeric_limits<T>::is_signed>
 class ByteWriter;
 
-// Specialization of ByteWriter for unsigned types.
-template <typename T, unsigned int B>
+// Specialization of ByteWriter for uint32_t types.
+template <typename T, uint32_t B>
 class ByteWriter<T, B, false> {
  public:
   static void WriteBigEndian(uint8_t* data, T val) {
     static_assert(B <= sizeof(T), kSizeErrorMsg);
-    for (unsigned int i = 0; i < B; ++i) {
+    for (uint32_t i = 0; i < B; ++i) {
       data[i] = val >> ((B - 1 - i) * 8);
     }
   }
 
   static void WriteLittleEndian(uint8_t* data, T val) {
     static_assert(B <= sizeof(T), kSizeErrorMsg);
-    for (unsigned int i = 0; i < B; ++i) {
+    for (uint32_t i = 0; i < B; ++i) {
       data[i] = val >> (i * 8);
     }
   }
 };
 
-// Specialization of ByteWriter for signed types.
-template <typename T, unsigned int B>
+// Specialization of ByteWriter for int32_t types.
+template <typename T, uint32_t B>
 class ByteWriter<T, B, true> {
  public:
   typedef typename UnsignedOf<T>::Type U;
@@ -211,7 +211,7 @@ class ByteWriter<T, B, true> {
  private:
   static U ReinterpretAsUnsigned(T val) {
     // According to ISO C standard ISO/IEC 9899, section 6.3.1.3 (1, 2) a
-    // conversion from signed to unsigned keeps the value if the new type can
+    // conversion from int32_t to uint32_t keeps the value if the new type can
     // represent it, and otherwise adds one more than the max value of T until
     // the value is in range. For two's complement, this fortunately means
     // that the bit-wise value will be intact. Thus, since we have asserted that
@@ -239,7 +239,7 @@ struct UnsignedOf<int64_t> {
   typedef uint64_t Type;
 };
 
-// ----- Below follows specializations for unsigned, B in { 1, 2, 4, 8 } -----
+// ----- Below follows specializations for uint32_t, B in { 1, 2, 4, 8 } -----
 
 // TODO(sprang): Check if these actually help or if generic cases will be
 // unrolled to and optimized to similar performance.
@@ -321,7 +321,7 @@ class ByteReader<T, 4, false> {
   }
 
  private:
-  inline static T Get(const uint8_t* data, unsigned int index) {
+  inline static T Get(const uint8_t* data, uint32_t index) {
     return static_cast<T>(data[index]);
   }
 };
@@ -366,7 +366,7 @@ class ByteReader<T, 8, false> {
   }
 
  private:
-  inline static T Get(const uint8_t* data, unsigned int index) {
+  inline static T Get(const uint8_t* data, uint32_t index) {
     return static_cast<T>(data[index]);
   }
 };

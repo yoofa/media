@@ -16,10 +16,10 @@ namespace ave {
 namespace media {
 namespace rtp_rtcp {
 
-constexpr int DependencyDescriptor::kMaxSpatialIds;
-constexpr int DependencyDescriptor::kMaxTemporalIds;
-constexpr int DependencyDescriptor::kMaxTemplates;
-constexpr int DependencyDescriptor::kMaxDecodeTargets;
+constexpr int32_t DependencyDescriptor::kMaxSpatialIds;
+constexpr int32_t DependencyDescriptor::kMaxTemporalIds;
+constexpr int32_t DependencyDescriptor::kMaxTemplates;
+constexpr int32_t DependencyDescriptor::kMaxDecodeTargets;
 
 namespace impl {
 

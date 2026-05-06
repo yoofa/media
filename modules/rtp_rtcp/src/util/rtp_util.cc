@@ -47,7 +47,7 @@ bool IsRtcpPacket(std::span<const uint8_t> packet) {
          PayloadTypeIsReservedForRtcp(packet[1] & 0x7F);
 }
 
-int ParseRtpPayloadType(std::span<const uint8_t> rtp_packet) {
+int32_t ParseRtpPayloadType(std::span<const uint8_t> rtp_packet) {
   AVE_DCHECK(IsRtpPacket(rtp_packet));
   return rtp_packet[1] & 0x7F;
 }

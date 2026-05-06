@@ -51,8 +51,8 @@ inline std::string ToString(H264PacketizationMode mode) {
 
 struct NaluInfo {
   uint8_t type;
-  int sps_id;
-  int pps_id;
+  int32_t sps_id;
+  int32_t pps_id;
 
   friend bool operator==(const NaluInfo& lhs, const NaluInfo& rhs) {
     return lhs.type == rhs.type && lhs.sps_id == rhs.sps_id &&

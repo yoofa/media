@@ -30,13 +30,13 @@ class CorruptionDetectionMessage {
 
   ~CorruptionDetectionMessage() = default;
 
-  int sequence_index() const { return sequence_index_; }
+  int32_t sequence_index() const { return sequence_index_; }
   bool interpret_sequence_index_as_most_significant_bits() const {
     return interpret_sequence_index_as_most_significant_bits_;
   }
   double std_dev() const { return std_dev_; }
-  int luma_error_threshold() const { return luma_error_threshold_; }
-  int chroma_error_threshold() const { return chroma_error_threshold_; }
+  int32_t luma_error_threshold() const { return luma_error_threshold_; }
+  int32_t chroma_error_threshold() const { return chroma_error_threshold_; }
   const std::vector<double>& sample_values() const { return sample_values_; }
 
  private:
@@ -46,7 +46,7 @@ class CorruptionDetectionMessage {
 
   // Sequence index in the Halton sequence.
   // Valid values: [0, 2^7-1]
-  int sequence_index_ = 0;
+  int32_t sequence_index_ = 0;
 
   // Whether to interpret the `sequence_index_` as the most significant bits of
   // the true sequence index.
@@ -58,11 +58,11 @@ class CorruptionDetectionMessage {
 
   // Corruption threshold for the luma layer.
   // Valid values: [0, 2^4 - 1]
-  int luma_error_threshold_ = 0;
+  int32_t luma_error_threshold_ = 0;
 
   // Corruption threshold for the chroma layer.
   // Valid values: [0, 2^4 - 1]
-  int chroma_error_threshold_ = 0;
+  int32_t chroma_error_threshold_ = 0;
 
   // An ordered list of samples that are the result of applying the Gaussian
   // filter on the image. The coordinates of the samples and their layer are
@@ -108,7 +108,7 @@ class CorruptionDetectionMessage::Builder {
     return message_;
   }
 
-  Builder& WithSequenceIndex(int sequence_index) {
+  Builder& WithSequenceIndex(int32_t sequence_index) {
     message_.sequence_index_ = sequence_index;
     return *this;
   }
@@ -125,12 +125,12 @@ class CorruptionDetectionMessage::Builder {
     return *this;
   }
 
-  Builder& WithLumaErrorThreshold(int luma_error_threshold) {
+  Builder& WithLumaErrorThreshold(int32_t luma_error_threshold) {
     message_.luma_error_threshold_ = luma_error_threshold;
     return *this;
   }
 
-  Builder& WithChromaErrorThreshold(int chroma_error_threshold) {
+  Builder& WithChromaErrorThreshold(int32_t chroma_error_threshold) {
     message_.chroma_error_threshold_ = chroma_error_threshold;
     return *this;
   }

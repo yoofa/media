@@ -9,7 +9,6 @@
 #include <span>
 
 #include "base/buffer/bitstream_reader.h"
-#include "base/logging.h"
 #include "media/foundation/h265/h265_common.h"
 
 namespace ave {
@@ -38,7 +37,7 @@ std::optional<H265VpsParser::VpsState> H265VpsParser::ParseInternal(
   VpsState vps;
 
   // vps_video_parameter_set_id: u(4)
-  vps.id = reader.ReadBits(4);
+  vps.id = static_cast<uint32_t>(reader.ReadBits(4));
 
   if (!reader.Ok()) {
     return std::nullopt;

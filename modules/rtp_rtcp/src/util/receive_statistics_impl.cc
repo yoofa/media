@@ -30,7 +30,6 @@ namespace media {
 namespace rtp_rtcp {
 
 using base::Clock;
-using base::kNtpJan1970;
 using base::NtpTime;
 
 namespace {
@@ -48,7 +47,7 @@ TimeDelta UnixEpochDelta(Clock& clock) {
 
 }  // namespace
 
-StreamStatistician::~StreamStatistician() {}
+StreamStatistician::~StreamStatistician() = default;
 
 StreamStatisticianImpl::StreamStatisticianImpl(uint32_t ssrc, Clock* clock)
     : ssrc_(ssrc),
@@ -110,12 +109,14 @@ bool StreamStatisticianImpl::UpdateOutOfOrder(const RtpPacketReceived& packet,
     return true;
   }
 
-  if (sequence_number > received_seq_max_)
+  if (sequence_number > received_seq_max_) {
     return false;
+  }
 
   // Old out of order packet, may be retransmit.
-  if (enable_retransmit_detection_ && IsRetransmitOfOldPacket(packet, now))
+  if (enable_retransmit_detection_ && IsRetransmitOfOldPacket(packet, now)) {
     receive_counters_.retransmitted.AddPacket(packet);
+  }
   return true;
 }
 
@@ -161,7 +162,7 @@ void StreamStatisticianImpl::UpdateJitter(const RtpPacketReceived& packet,
   AVE_DCHECK(last_receive_time_.has_value());
   TimeDelta receive_diff = receive_time - *last_receive_time_;
   AVE_DCHECK_GE(receive_diff, TimeDelta::Zero());
-  uint32_t receive_diff_rtp =
+  auto receive_diff_rtp =
       (receive_diff * packet.payload_type_frequency()).seconds<uint32_t>();
   int32_t time_diff_samples =
       receive_diff_rtp - (packet.Timestamp() - last_received_timestamp_);
@@ -180,7 +181,7 @@ void StreamStatisticianImpl::UpdateJitter(const RtpPacketReceived& packet,
 }
 
 void StreamStatisticianImpl::ReviseFrequencyAndJitter(
-    int payload_type_frequency) {
+    int32_t payload_type_frequency) {
   if (payload_type_frequency == last_payload_type_frequency_) {
     return;
   }
@@ -191,9 +192,9 @@ void StreamStatisticianImpl::ReviseFrequencyAndJitter(
       // I.e. jitter = timestamp (s) * frequency (Hz).
       // Since the frequency has changed we have to update the number of samples
       // accordingly. The new value should rely on a new frequency.
-      jitter_q4_ = static_cast<int>(static_cast<uint64_t>(jitter_q4_) *
-                                    payload_type_frequency /
-                                    last_payload_type_frequency_);
+      jitter_q4_ = static_cast<int32_t>(static_cast<uint64_t>(jitter_q4_) *
+                                        payload_type_frequency /
+                                        last_payload_type_frequency_);
     }
     // If last_payload_type_frequency_ is not present, the jitter_q4_
     // variable has its initial value.
@@ -204,7 +205,7 @@ void StreamStatisticianImpl::ReviseFrequencyAndJitter(
 }
 
 void StreamStatisticianImpl::SetMaxReorderingThreshold(
-    int max_reordering_threshold) {
+    int32_t max_reordering_threshold) {
   max_reordering_threshold_ = max_reordering_threshold;
 }
 
@@ -255,7 +256,7 @@ void StreamStatisticianImpl::MaybeAppendReportBlockAndReset(
     stats.SetFractionLost(255 * lost_since_last / exp_since_last);
   }
 
-  int packets_lost = cumulative_loss_ + cumulative_loss_rtcp_offset_;
+  int32_t packets_lost = cumulative_loss_ + cumulative_loss_rtcp_offset_;
   if (packets_lost < 0) {
     // Clamp to zero. Work around to accommodate for senders that misbehave with
     // negative cumulative loss.
@@ -263,7 +264,7 @@ void StreamStatisticianImpl::MaybeAppendReportBlockAndReset(
     cumulative_loss_rtcp_offset_ = -cumulative_loss_;
   }
   if (packets_lost > 0x7fffff) {
-    // Packets lost is a 24 bit signed field, and thus should be clamped, as
+    // Packets lost is a 24 bit int32_t field, and thus should be clamped, as
     // described in https://datatracker.ietf.org/doc/html/rfc3550#appendix-A.3
     if (!cumulative_loss_is_capped_) {
       cumulative_loss_is_capped_ = true;
@@ -282,7 +283,8 @@ void StreamStatisticianImpl::MaybeAppendReportBlockAndReset(
   last_report_seq_max_ = received_seq_max_;
 }
 
-std::optional<int> StreamStatisticianImpl::GetFractionLostInPercent() const {
+std::optional<int32_t> StreamStatisticianImpl::GetFractionLostInPercent()
+    const {
   if (!ReceivedRtpPacket()) {
     return std::nullopt;
   }
@@ -310,7 +312,7 @@ uint32_t StreamStatisticianImpl::BitrateReceived() const {
 bool StreamStatisticianImpl::IsRetransmitOfOldPacket(
     const RtpPacketReceived& packet,
     Timestamp now) const {
-  int frequency_hz = packet.payload_type_frequency();
+  int32_t frequency_hz = packet.payload_type_frequency();
   AVE_DCHECK(last_receive_time_.has_value());
   AVE_CHECK_GT(frequency_hz, 0);
   TimeDelta time_diff = now - *last_receive_time_;
@@ -366,8 +368,9 @@ void ReceiveStatisticsImpl::OnRtpPacket(const RtpPacketReceived& packet) {
 StreamStatistician* ReceiveStatisticsImpl::GetStatistician(
     uint32_t ssrc) const {
   const auto& it = statisticians_.find(ssrc);
-  if (it == statisticians_.end())
+  if (it == statisticians_.end()) {
     return nullptr;
+  }
   return it->second.get();
 }
 
@@ -383,7 +386,7 @@ StreamStatisticianImplInterface* ReceiveStatisticsImpl::GetOrCreateStatistician(
 
 void ReceiveStatisticsImpl::SetMaxReorderingThreshold(
     uint32_t ssrc,
-    int max_reordering_threshold) {
+    int32_t max_reordering_threshold) {
   GetOrCreateStatistician(ssrc)->SetMaxReorderingThreshold(
       max_reordering_threshold);
 }

@@ -52,7 +52,7 @@ constexpr size_t kMinAudioPaddingLength = 50;
 constexpr size_t kRtpHeaderLength = 12;
 
 // Min size needed to get payload padding from packet history.
-constexpr int kMinPayloadPaddingBytes = 50;
+constexpr int32_t kMinPayloadPaddingBytes = 50;
 
 // Determines how much larger a payload padding packet may be, compared to the
 // requested padding size.
@@ -96,8 +96,8 @@ constexpr RtpExtensionSize kVideoExtensionSizes[] = {
     CreateMaxExtensionSize<RtpStreamId>(),
     CreateMaxExtensionSize<RepairedRtpStreamId>(),
     CreateMaxExtensionSize<RtpMid>(),
-    {RtpGenericFrameDescriptorExtension00::kId,
-     RtpGenericFrameDescriptorExtension00::kMaxSizeBytes},
+    {.type = RtpGenericFrameDescriptorExtension00::kId,
+     .value_size = RtpGenericFrameDescriptorExtension00::kMaxSizeBytes},
 };
 
 // Size info for header extensions that might be used in audio packets.
@@ -190,27 +190,24 @@ RTPSender::RTPSender(base::Clock* clock,
 RTPSender::~RTPSender() = default;
 
 std::span<const RtpExtensionSize> RTPSender::FecExtensionSizes() {
-  return std::span<const RtpExtensionSize>(
-      kFecOrPaddingExtensionSizes, arraysize(kFecOrPaddingExtensionSizes));
+  return {kFecOrPaddingExtensionSizes, arraysize(kFecOrPaddingExtensionSizes)};
 }
 
 std::span<const RtpExtensionSize> RTPSender::VideoExtensionSizes() {
-  return std::span<const RtpExtensionSize>(kVideoExtensionSizes,
-                                           arraysize(kVideoExtensionSizes));
+  return {kVideoExtensionSizes, arraysize(kVideoExtensionSizes)};
 }
 
 std::span<const RtpExtensionSize> RTPSender::AudioExtensionSizes() {
-  return std::span<const RtpExtensionSize>(kAudioExtensionSizes,
-                                           arraysize(kAudioExtensionSizes));
+  return {kAudioExtensionSizes, arraysize(kAudioExtensionSizes)};
 }
 
 void RTPSender::SetExtmapAllowMixed(bool extmap_allow_mixed) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   rtp_header_extension_map_.SetExtmapAllowMixed(extmap_allow_mixed);
 }
 
-bool RTPSender::RegisterRtpHeaderExtension(std::string_view uri, int id) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+bool RTPSender::RegisterRtpHeaderExtension(std::string_view uri, int32_t id) {
+  std::scoped_lock lock(send_mutex_);
   bool registered = rtp_header_extension_map_.RegisterByUri(id, uri);
   supports_bwe_extension_ = HasBweExtension(rtp_header_extension_map_);
   UpdateHeaderSizes();
@@ -218,12 +215,12 @@ bool RTPSender::RegisterRtpHeaderExtension(std::string_view uri, int id) {
 }
 
 bool RTPSender::IsRtpHeaderExtensionRegistered(RTPExtensionType type) const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   return rtp_header_extension_map_.IsRegistered(type);
 }
 
 void RTPSender::DeregisterRtpHeaderExtension(std::string_view uri) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   rtp_header_extension_map_.Deregister(uri);
   supports_bwe_extension_ = HasBweExtension(rtp_header_extension_map_);
   UpdateHeaderSizes();
@@ -232,7 +229,7 @@ void RTPSender::DeregisterRtpHeaderExtension(std::string_view uri) {
 void RTPSender::SetMaxRtpPacketSize(size_t max_packet_size) {
   AVE_DCHECK(max_packet_size >= 100);
   AVE_DCHECK(max_packet_size <= IP_PACKET_SIZE);
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   max_packet_size_ = max_packet_size;
 }
 
@@ -240,8 +237,8 @@ size_t RTPSender::MaxRtpPacketSize() const {
   return max_packet_size_;
 }
 
-void RTPSender::SetRtxStatus(int mode) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+void RTPSender::SetRtxStatus(int32_t mode) {
+  std::scoped_lock lock(send_mutex_);
   if (mode != kRtxOff &&
       (!rtx_ssrc_.has_value() || rtx_payload_type_map_.empty())) {
     AVE_LOG(LS_ERROR)
@@ -251,14 +248,14 @@ void RTPSender::SetRtxStatus(int mode) {
   rtx_ = mode;
 }
 
-int RTPSender::RtxStatus() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+int32_t RTPSender::RtxStatus() const {
+  std::scoped_lock lock(send_mutex_);
   return rtx_;
 }
 
-void RTPSender::SetRtxPayloadType(int payload_type,
-                                  int associated_payload_type) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+void RTPSender::SetRtxPayloadType(int32_t payload_type,
+                                  int32_t associated_payload_type) {
+  std::scoped_lock lock(send_mutex_);
   AVE_DCHECK(payload_type <= 127);
   AVE_DCHECK(associated_payload_type <= 127);
   if (payload_type < 0) {
@@ -312,7 +309,7 @@ int32_t RTPSender::ReSendPacket(uint16_t packet_id) {
 }
 
 void RTPSender::OnReceivedAckOnSsrc(int64_t) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   bool update_required = !ssrc_has_acked_;
   ssrc_has_acked_ = true;
   if (update_required) {
@@ -321,7 +318,7 @@ void RTPSender::OnReceivedAckOnSsrc(int64_t) {
 }
 
 void RTPSender::OnReceivedAckOnRtxSsrc(int64_t) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   bool update_required = !rtx_ssrc_has_acked_;
   rtx_ssrc_has_acked_ = true;
   if (update_required) {
@@ -344,12 +341,12 @@ void RTPSender::OnReceivedNack(
 }
 
 bool RTPSender::SupportsPadding() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   return sending_media_ && supports_bwe_extension_;
 }
 
 bool RTPSender::SupportsRtxPayloadPadding() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   return sending_media_ && supports_bwe_extension_ &&
          (rtx_ & kRtxRedundantPayloads);
 }
@@ -366,7 +363,7 @@ std::vector<std::unique_ptr<RtpPacketToSend>> RTPSender::GeneratePadding(
           packet_history_->GetPayloadPaddingPacket(
               [&](const RtpPacketToSend& packet)
                   -> std::unique_ptr<RtpPacketToSend> {
-                const size_t max_overshoot_bytes = static_cast<size_t>(
+                const auto max_overshoot_bytes = static_cast<size_t>(
                     ((kMaxPaddingSizeFactor - 1.0) * target_size_bytes) + 0.5);
                 if (packet.payload_size() + kRtxHeaderSize >
                     max_overshoot_bytes + bytes_left) {
@@ -383,12 +380,12 @@ std::vector<std::unique_ptr<RtpPacketToSend>> RTPSender::GeneratePadding(
     }
   }
 
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   if (!sending_media_) {
     return {};
   }
 
-  size_t padding_bytes_in_packet;
+  size_t padding_bytes_in_packet = 0;
   const size_t max_payload_size =
       max_packet_size_ - max_padding_fec_packet_header_;
   if (audio_configured_) {
@@ -463,18 +460,18 @@ void RTPSender::EnqueuePackets(
 }
 
 size_t RTPSender::FecOrPaddingPacketMaxRtpHeaderLength() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   return max_padding_fec_packet_header_;
 }
 
 size_t RTPSender::ExpectedPerPacketOverhead() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   return max_media_packet_header_;
 }
 
 std::unique_ptr<RtpPacketToSend> RTPSender::AllocatePacket(
     std::span<const uint32_t> csrcs) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   AVE_DCHECK(csrcs.size() <= kRtpCsrcSize);
   if (csrcs.size() > max_num_csrcs_) {
     max_num_csrcs_ = csrcs.size();
@@ -500,13 +497,13 @@ std::unique_ptr<RtpPacketToSend> RTPSender::AllocatePacket(
 }
 
 size_t RTPSender::RtxPacketOverhead() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   if (rtx_ == kRtxOff) {
     return 0;
   }
   size_t overhead = 0;
   if (!always_send_mid_and_rid_ && (!rtx_ssrc_has_acked_ && ssrc_has_acked_)) {
-    static constexpr int kRtpExtensionHeaderSize = 2;
+    static constexpr int32_t kRtpExtensionHeaderSize = 2;
     if (!mid_.empty()) {
       overhead += (kRtpExtensionHeaderSize + mid_.size());
     }
@@ -520,12 +517,12 @@ size_t RTPSender::RtxPacketOverhead() const {
 }
 
 void RTPSender::SetSendingMediaStatus(bool enabled) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   sending_media_ = enabled;
 }
 
 bool RTPSender::SendingMedia() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   return sending_media_;
 }
 
@@ -534,17 +531,17 @@ bool RTPSender::IsAudioConfigured() const {
 }
 
 void RTPSender::SetTimestampOffset(uint32_t timestamp) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   timestamp_offset_ = timestamp;
 }
 
 uint32_t RTPSender::TimestampOffset() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   return timestamp_offset_;
 }
 
 void RTPSender::SetMid(std::string_view mid) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   AVE_DCHECK(mid.length() <= RtpMid::kMaxValueSizeBytes);
   mid_ = std::string(mid);
   UpdateHeaderSizes();
@@ -556,7 +553,7 @@ static void CopyHeaderAndExtensionsToRtxPacket(const RtpPacketToSend& packet,
   rtx_packet->SetTimestamp(packet.Timestamp());
   auto csrcs = packet.Csrcs();
   rtx_packet->SetCsrcs(std::span<const uint32_t>(csrcs.data(), csrcs.size()));
-  for (int extension_num = kRtpExtensionNone + 1;
+  for (int32_t extension_num = kRtpExtensionNone + 1;
        extension_num < kRtpExtensionNumberOfExtensions; ++extension_num) {
     auto extension = static_cast<RTPExtensionType>(extension_num);
     if (extension == kRtpExtensionMid ||
@@ -580,14 +577,16 @@ std::unique_ptr<RtpPacketToSend> RTPSender::BuildRtxPacket(
     const RtpPacketToSend& packet) {
   std::unique_ptr<RtpPacketToSend> rtx_packet;
   {
-    std::lock_guard<std::mutex> lock(send_mutex_);
-    if (!sending_media_)
+    std::scoped_lock lock(send_mutex_);
+    if (!sending_media_) {
       return nullptr;
+    }
 
     AVE_DCHECK(rtx_ssrc_);
     auto kv = rtx_payload_type_map_.find(packet.PayloadType());
-    if (kv == rtx_payload_type_map_.end())
+    if (kv == rtx_payload_type_map_.end()) {
       return nullptr;
+    }
 
     rtx_packet = std::make_unique<RtpPacketToSend>(&rtp_header_extension_map_,
                                                    max_packet_size_);
@@ -618,14 +617,14 @@ std::unique_ptr<RtpPacketToSend> RTPSender::BuildRtxPacket(
 }
 
 void RTPSender::SetRtpState(const RtpState& rtp_state) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   timestamp_offset_ = rtp_state.start_timestamp;
   ssrc_has_acked_ = rtp_state.ssrc_has_acked;
   UpdateHeaderSizes();
 }
 
 RtpState RTPSender::GetRtpState() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   RtpState state;
   state.start_timestamp = timestamp_offset_;
   state.ssrc_has_acked = ssrc_has_acked_;
@@ -633,12 +632,12 @@ RtpState RTPSender::GetRtpState() const {
 }
 
 void RTPSender::SetRtxRtpState(const RtpState& rtp_state) {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   rtx_ssrc_has_acked_ = rtp_state.ssrc_has_acked;
 }
 
 RtpState RTPSender::GetRtxRtpState() const {
-  std::lock_guard<std::mutex> lock(send_mutex_);
+  std::scoped_lock lock(send_mutex_);
   RtpState state;
   state.start_timestamp = timestamp_offset_;
   state.ssrc_has_acked = rtx_ssrc_has_acked_;
@@ -657,7 +656,7 @@ void RTPSender::UpdateHeaderSizes() {
       (always_send_mid_and_rid_ || !rtx_ssrc_has_acked_);
   const bool send_mid_rid = always_send_mid_and_rid_ || !ssrc_has_acked_;
   std::vector<RtpExtensionSize> non_volatile_extensions;
-  for (auto& extension :
+  for (const auto& extension :
        audio_configured_ ? AudioExtensionSizes() : VideoExtensionSizes()) {
     if (IsNonVolatile(extension.type)) {
       switch (extension.type) {

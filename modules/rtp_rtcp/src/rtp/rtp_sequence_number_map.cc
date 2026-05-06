@@ -54,7 +54,7 @@ void RtpSequenceNumberMap::InsertPacket(uint16_t sequence_number, Info info) {
     return;
   }
 
-  std::deque<Association>::iterator erase_to = associations_.begin();
+  auto erase_to = associations_.begin();
 
   AVE_DCHECK_LE(associations_.size(), max_entries_);
   if (associations_.size() == max_entries_) {

@@ -16,8 +16,8 @@ namespace ave {
 namespace media {
 namespace rtp_rtcp {
 
-int Leb128Size(uint64_t value) {
-  int size = 0;
+int32_t Leb128Size(uint64_t value) {
+  int32_t size = 0;
   while (value >= 0x80) {
     ++size;
     value >>= 7;
@@ -27,7 +27,7 @@ int Leb128Size(uint64_t value) {
 
 uint64_t ReadLeb128(const uint8_t*& read_at, const uint8_t* end) {
   uint64_t value = 0;
-  int fill_bits = 0;
+  int32_t fill_bits = 0;
   while (read_at != end && fill_bits < 64 - 7) {
     uint8_t leb128_byte = *read_at;
     value |= uint64_t{leb128_byte & 0x7Fu} << fill_bits;
@@ -50,8 +50,8 @@ uint64_t ReadLeb128(const uint8_t*& read_at, const uint8_t* end) {
   return 0;
 }
 
-int WriteLeb128(uint64_t value, uint8_t* buffer) {
-  int size = 0;
+int32_t WriteLeb128(uint64_t value, uint8_t* buffer) {
+  int32_t size = 0;
   while (value >= 0x80) {
     buffer[size] = 0x80 | (value & 0x7F);
     ++size;

@@ -7,6 +7,8 @@
 
 #include "hevc_utils.h"
 
+#include <utility>
+
 #include "base/checks.h"
 #include "base/logging.h"
 
@@ -193,13 +195,13 @@ status_t HevcParameterSets::parseSps(const uint8_t* data, size_t size) {
     bool subLayerProfilePresentFlag[8]{};
     bool subLayerLevelPresentFlag[8]{};
     // NOLINTEND(modernize-avoid-c-arrays)
-    for (int i = 0; i < maxSubLayersMinus1; ++i) {
+    for (int32_t i = 0; std::cmp_less(i, maxSubLayersMinus1); ++i) {
       subLayerProfilePresentFlag[i] = reader.getBitsWithFallback(1, 0);
       subLayerLevelPresentFlag[i] = reader.getBitsWithFallback(1, 0);
     }
     // Skip reserved
     reader.skipBits(2 * (8 - maxSubLayersMinus1));
-    for (int i = 0; i < maxSubLayersMinus1; ++i) {
+    for (int32_t i = 0; std::cmp_less(i, maxSubLayersMinus1); ++i) {
       if (subLayerProfilePresentFlag[i]) {
         // Skip profile
         reader.skipBits(88);
@@ -393,13 +395,13 @@ void HevcParameterSets::FindHEVCDimensions(
     bool subLayerProfilePresentFlag[8]{};
     bool subLayerLevelPresentFlag[8]{};
     // NOLINTEND(modernize-avoid-c-arrays)
-    for (int i = 0; i < maxSubLayersMinus1; ++i) {
+    for (int32_t i = 0; std::cmp_less(i, maxSubLayersMinus1); ++i) {
       subLayerProfilePresentFlag[i] = reader.getBitsWithFallback(1, 0);
       subLayerLevelPresentFlag[i] = reader.getBitsWithFallback(1, 0);
     }
     // Skip reserved
     reader.skipBits(2 * (8 - maxSubLayersMinus1));
-    for (int i = 0; i < maxSubLayersMinus1; ++i) {
+    for (int32_t i = 0; std::cmp_less(i, maxSubLayersMinus1); ++i) {
       if (subLayerProfilePresentFlag[i]) {
         // Skip profile
         reader.skipBits(88);

@@ -16,10 +16,10 @@ namespace ave {
 namespace media {
 namespace rtp_rtcp {
 
-constexpr int kDefaultMaxReorderingThreshold = 50;  // In sequence numbers.
-constexpr int kRtcpMaxNackFields = 253;
+constexpr int32_t kDefaultMaxReorderingThreshold = 50;  // In sequence numbers.
+constexpr int32_t kRtcpMaxNackFields = 253;
 
-constexpr int RTCP_MAX_REPORT_BLOCKS = 31;  // RFC 3550 page 37
+constexpr int32_t RTCP_MAX_REPORT_BLOCKS = 31;  // RFC 3550 page 37
 
 }  // namespace rtp_rtcp
 }  // namespace media

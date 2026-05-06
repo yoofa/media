@@ -171,9 +171,9 @@ struct ColorUtils {
 
   // it returns the platform color configs from given |dataspace|.
   // static void getColorConfigFromDataSpace(const android_dataspace& dataspace,
-  //                                        int* range,
-  //                                        int* standard,
-  //                                        int* transfer);
+  //                                        int32_t* range,
+  //                                        int32_t* standard,
+  //                                        int32_t* transfer);
 
   // converts |dataSpace| to a V0 enum, and returns true if dataSpace is an
   // aspect-only value
@@ -189,9 +189,9 @@ struct ColorUtils {
 
   // finds color config in format, defaulting them to 0.
   static void getColorConfigFromFormat(const std::shared_ptr<Message>& format,
-                                       int* range,
-                                       int* standard,
-                                       int* transfer);
+                                       int32_t* range,
+                                       int32_t* standard,
+                                       int32_t* transfer);
 
   // copies existing color config from |source| to |target|.
   static void copyColorConfig(const std::shared_ptr<Message>& source,

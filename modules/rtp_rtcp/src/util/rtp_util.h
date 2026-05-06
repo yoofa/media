@@ -24,7 +24,7 @@ bool IsRtpPacket(std::span<const uint8_t> packet);
 
 // Returns base rtp header fields of the rtp packet.
 // Behaviour is undefined when `!IsRtpPacket(rtp_packet)`.
-int ParseRtpPayloadType(std::span<const uint8_t> rtp_packet);
+int32_t ParseRtpPayloadType(std::span<const uint8_t> rtp_packet);
 uint16_t ParseRtpSequenceNumber(std::span<const uint8_t> rtp_packet);
 uint32_t ParseRtpSsrc(std::span<const uint8_t> rtp_packet);
 

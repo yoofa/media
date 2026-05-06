@@ -81,14 +81,14 @@ class RTCPReceiver final {
       return round_trip_time_;
     }
     TimeDelta total_round_trip_time() const { return total_round_trip_time_; }
-    int round_trip_time_measurements() const {
+    int32_t round_trip_time_measurements() const {
       return round_trip_time_measurements_;
     }
 
    private:
     std::optional<TimeDelta> round_trip_time_;
     TimeDelta total_round_trip_time_ = TimeDelta::Zero();
-    int round_trip_time_measurements_ = 0;
+    int32_t round_trip_time_measurements_ = 0;
   };
 
   RTCPReceiver(base::Clock* clock,
@@ -263,16 +263,16 @@ class RTCPReceiver final {
   bool HandleNack(const rtcp::CommonHeader& rtcp_block,
                   PacketInformation* packet_information);
 
-  bool HandleApp(const rtcp::CommonHeader& rtcp_block,
-                 PacketInformation* packet_information);
+  static bool HandleApp(const rtcp::CommonHeader& rtcp_block,
+                        PacketInformation* packet_information);
 
   bool HandleBye(const rtcp::CommonHeader& rtcp_block);
 
   bool HandlePli(const rtcp::CommonHeader& rtcp_block,
                  PacketInformation* packet_information);
 
-  void HandlePsfbApp(const rtcp::CommonHeader& rtcp_block,
-                     PacketInformation* packet_information);
+  static void HandlePsfbApp(const rtcp::CommonHeader& rtcp_block,
+                            PacketInformation* packet_information);
 
   bool HandleTmmbr(const rtcp::CommonHeader& rtcp_block,
                    PacketInformation* packet_information);
@@ -280,17 +280,18 @@ class RTCPReceiver final {
   bool HandleTmmbn(const rtcp::CommonHeader& rtcp_block,
                    PacketInformation* packet_information);
 
-  bool HandleSrReq(const rtcp::CommonHeader& rtcp_block,
-                   PacketInformation* packet_information);
+  static bool HandleSrReq(const rtcp::CommonHeader& rtcp_block,
+                          PacketInformation* packet_information);
 
   bool HandleFir(const rtcp::CommonHeader& rtcp_block,
                  PacketInformation* packet_information);
 
-  void HandleTransportFeedback(const rtcp::CommonHeader& rtcp_block,
-                               PacketInformation* packet_information);
+  static void HandleTransportFeedback(const rtcp::CommonHeader& rtcp_block,
+                                      PacketInformation* packet_information);
 
-  bool HandleCongestionControlFeedback(const rtcp::CommonHeader& rtcp_block,
-                                       PacketInformation* packet_information);
+  static bool HandleCongestionControlFeedback(
+      const rtcp::CommonHeader& rtcp_block,
+      PacketInformation* packet_information);
 
   bool RtcpRrTimeoutLocked(Timestamp now);
   bool RtcpRrSequenceNumberTimeoutLocked(Timestamp now);

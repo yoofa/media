@@ -100,9 +100,9 @@ class RtcpPacket {
                            uint8_t* buffer,
                            size_t* pos);
 
-  bool OnBufferFull(uint8_t* packet,
-                    size_t* index,
-                    PacketReadyCallback callback) const;
+  static bool OnBufferFull(uint8_t* packet,
+                           size_t* index,
+                           PacketReadyCallback callback);
   // Size of the rtcp packet as written in header.
   size_t HeaderLength() const;
 

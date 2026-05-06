@@ -36,7 +36,7 @@ class RtpDependencyDescriptorWriter {
 
   // Returns minimum number of bits needed to serialize descriptor with respect
   // to the `structure`. Returns 0 if `descriptor` can't be serialized.
-  int ValueSizeBits() const;
+  int32_t ValueSizeBits() const;
 
  private:
   // Used both as pointer to the template and as index in the templates vector.
@@ -48,9 +48,9 @@ class RtpDependencyDescriptorWriter {
     bool need_custom_chains;
     // Size in bits to store frame-specific details, i.e.
     // excluding mandatory fields and template dependency structure.
-    int extra_size_bits;
+    int32_t extra_size_bits;
   };
-  int StructureSizeBits() const;
+  int32_t StructureSizeBits() const;
   TemplateMatch CalculateMatch(TemplateIterator frame_template) const;
   void FindBestTemplate();
   bool ShouldWriteActiveDecodeTargetsBitmask() const;

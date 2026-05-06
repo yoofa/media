@@ -68,7 +68,7 @@ class RTPSender {
   void SetExtmapAllowMixed(bool extmap_allow_mixed);
 
   // RTP header extension
-  bool RegisterRtpHeaderExtension(std::string_view uri, int id);
+  bool RegisterRtpHeaderExtension(std::string_view uri, int32_t id);
   bool IsRtpHeaderExtensionRegistered(RTPExtensionType type) const;
   void DeregisterRtpHeaderExtension(std::string_view uri);
 
@@ -91,14 +91,14 @@ class RTPSender {
   void OnReceivedAckOnRtxSsrc(int64_t extended_highest_sequence_number);
 
   // RTX.
-  void SetRtxStatus(int mode);
-  int RtxStatus() const;
+  void SetRtxStatus(int32_t mode);
+  int32_t RtxStatus() const;
   std::optional<uint32_t> RtxSsrc() const { return rtx_ssrc_; }
   // Returns expected size difference between an RTX packet and media packet
   // that RTX packet is created from. Returns 0 if RTX is disabled.
   size_t RtxPacketOverhead() const;
 
-  void SetRtxPayloadType(int payload_type, int associated_payload_type);
+  void SetRtxPayloadType(int32_t payload_type, int32_t associated_payload_type);
 
   // Size info for header extensions used by FEC packets.
   static std::span<const RtpExtensionSize> FecExtensionSizes();
@@ -162,8 +162,8 @@ class RTPSender {
   size_t max_packet_size_;
 
   RtpHeaderExtensionMap rtp_header_extension_map_;
-  size_t max_media_packet_header_;
-  size_t max_padding_fec_packet_header_;
+  size_t max_media_packet_header_{};
+  size_t max_padding_fec_packet_header_{};
 
   // RTP variables
   uint32_t timestamp_offset_;
@@ -179,7 +179,7 @@ class RTPSender {
   bool rtx_ssrc_has_acked_;
   // Maximum number of csrcs this sender is used with.
   size_t max_num_csrcs_ = 0;
-  int rtx_;
+  int32_t rtx_;
   // Mapping rtx_payload_type_map_[associated] = rtx.
   std::map<int8_t, int8_t> rtx_payload_type_map_;
   bool supports_bwe_extension_;

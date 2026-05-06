@@ -7,8 +7,8 @@
 
 #include "media/modules/rtp_rtcp/src/video/rtp_packetizer_av1.h"
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 #include <algorithm>
 
@@ -23,15 +23,15 @@ namespace ave {
 namespace media {
 namespace rtp_rtcp {
 namespace {
-constexpr int kAggregationHeaderSize = 1;
+constexpr int32_t kAggregationHeaderSize = 1;
 // when there are 3 or less OBU (fragments) in a packet, size of the last one
 // can be omited.
-constexpr int kMaxNumObusToOmitSize = 3;
+constexpr int32_t kMaxNumObusToOmitSize = 3;
 constexpr uint8_t kObuSizePresentBit = 0b0'0000'010;
-constexpr int kObuTypeSequenceHeader = 1;
-constexpr int kObuTypeTemporalDelimiter = 2;
-constexpr int kObuTypeTileList = 8;
-constexpr int kObuTypePadding = 15;
+constexpr int32_t kObuTypeSequenceHeader = 1;
+constexpr int32_t kObuTypeTemporalDelimiter = 2;
+constexpr int32_t kObuTypeTileList = 8;
+constexpr int32_t kObuTypePadding = 15;
 
 // Overhead introduced by "even distribution" of packet sizes.
 constexpr size_t kBytesOverheadEvenDistribution = 1;
@@ -47,18 +47,18 @@ bool ObuHasSize(uint8_t obu_header) {
   return obu_header & kObuSizePresentBit;
 }
 
-int ObuType(uint8_t obu_header) {
+int32_t ObuType(uint8_t obu_header) {
   return (obu_header & 0b0'1111'000) >> 3;
 }
 
 // Given `remaining_bytes` free bytes left in a packet, returns max size of an
 // OBU fragment that can fit into the packet.
 // i.e. MaxFragmentSize + Leb128Size(MaxFragmentSize) <= remaining_bytes.
-int MaxFragmentSize(int remaining_bytes) {
+int32_t MaxFragmentSize(int32_t remaining_bytes) {
   if (remaining_bytes <= 1) {
     return 0;
   }
-  for (int i = 1;; ++i) {
+  for (int32_t i = 1;; ++i) {
     if (remaining_bytes < (1 << 7 * i) + i) {
       return remaining_bytes - i;
     }
@@ -116,7 +116,7 @@ std::vector<RtpPacketizerAv1::Obu> RtpPacketizerAv1::ParseObus(
     }
     obu.size += obu.payload.size();
     // Skip obus that shouldn't be transfered over rtp.
-    int obu_type = ObuType(obu.header);
+    int32_t obu_type = ObuType(obu.header);
     if (obu_type != kObuTypeTemporalDelimiter &&  //
         obu_type != kObuTypeTileList &&           //
         obu_type != kObuTypePadding) {
@@ -126,7 +126,7 @@ std::vector<RtpPacketizerAv1::Obu> RtpPacketizerAv1::ParseObus(
   return result;
 }
 
-int RtpPacketizerAv1::AdditionalBytesForPreviousObuElement(
+int32_t RtpPacketizerAv1::AdditionalBytesForPreviousObuElement(
     const Packet& packet) {
   if (packet.packet_size == 0) {
     // Packet is still empty => no last OBU element, no need to reserve space
@@ -167,7 +167,7 @@ std::vector<RtpPacketizerAv1::Packet> RtpPacketizerAv1::Packetize(
   // considering next one. That would normally cause uneven distribution across
   // packets, specifically last one would be generally smaller.
   packets.emplace_back(/*first_obu_index=*/0);
-  int packet_remaining_bytes =
+  int32_t packet_remaining_bytes =
       limits.max_payload_len - limits.first_packet_reduction_len;
   for (size_t obu_index = 0; obu_index < obus.size(); ++obu_index) {
     const bool is_last_obu = obu_index == obus.size() - 1;
@@ -177,9 +177,9 @@ std::vector<RtpPacketizerAv1::Packet> RtpPacketizerAv1::Packetize(
     // that packet not last. All not last OBU elements must be prepend with the
     // element length. AdditionalBytesForPreviousObuElement calculates how many
     // bytes are needed to store that length.
-    int previous_obu_extra_size =
+    int32_t previous_obu_extra_size =
         AdditionalBytesForPreviousObuElement(packets.back());
-    int min_required_size =
+    int32_t min_required_size =
         packets.back().num_obu_elements >= kMaxNumObusToOmitSize ? 2 : 1;
     if (packet_remaining_bytes < previous_obu_extra_size + min_required_size) {
       // Start a new packet.
@@ -196,11 +196,11 @@ std::vector<RtpPacketizerAv1::Packet> RtpPacketizerAv1::Packetize(
     bool must_write_obu_element_size =
         packet.num_obu_elements > kMaxNumObusToOmitSize;
     // Can fit all of the obu into the packet?
-    int required_bytes = obu.size;
+    int32_t required_bytes = obu.size;
     if (must_write_obu_element_size) {
       required_bytes += Leb128Size(obu.size);
     }
-    int available_bytes = packet_remaining_bytes;
+    int32_t available_bytes = packet_remaining_bytes;
     if (is_last_obu) {
       // If this packet would be the last packet, available size is smaller.
       if (packets.size() == 1) {
@@ -219,14 +219,15 @@ std::vector<RtpPacketizerAv1::Packet> RtpPacketizerAv1::Packetize(
     }
 
     // Fragment the obu.
-    int max_first_fragment_size = must_write_obu_element_size
-                                      ? MaxFragmentSize(packet_remaining_bytes)
-                                      : packet_remaining_bytes;
+    int32_t max_first_fragment_size =
+        must_write_obu_element_size ? MaxFragmentSize(packet_remaining_bytes)
+                                    : packet_remaining_bytes;
     // Because available_bytes might be different than
     // packet_remaining_bytes it might happen that max_first_fragment_size >=
     // obu.size. Also, since checks above verified `obu` should not be put
     // completely into the `packet`, leave at least 1 byte for later packet.
-    int first_fragment_size = std::min(obu.size - 1, max_first_fragment_size);
+    int32_t first_fragment_size =
+        std::min(obu.size - 1, max_first_fragment_size);
     if (first_fragment_size == 0) {
       // Rather than writing 0-size element at the tail of the packet,
       // 'uninsert' the `obu` from the `packet`.
@@ -245,7 +246,7 @@ std::vector<RtpPacketizerAv1::Packet> RtpPacketizerAv1::Packetize(
     // - one obu per packet imply no need to store the size of the obu.
     // - this packets are nor the first nor the last packets of the frame, so
     // packet capacity is always limits.max_payload_len.
-    int obu_offset;
+    int32_t obu_offset = 0;
     for (obu_offset = first_fragment_size;
          obu_offset + limits.max_payload_len < obu.size;
          obu_offset += limits.max_payload_len) {
@@ -253,13 +254,13 @@ std::vector<RtpPacketizerAv1::Packet> RtpPacketizerAv1::Packetize(
       Packet& middle_packet = packets.back();
       middle_packet.num_obu_elements = 1;
       middle_packet.first_obu_offset = obu_offset;
-      int middle_fragment_size = limits.max_payload_len;
+      int32_t middle_fragment_size = limits.max_payload_len;
       middle_packet.last_obu_size = middle_fragment_size;
       middle_packet.packet_size = middle_fragment_size;
     }
 
     // Add the last fragment of the obu.
-    int last_fragment_size = obu.size - obu_offset;
+    int32_t last_fragment_size = obu.size - obu_offset;
     // Check for corner case where last fragment of the last obu is too large
     // to fit into last packet, but may fully fit into semi-last packet.
     if (is_last_obu &&
@@ -269,7 +270,7 @@ std::vector<RtpPacketizerAv1::Packet> RtpPacketizerAv1::Packetize(
       AVE_DCHECK_GE(last_fragment_size, 2);
       // Try to even packet sizes rather than payload sizes across the last
       // two packets.
-      int semi_last_fragment_size =
+      int32_t semi_last_fragment_size =
           (last_fragment_size + limits.last_packet_reduction_len) / 2;
       // But leave at least one payload byte for the last packet to avoid
       // weird scenarios where size of the fragment is zero and rtp payload has
@@ -310,7 +311,7 @@ std::vector<RtpPacketizerAv1::Packet> RtpPacketizerAv1::PacketizeAboutEqually(
   for (const auto& packet : packets) {
     // Every packet has to have an aggregation header of size
     // kAggregationHeaderSize.
-    int available_bytes = limits.max_payload_len - kAggregationHeaderSize;
+    int32_t available_bytes = limits.max_payload_len - kAggregationHeaderSize;
 
     if (packet_index == 0) {
       available_bytes -= limits.first_packet_reduction_len;
@@ -352,21 +353,24 @@ uint8_t RtpPacketizerAv1::AggregationHeader() const {
 
   // Set Z flag: first obu element is continuation of the previous OBU.
   bool first_obu_element_is_fragment = packet.first_obu_offset > 0;
-  if (first_obu_element_is_fragment)
+  if (first_obu_element_is_fragment) {
     aggregation_header |= (1 << 7);
+  }
 
   // Set Y flag: last obu element will be continuated in the next packet.
-  int last_obu_offset =
+  int32_t last_obu_offset =
       packet.num_obu_elements == 1 ? packet.first_obu_offset : 0;
   bool last_obu_is_fragment =
       last_obu_offset + packet.last_obu_size <
       obus_[packet.first_obu + packet.num_obu_elements - 1].size;
-  if (last_obu_is_fragment)
+  if (last_obu_is_fragment) {
     aggregation_header |= (1 << 6);
+  }
 
   // Set W field: number of obu elements in the packet (when not too large).
-  if (packet.num_obu_elements <= kMaxNumObusToOmitSize)
+  if (packet.num_obu_elements <= kMaxNumObusToOmitSize) {
     aggregation_header |= packet.num_obu_elements << 4;
+  }
 
   // Set N flag: beginning of a new coded video sequence.
   // Encoder may produce key frame without a sequence header, thus double check
@@ -398,9 +402,9 @@ bool RtpPacketizerAv1::NextPacket(RtpPacketToSend* packet) {
 
   *write_at++ = AggregationHeader();
 
-  int obu_offset = next_packet.first_obu_offset;
+  int32_t obu_offset = next_packet.first_obu_offset;
   // Store all OBU elements except the last one.
-  for (int i = 0; i < next_packet.num_obu_elements - 1; ++i) {
+  for (int32_t i = 0; i < next_packet.num_obu_elements - 1; ++i) {
     const Obu& obu = obus_[next_packet.first_obu + i];
     size_t fragment_size = obu.size - obu_offset;
     write_at += WriteLeb128(fragment_size, write_at);
@@ -410,7 +414,7 @@ bool RtpPacketizerAv1::NextPacket(RtpPacketToSend* packet) {
     if (obu_offset <= 1 && ObuHasExtension(obu.header)) {
       *write_at++ = obu.extension_header;
     }
-    int payload_offset =
+    int32_t payload_offset =
         std::max(0, obu_offset - (ObuHasExtension(obu.header) ? 2 : 1));
     size_t payload_size = obu.payload.size() - payload_offset;
     if (!obu.payload.empty() && payload_size > 0) {
@@ -423,7 +427,7 @@ bool RtpPacketizerAv1::NextPacket(RtpPacketToSend* packet) {
   // Store the last OBU element.
   const Obu& last_obu =
       obus_[next_packet.first_obu + next_packet.num_obu_elements - 1];
-  int fragment_size = next_packet.last_obu_size;
+  int32_t fragment_size = next_packet.last_obu_size;
   AVE_DCHECK_GT(fragment_size, 0);
   if (next_packet.num_obu_elements > kMaxNumObusToOmitSize) {
     write_at += WriteLeb128(fragment_size, write_at);
@@ -439,7 +443,7 @@ bool RtpPacketizerAv1::NextPacket(RtpPacketToSend* packet) {
   }
   AVE_DCHECK_EQ(write_at - rtp_payload + fragment_size,
                 kAggregationHeaderSize + next_packet.packet_size);
-  int payload_offset =
+  int32_t payload_offset =
       std::max(0, obu_offset - (ObuHasExtension(last_obu.header) ? 2 : 1));
   memcpy(write_at, last_obu.payload.data() + payload_offset, fragment_size);
   write_at += fragment_size;

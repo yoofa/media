@@ -23,7 +23,7 @@ namespace {
 
 // After this many packets are added, adding additional packets will cause the
 // oldest packets to be pruned from the buffer.
-constexpr int kBufferSize = 100;
+constexpr int32_t kBufferSize = 100;
 
 }  // namespace
 
@@ -37,7 +37,7 @@ PacketLossStats::~PacketLossStats() = default;
 void PacketLossStats::AddLostPacket(uint16_t sequence_number) {
   // Detect sequence number wrap around.
   if (!lost_packets_buffer_.empty() &&
-      static_cast<int>(*(lost_packets_buffer_.rbegin())) - sequence_number >
+      static_cast<int32_t>(*(lost_packets_buffer_.rbegin())) - sequence_number >
           0x8000) {
     // The buffer contains large numbers and this is a small number.
     lost_packets_wrapped_buffer_.insert(sequence_number);
@@ -52,28 +52,28 @@ void PacketLossStats::AddLostPacket(uint16_t sequence_number) {
   }
 }
 
-int PacketLossStats::GetSingleLossCount() const {
-  int single_loss_count, unused1, unused2;
+int32_t PacketLossStats::GetSingleLossCount() const {
+  int32_t single_loss_count = 0, unused1 = 0, unused2 = 0;
   ComputeLossCounts(&single_loss_count, &unused1, &unused2);
   return single_loss_count;
 }
 
-int PacketLossStats::GetMultipleLossEventCount() const {
-  int event_count, unused1, unused2;
+int32_t PacketLossStats::GetMultipleLossEventCount() const {
+  int32_t event_count = 0, unused1 = 0, unused2 = 0;
   ComputeLossCounts(&unused1, &event_count, &unused2);
   return event_count;
 }
 
-int PacketLossStats::GetMultipleLossPacketCount() const {
-  int packet_count, unused1, unused2;
+int32_t PacketLossStats::GetMultipleLossPacketCount() const {
+  int32_t packet_count = 0, unused1 = 0, unused2 = 0;
   ComputeLossCounts(&unused1, &unused2, &packet_count);
   return packet_count;
 }
 
 void PacketLossStats::ComputeLossCounts(
-    int* out_single_loss_count,
-    int* out_multiple_loss_event_count,
-    int* out_multiple_loss_packet_count) const {
+    int32_t* out_single_loss_count,
+    int32_t* out_multiple_loss_event_count,
+    int32_t* out_multiple_loss_packet_count) const {
   *out_single_loss_count = single_loss_historic_count_;
   *out_multiple_loss_event_count = multiple_loss_historic_event_count_;
   *out_multiple_loss_packet_count = multiple_loss_historic_packet_count_;
@@ -82,13 +82,12 @@ void PacketLossStats::ComputeLossCounts(
     return;
   }
   uint16_t last_num = 0;
-  int sequential_count = 0;
+  int32_t sequential_count = 0;
   std::vector<const std::set<uint16_t>*> buffers;
   buffers.push_back(&lost_packets_buffer_);
   buffers.push_back(&lost_packets_wrapped_buffer_);
   for (const auto* buffer : buffers) {
-    for (auto it = buffer->begin(); it != buffer->end(); ++it) {
-      uint16_t current_num = *it;
+    for (uint16_t current_num : *buffer) {
       if (sequential_count > 0 && current_num != ((last_num + 1) & 0xFFFF)) {
         if (sequential_count == 1) {
           (*out_single_loss_count)++;
@@ -115,7 +114,7 @@ void PacketLossStats::PruneBuffer() {
   // into the historic counts.
   auto it = lost_packets_buffer_.begin();
   uint16_t last_removed = 0;
-  int remove_count = 0;
+  int32_t remove_count = 0;
   // Count adjacent packets and continue counting if it is wrap around by
   // swapping in the wrapped buffer and letting our value wrap as well.
   while (remove_count == 0 || (!lost_packets_buffer_.empty() &&

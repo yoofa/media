@@ -46,12 +46,12 @@ MediaClock::~MediaClock() {
 }
 
 void MediaClock::SetStartingTimeMedia(int64_t starting_time_media_us) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   starting_time_media_us_ = starting_time_media_us;
 }
 
 void MediaClock::ClearAnchor() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   UpdateAnchorTimesAndPlaybackRate(-1, -1, playback_rate_);
 }
 
@@ -64,7 +64,7 @@ void MediaClock::UpdateAnchor(int64_t anchor_time_media_us,
   }
   auto anchor_time_real_us = base::TimeMicros();
 
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   // maybe pass some time when acquire lock
   int64_t now_us = base::TimeMicros();
@@ -98,13 +98,13 @@ void MediaClock::UpdateAnchor(int64_t anchor_time_media_us,
 }
 
 void MediaClock::UpdateMaxTimeMedia(int64_t max_time_media_us) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   max_time_media_us_ = max_time_media_us;
 }
 
 void MediaClock::SetPlaybackRate(float rate) {
   AVE_CHECK_GE(rate, 0.0);
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (anchor_time_media_us_ == -1) {
     playback_rate_ = rate;
     return;
@@ -130,7 +130,7 @@ void MediaClock::SetPlaybackRate(float rate) {
 }
 
 float MediaClock::GetPlaybackRate() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   return playback_rate_;
 }
 
@@ -141,7 +141,7 @@ status_t MediaClock::GetMediaTime(int64_t real_us,
     return BAD_VALUE;
   }
 
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   return GetMediaTime_l(real_us, out_media_us, allow_past_max_time);
 }
 
@@ -151,7 +151,7 @@ status_t MediaClock::GetRealTimeFor(int64_t target_media_us,
     return BAD_VALUE;
   }
 
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (playback_rate_ == 0.0 || anchor_time_real_us_ == -1) {
     return NO_INIT;
   }
@@ -173,7 +173,7 @@ status_t MediaClock::GetRealTimeFor(int64_t target_media_us,
 void MediaClock::AddTimerEvent(std::unique_ptr<TimerEvent> event,
                                int64_t media_time_us,
                                int64_t adjust_real_us) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (anchor_time_media_us_ == -1) {
     AVE_LOG(LS_WARNING) << "AddTimerEvent, no anchor time set";
     return;
@@ -189,13 +189,13 @@ void MediaClock::AddTimerEvent(std::unique_ptr<TimerEvent> event,
 }
 
 void MediaClock::SetNotificationCallback(Callback* callback) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   notify_callback_ = callback;
 }
 
 // private
 void MediaClock::Reset() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   // process all timers and wait for them to be processed
   auto it = timers_.begin();
   while (it != timers_.end()) {
@@ -334,7 +334,7 @@ void MediaClock::PostProcessTimers(int64_t delay_us) {
   AVE_LOG(LS_INFO) << "PostProcessTimers " << delay_us;
   task_runner_->PostDelayedTask(
       [this]() {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::scoped_lock lock(mutex_);
         ProcessTimers();
       },
       delay_us);

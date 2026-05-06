@@ -10,7 +10,7 @@
 
 #include "media/modules/rtp_rtcp/src/util/frame_object.h"
 
-#include <string.h>
+#include <cstring>
 
 #include <optional>
 #include <utility>
@@ -22,7 +22,7 @@ namespace rtp_rtcp {
 RtpFrameObject::RtpFrameObject(uint16_t first_seq_num,
                                uint16_t last_seq_num,
                                bool marker_bit,
-                               int times_nacked,
+                               int32_t times_nacked,
                                int64_t first_packet_received_time,
                                int64_t last_packet_received_time,
                                uint32_t rtp_timestamp,

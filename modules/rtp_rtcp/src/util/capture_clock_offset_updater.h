@@ -49,7 +49,7 @@ class CaptureClockOffsetUpdater {
   // Note that the value must be in Q32.32-formatted fixed-point seconds.
   void SetRemoteToLocalClockOffset(std::optional<int64_t> offset_q32x32);
 
-  // Converts a signed Q32.32-formatted fixed-point to a TimeDelta.
+  // Converts a int32_t Q32.32-formatted fixed-point to a TimeDelta.
   static std::optional<TimeDelta> ConvertsToTimeDela(
       std::optional<int64_t> q32x32);
 

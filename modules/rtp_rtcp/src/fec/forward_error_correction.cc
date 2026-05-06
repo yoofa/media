@@ -8,9 +8,10 @@
  */
 
 #include "media/modules/rtp_rtcp/src/fec/forward_error_correction.h"
+#include <memory>
 #include <span>
 
-#include <string.h>
+#include <cstring>
 
 #include <algorithm>
 #include <utility>
@@ -28,7 +29,6 @@ namespace ave {
 namespace media {
 namespace rtp_rtcp {
 
-namespace base = ::ave::base;
 using ::ave::base::IsNewerSequenceNumber;
 
 namespace {
@@ -84,18 +84,18 @@ std::unique_ptr<ForwardErrorCorrection> ForwardErrorCorrection::CreateUlpfec(
 }
 
 std::unique_ptr<ForwardErrorCorrection> ForwardErrorCorrection::CreateFlexfec(
-    uint32_t ssrc,
-    uint32_t protected_media_ssrc) {
+    uint32_t /*ssrc*/,
+    uint32_t /*protected_media_ssrc*/) {
   // FlexFEC not implemented yet - would need flexfec_header_reader_writer
   return nullptr;
 }
 
-int ForwardErrorCorrection::EncodeFec(const PacketList& media_packets,
-                                      uint8_t protection_factor,
-                                      int num_important_packets,
-                                      bool use_unequal_protection,
-                                      FecMaskType fec_mask_type,
-                                      std::list<Packet*>* fec_packets) {
+int32_t ForwardErrorCorrection::EncodeFec(const PacketList& media_packets,
+                                          uint8_t protection_factor,
+                                          int32_t num_important_packets,
+                                          bool use_unequal_protection,
+                                          FecMaskType fec_mask_type,
+                                          std::list<Packet*>* fec_packets) {
   const size_t num_media_packets = media_packets.size();
 
   // Sanity check arguments.
@@ -129,7 +129,7 @@ int ForwardErrorCorrection::EncodeFec(const PacketList& media_packets,
   }
 
   // Prepare generated FEC packets.
-  int num_fec_packets = NumFecPackets(num_media_packets, protection_factor);
+  int32_t num_fec_packets = NumFecPackets(num_media_packets, protection_factor);
   if (num_fec_packets == 0) {
     return 0;
   }
@@ -154,7 +154,8 @@ int ForwardErrorCorrection::EncodeFec(const PacketList& media_packets,
   }
 
   // Insert zero columns in the packet mask
-  int num_mask_bits = InsertZerosInPacketMasks(media_packets, num_fec_packets);
+  int32_t num_mask_bits =
+      InsertZerosInPacketMasks(media_packets, num_fec_packets);
   if (num_mask_bits < 0) {
     AVE_LOG(LS_INFO) << "Too large sequence number gap.";
     return -1;
@@ -169,14 +170,14 @@ int ForwardErrorCorrection::EncodeFec(const PacketList& media_packets,
   FinalizeFecHeaders(num_fec_packets, protected_media_ssrc_, first_seq_num);
 
   // Build the FEC packets return list
-  for (size_t i = 0; i < static_cast<size_t>(num_fec_packets); ++i) {
+  for (size_t i = 0; std::cmp_less(i, num_fec_packets); ++i) {
     fec_packets->push_back(&generated_fec_packets_[i]);
   }
 
   return 0;
 }
 
-int ForwardErrorCorrection::InsertZerosInPacketMasks(
+int32_t ForwardErrorCorrection::InsertZerosInPacketMasks(
     const PacketList& media_packets,
     size_t num_fec_packets) {
   size_t num_media_packets = media_packets.size();
@@ -190,8 +191,7 @@ int ForwardErrorCorrection::InsertZerosInPacketMasks(
   uint16_t last_seq_num = ByteReader<uint16_t>::ReadBigEndian(
       media_packets.back()->data.data() + 2);
 
-  uint16_t seq_num_span =
-      static_cast<uint16_t>(last_seq_num - first_seq_num + 1);
+  auto seq_num_span = static_cast<uint16_t>(last_seq_num - first_seq_num + 1);
 
   // Check if we need to insert zeros
   if (seq_num_span == num_media_packets) {
@@ -216,8 +216,8 @@ int ForwardErrorCorrection::InsertZerosInPacketMasks(
 
   // Iterate through the media packets and build the new mask
   auto it = media_packets.begin();
-  int old_bit_index = 0;
-  int new_bit_index = 0;
+  int32_t old_bit_index = 0;
+  int32_t new_bit_index = 0;
 
   uint16_t expected_seq_num = first_seq_num;
   while (it != media_packets.end()) {
@@ -225,7 +225,7 @@ int ForwardErrorCorrection::InsertZerosInPacketMasks(
         ByteReader<uint16_t>::ReadBigEndian((*it)->data.data() + 2);
 
     // Insert zeros for missing sequence numbers
-    int num_zeros = static_cast<uint16_t>(seq_num - expected_seq_num);
+    int32_t num_zeros = static_cast<uint16_t>(seq_num - expected_seq_num);
     if (num_zeros > 0) {
       internal::InsertZeroColumns(num_zeros, packet_masks_,
                                   new_packet_mask_bytes, num_fec_packets,
@@ -282,7 +282,7 @@ void ForwardErrorCorrection::GenerateFecPayloads(
           ByteWriter<uint16_t>::WriteBigEndian(
               fec_packet.data.MutableData() + 2, length);
           // XOR timestamp
-          for (int i = 0; i < 4; ++i) {
+          for (int32_t i = 0; i < 4; ++i) {
             fec_packet.data.MutableData()[4 + i] ^=
                 media_packet->data.data()[4 + i];
           }
@@ -313,7 +313,7 @@ void ForwardErrorCorrection::GenerateFecPayloads(
               fec_packet.data.MutableData() + 2, old_length ^ new_length);
 
           // XOR timestamp
-          for (int i = 0; i < 4; ++i) {
+          for (int32_t i = 0; i < 4; ++i) {
             fec_packet.data.MutableData()[4 + i] ^=
                 media_packet->data.data()[4 + i];
           }
@@ -413,8 +413,7 @@ void ForwardErrorCorrection::UpdateCoveringFecPackets(
         continue;
       }
 
-      uint16_t delta =
-          static_cast<uint16_t>(packet.seq_num - stream.seq_num_base);
+      auto delta = static_cast<uint16_t>(packet.seq_num - stream.seq_num_base);
       if (delta < stream.packet_mask_size * 8) {
         // This media packet is covered by this FEC packet
         auto& protected_packets = fec_packet->protected_packets;
@@ -458,7 +457,7 @@ void ForwardErrorCorrection::InsertFecPacket(
 
     for (size_t byte_index = 0; byte_index < stream.packet_mask_size;
          ++byte_index) {
-      for (int bit_index = 7; bit_index >= 0; --bit_index) {
+      for (int32_t bit_index = 7; bit_index >= 0; --bit_index) {
         if ((packet_mask[byte_index] >> bit_index) & 1) {
           auto protected_packet = std::make_unique<ProtectedPacket>();
           protected_packet->ssrc = stream.ssrc;
@@ -512,7 +511,7 @@ size_t ForwardErrorCorrection::AttemptRecovery(
     recovered_something = false;
 
     for (auto& fec_packet : received_fec_packets_) {
-      int missing_count = NumCoveredPacketsMissing(*fec_packet);
+      int32_t missing_count = NumCoveredPacketsMissing(*fec_packet);
 
       if (missing_count == 1) {
         // Can recover one packet
@@ -554,7 +553,7 @@ size_t ForwardErrorCorrection::AttemptRecovery(
 bool ForwardErrorCorrection::StartPacketRecovery(
     const ReceivedFecPacket& fec_packet,
     RecoveredPacket* recovered_packet) {
-  recovered_packet->pkt = std::shared_ptr<Packet>(new Packet());
+  recovered_packet->pkt = std::make_shared<Packet>();
   recovered_packet->pkt->data.SetSize(fec_packet.protection_length +
                                       kRtpHeaderSize);
 
@@ -580,7 +579,7 @@ void ForwardErrorCorrection::XorHeaders(const Packet& src, Packet* dst) {
   dst->data.MutableData()[1] ^= src.data.data()[1];
 
   // Timestamp (bytes 4-7)
-  for (int i = 0; i < 4; ++i) {
+  for (int32_t i = 0; i < 4; ++i) {
     dst->data.MutableData()[4 + i] ^= src.data.data()[4 + i];
   }
 }
@@ -638,9 +637,9 @@ bool ForwardErrorCorrection::RecoverPacket(const ReceivedFecPacket& fec_packet,
   return FinishPacketRecovery(fec_packet, recovered_packet);
 }
 
-int ForwardErrorCorrection::NumCoveredPacketsMissing(
+int32_t ForwardErrorCorrection::NumCoveredPacketsMissing(
     const ReceivedFecPacket& fec_packet) {
-  int missing = 0;
+  int32_t missing = 0;
   for (const auto& protected_packet : fec_packet.protected_packets) {
     if (!protected_packet->pkt) {
       ++missing;
@@ -680,10 +679,10 @@ bool ForwardErrorCorrection::IsOldFecPacket(
   return static_cast<uint16_t>(newest_seq - fec_seq) > kOldSequenceThreshold;
 }
 
-int ForwardErrorCorrection::NumFecPackets(int num_media_packets,
-                                          int protection_factor) {
+int32_t ForwardErrorCorrection::NumFecPackets(int32_t num_media_packets,
+                                              int32_t protection_factor) {
   // (num_media_packets * protection_factor + 127) / 255
-  int num_fec_packets = (num_media_packets * protection_factor + 127) >> 8;
+  int32_t num_fec_packets = (num_media_packets * protection_factor + 127) >> 8;
   // Ensure at least one FEC packet if protection is requested
   if (num_fec_packets == 0 && protection_factor > 0) {
     num_fec_packets = 1;

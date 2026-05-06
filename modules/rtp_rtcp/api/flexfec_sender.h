@@ -38,10 +38,10 @@ struct RtpExtension;
 class FlexfecSender : public VideoFecGenerator {
  public:
   FlexfecSender(base::Clock* clock,
-                int payload_type,
+                int32_t payload_type,
                 uint32_t ssrc,
                 uint32_t protected_media_ssrc,
-                const std::string& mid,
+                std::string mid,
                 const std::vector<RtpExtension>& rtp_header_extensions,
                 std::span<const RtpExtensionSize> extension_sizes,
                 const RtpState* rtp_state);
@@ -80,7 +80,7 @@ class FlexfecSender : public VideoFecGenerator {
   base::Timestamp last_generated_packet_ = base::Timestamp::MinusInfinity();
 
   // Config.
-  const int payload_type_;
+  const int32_t payload_type_;
   const uint32_t timestamp_offset_;
   const uint32_t ssrc_;
   const uint32_t protected_media_ssrc_;

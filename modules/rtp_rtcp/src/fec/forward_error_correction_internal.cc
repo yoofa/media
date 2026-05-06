@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <utility>
 
 #include "base/checks.h"
 #include "media/modules/rtp_rtcp/src/fec/fec_private_tables_bursty.h"
@@ -37,18 +38,18 @@ enum ProtectionMode {
 //                                [0, num_rows * num_sub_mask_bytes]
 // \param[out] packet_mask        A pointer to hold the output mask, of size
 //                                [0, x * num_mask_bytes], where x >= num_rows.
-void FitSubMask(int num_mask_bytes,
-                int num_sub_mask_bytes,
-                int num_rows,
+void FitSubMask(int32_t num_mask_bytes,
+                int32_t num_sub_mask_bytes,
+                int32_t num_rows,
                 const uint8_t* sub_mask,
                 uint8_t* packet_mask) {
   if (num_mask_bytes == num_sub_mask_bytes) {
     memcpy(packet_mask, sub_mask, num_rows * num_sub_mask_bytes);
   } else {
-    for (int i = 0; i < num_rows; ++i) {
-      int pkt_mask_idx = i * num_mask_bytes;
-      int pkt_mask_idx2 = i * num_sub_mask_bytes;
-      for (int j = 0; j < num_sub_mask_bytes; ++j) {
+    for (int32_t i = 0; i < num_rows; ++i) {
+      int32_t pkt_mask_idx = i * num_mask_bytes;
+      int32_t pkt_mask_idx2 = i * num_sub_mask_bytes;
+      for (int32_t j = 0; j < num_sub_mask_bytes; ++j) {
         packet_mask[pkt_mask_idx] = sub_mask[pkt_mask_idx2];
         pkt_mask_idx++;
         pkt_mask_idx2++;
@@ -76,26 +77,26 @@ void FitSubMask(int num_mask_bytes,
 // TODO(marpan): This function is doing three things at the same time:
 // shift within a byte, byte shift and resizing.
 // Split up into subroutines.
-void ShiftFitSubMask(int num_mask_bytes,
-                     int res_mask_bytes,
-                     int num_column_shift,
-                     int end_row,
+void ShiftFitSubMask(int32_t num_mask_bytes,
+                     int32_t res_mask_bytes,
+                     int32_t num_column_shift,
+                     int32_t end_row,
                      const uint8_t* sub_mask,
                      uint8_t* packet_mask) {
   // Number of bit shifts within a byte
-  const int num_bit_shifts = (num_column_shift % 8);
-  const int num_byte_shifts = num_column_shift >> 3;
+  const int32_t num_bit_shifts = (num_column_shift % 8);
+  const int32_t num_byte_shifts = num_column_shift >> 3;
 
   // Modify new mask with sub-mask21.
 
   // Loop over the remaining FEC packets.
-  for (int i = num_column_shift; i < end_row; ++i) {
+  for (int32_t i = num_column_shift; i < end_row; ++i) {
     // Byte index of new mask, for row i and column res_mask_bytes,
     // offset by the number of bytes shifts
-    int pkt_mask_idx =
+    int32_t pkt_mask_idx =
         i * num_mask_bytes + res_mask_bytes - 1 + num_byte_shifts;
     // Byte index of sub_mask, for row i and column res_mask_bytes
-    int pkt_mask_idx2 =
+    int32_t pkt_mask_idx2 =
         (i - num_column_shift) * res_mask_bytes + res_mask_bytes - 1;
 
     uint8_t shift_right_curr_byte = 0;
@@ -113,7 +114,7 @@ void ShiftFitSubMask(int num_mask_bytes,
     // For each row i (FEC packet), shift the bit-mask of the sub_mask.
     // Each row of the mask contains "resMaskBytes" of bytes.
     // We start from the last byte of the sub_mask and move to first one.
-    for (int j = res_mask_bytes - 1; j > 0; j--) {
+    for (int32_t j = res_mask_bytes - 1; j > 0; j--) {
       // Shift current byte of sub21 to the right by "numBitShifts".
       shift_right_curr_byte = sub_mask[pkt_mask_idx2] >> num_bit_shifts;
 
@@ -144,13 +145,13 @@ namespace rtp_rtcp {
 namespace internal {
 
 PacketMaskTable::PacketMaskTable(FecMaskType fec_mask_type,
-                                 int num_media_packets)
+                                 int32_t num_media_packets)
     : table_(PickTable(fec_mask_type, num_media_packets)) {}
 
 PacketMaskTable::~PacketMaskTable() = default;
 
-std::span<const uint8_t> PacketMaskTable::LookUp(int num_media_packets,
-                                                 int num_fec_packets) {
+std::span<const uint8_t> PacketMaskTable::LookUp(int32_t num_media_packets,
+                                                 int32_t num_fec_packets) {
   AVE_DCHECK_GT(num_media_packets, 0);
   AVE_DCHECK_GT(num_fec_packets, 0);
   AVE_DCHECK_LE(static_cast<size_t>(num_media_packets), kUlpfecMaxMediaPackets);
@@ -159,8 +160,8 @@ std::span<const uint8_t> PacketMaskTable::LookUp(int num_media_packets,
   if (num_media_packets <= 12) {
     return LookUpInFecTable(table_, num_media_packets - 1, num_fec_packets - 1);
   }
-  int mask_length =
-      static_cast<int>(PacketMaskSize(static_cast<size_t>(num_media_packets)));
+  int32_t mask_length = static_cast<int32_t>(
+      PacketMaskSize(static_cast<size_t>(num_media_packets)));
 
   // Generate FEC code mask for {num_media_packets(M), num_fec_packets(N)} (use
   // N FEC packets to protect M media packets) In the mask, each FEC packet
@@ -169,12 +170,12 @@ std::span<const uint8_t> PacketMaskTable::LookUp(int num_media_packets,
   // packet B.
 
   // Loop through each fec packet.
-  for (int row = 0; row < num_fec_packets; row++) {
+  for (int32_t row = 0; row < num_fec_packets; row++) {
     // Loop through each fec code in a row, one code has 8 bits.
     // Bit X will be set to 1 if media packet X shall be protected by current
     // FEC packet. In this implementation, the protection is interleaved, thus
     // media packet X will be protected by FEC packet (X % N)
-    for (int col = 0; col < mask_length; col++) {
+    for (int32_t col = 0; col < mask_length; col++) {
       fec_packet_mask_[row * mask_length + col] =
           ((col * 8) % num_fec_packets == row && (col * 8) < num_media_packets
                ? 0x80
@@ -217,13 +218,13 @@ std::span<const uint8_t> PacketMaskTable::LookUp(int num_media_packets,
 // for the bursty type, or the random table is explicitly asked for, then the
 // random type is selected. Otherwise the bursty table callback is returned.
 const uint8_t* PacketMaskTable::PickTable(FecMaskType fec_mask_type,
-                                          int num_media_packets) {
+                                          int32_t num_media_packets) {
   AVE_DCHECK_GE(num_media_packets, 0);
   AVE_DCHECK_LE(static_cast<size_t>(num_media_packets), kUlpfecMaxMediaPackets);
 
   if (fec_mask_type != kFecMaskRandom &&
-      num_media_packets <=
-          static_cast<int>(fec_private_tables::kPacketMaskBurstyTbl[0])) {
+      std::cmp_less_equal(num_media_packets,
+                          fec_private_tables::kPacketMaskBurstyTbl[0])) {
     return &fec_private_tables::kPacketMaskBurstyTbl[0];
   }
 
@@ -231,17 +232,17 @@ const uint8_t* PacketMaskTable::PickTable(FecMaskType fec_mask_type,
 }
 
 // Remaining protection after important (first partition) packet protection
-void RemainingPacketProtection(int num_media_packets,
-                               int num_fec_remaining,
-                               int num_fec_for_imp_packets,
-                               int num_mask_bytes,
+void RemainingPacketProtection(int32_t num_media_packets,
+                               int32_t num_fec_remaining,
+                               int32_t num_fec_for_imp_packets,
+                               int32_t num_mask_bytes,
                                ProtectionMode mode,
                                uint8_t* packet_mask,
                                PacketMaskTable* mask_table) {
   if (mode == kModeNoOverlap) {
     // sub_mask21
 
-    const int res_mask_bytes =
+    const int32_t res_mask_bytes =
         PacketMaskSize(num_media_packets - num_fec_for_imp_packets);
 
     auto end_row = (num_fec_for_imp_packets + num_fec_remaining);
@@ -261,8 +262,8 @@ void RemainingPacketProtection(int num_media_packets,
                &packet_mask[num_fec_for_imp_packets * num_mask_bytes]);
 
     if (mode == kModeBiasFirstPacket) {
-      for (int i = 0; i < num_fec_remaining; ++i) {
-        int pkt_mask_idx = i * num_mask_bytes;
+      for (int32_t i = 0; i < num_fec_remaining; ++i) {
+        int32_t pkt_mask_idx = i * num_mask_bytes;
         packet_mask[pkt_mask_idx] = packet_mask[pkt_mask_idx] | (1 << 7);
       }
     }
@@ -272,12 +273,12 @@ void RemainingPacketProtection(int num_media_packets,
 }
 
 // Protection for important (first partition) packets
-void ImportantPacketProtection(int num_fec_for_imp_packets,
-                               int num_imp_packets,
-                               int num_mask_bytes,
+void ImportantPacketProtection(int32_t num_fec_for_imp_packets,
+                               int32_t num_imp_packets,
+                               int32_t num_mask_bytes,
                                uint8_t* packet_mask,
                                PacketMaskTable* mask_table) {
-  const int num_imp_mask_bytes = PacketMaskSize(num_imp_packets);
+  const int32_t num_imp_mask_bytes = PacketMaskSize(num_imp_packets);
 
   // Get sub_mask1 from table
   std::span<const uint8_t> packet_mask_sub_1 =
@@ -290,18 +291,18 @@ void ImportantPacketProtection(int num_fec_for_imp_packets,
 // This function sets the protection allocation: i.e., how many FEC packets
 // to use for num_imp (1st partition) packets, given the: number of media
 // packets, number of FEC packets, and number of 1st partition packets.
-int SetProtectionAllocation(int num_media_packets,
-                            int num_fec_packets,
-                            int num_imp_packets) {
+int32_t SetProtectionAllocation(int32_t num_media_packets,
+                                int32_t num_fec_packets,
+                                int32_t num_imp_packets) {
   // TODO(marpan): test different cases for protection allocation:
 
   // Use at most (alloc_par * num_fec_packets) for important packets.
   float alloc_par = 0.5;
-  int max_num_fec_for_imp = alloc_par * num_fec_packets;
+  int32_t max_num_fec_for_imp = alloc_par * num_fec_packets;
 
-  int num_fec_for_imp_packets = (num_imp_packets < max_num_fec_for_imp)
-                                    ? num_imp_packets
-                                    : max_num_fec_for_imp;
+  int32_t num_fec_for_imp_packets = (num_imp_packets < max_num_fec_for_imp)
+                                        ? num_imp_packets
+                                        : max_num_fec_for_imp;
 
   // Fall back to equal protection in this case
   if (num_fec_packets == 1 && (num_media_packets > 2 * num_imp_packets)) {
@@ -356,24 +357,24 @@ int SetProtectionAllocation(int num_media_packets,
 // Protection Mode 2 may be extended for a sort of sliding protection
 // (i.e., vary the number/density of "1s" across columns) across packets.
 
-void UnequalProtectionMask(int num_media_packets,
-                           int num_fec_packets,
-                           int num_imp_packets,
-                           int num_mask_bytes,
+void UnequalProtectionMask(int32_t num_media_packets,
+                           int32_t num_fec_packets,
+                           int32_t num_imp_packets,
+                           int32_t num_mask_bytes,
                            uint8_t* packet_mask,
                            PacketMaskTable* mask_table) {
   // Set Protection type and allocation
   // TODO(marpan): test/update for best mode and some combinations thereof.
 
   ProtectionMode mode = kModeOverlap;
-  int num_fec_for_imp_packets = 0;
+  int32_t num_fec_for_imp_packets = 0;
 
   if (mode != kModeBiasFirstPacket) {
     num_fec_for_imp_packets = SetProtectionAllocation(
         num_media_packets, num_fec_packets, num_imp_packets);
   }
 
-  int num_fec_remaining = num_fec_packets - num_fec_for_imp_packets;
+  int32_t num_fec_remaining = num_fec_packets - num_fec_for_imp_packets;
   // Done with setting protection type and allocation
 
   //
@@ -410,8 +411,8 @@ void UnequalProtectionMask(int num_media_packets,
 //   * Size for kPacketMaskBurstyTbl: 2 bytes.
 //     * For all entries: 2 * fec index (1 based)
 std::span<const uint8_t> LookUpInFecTable(const uint8_t* table,
-                                          int media_packet_index,
-                                          int fec_index) {
+                                          int32_t media_packet_index,
+                                          int32_t fec_index) {
   AVE_DCHECK_LT(media_packet_index, table[0]);
 
   // Skip over the table size.
@@ -420,18 +421,20 @@ std::span<const uint8_t> LookUpInFecTable(const uint8_t* table,
   uint8_t entry_size_increment = 2;  // 0-16 are 2 byte wide, then changes to 6.
 
   // Hop over un-interesting array entries.
-  for (int i = 0; i < media_packet_index; ++i) {
-    if (i == 16)
+  for (int32_t i = 0; i < media_packet_index; ++i) {
+    if (i == 16) {
       entry_size_increment = 6;
+    }
     uint8_t count = entry[0];
     ++entry;  // skip over the count.
-    for (int j = 0; j < count; ++j) {
+    for (int32_t j = 0; std::cmp_less(j, count); ++j) {
       entry += entry_size_increment * (j + 1);  // skip over the data.
     }
   }
 
-  if (media_packet_index == 16)
+  if (media_packet_index == 16) {
     entry_size_increment = 6;
+  }
 
   AVE_DCHECK_LT(fec_index, entry[0]);
   ++entry;  // Skip over the size.
@@ -439,16 +442,17 @@ std::span<const uint8_t> LookUpInFecTable(const uint8_t* table,
   // Find the appropriate data in the second dimension.
 
   // Find the specific data we're looking for.
-  for (int i = 0; i < fec_index; ++i)
+  for (int32_t i = 0; i < fec_index; ++i) {
     entry += entry_size_increment * (i + 1);  // skip over the data.
+  }
 
   size_t size = entry_size_increment * (fec_index + 1);
   return {&entry[0], size};
 }
 
-void GeneratePacketMasks(int num_media_packets,
-                         int num_fec_packets,
-                         int num_imp_packets,
+void GeneratePacketMasks(int32_t num_media_packets,
+                         int32_t num_fec_packets,
+                         int32_t num_imp_packets,
                          bool use_unequal_protection,
                          PacketMaskTable* mask_table,
                          uint8_t* packet_mask) {
@@ -458,7 +462,7 @@ void GeneratePacketMasks(int num_media_packets,
   AVE_DCHECK_LE(num_imp_packets, num_media_packets);
   AVE_DCHECK_GE(num_imp_packets, 0);
 
-  const int num_mask_bytes = PacketMaskSize(num_media_packets);
+  const int32_t num_mask_bytes = PacketMaskSize(num_media_packets);
 
   // Equal-protection for these cases.
   if (!use_unequal_protection || num_imp_packets == 0) {
@@ -482,32 +486,32 @@ size_t PacketMaskSize(size_t num_sequence_numbers) {
   return kUlpfecPacketMaskSizeLBitClear;
 }
 
-void InsertZeroColumns(int num_zeros,
+void InsertZeroColumns(int32_t num_zeros,
                        uint8_t* new_mask,
-                       int new_mask_bytes,
-                       int num_fec_packets,
-                       int new_bit_index) {
-  for (uint16_t row = 0; row < num_fec_packets; ++row) {
-    const int new_byte_index = row * new_mask_bytes + new_bit_index / 8;
-    const int max_shifts = (7 - (new_bit_index % 8));
+                       int32_t new_mask_bytes,
+                       int32_t num_fec_packets,
+                       int32_t new_bit_index) {
+  for (uint16_t row = 0; std::cmp_less(row, num_fec_packets); ++row) {
+    const int32_t new_byte_index = row * new_mask_bytes + new_bit_index / 8;
+    const int32_t max_shifts = (7 - (new_bit_index % 8));
     new_mask[new_byte_index] <<= std::min(num_zeros, max_shifts);
   }
 }
 
 void CopyColumn(uint8_t* new_mask,
-                int new_mask_bytes,
+                int32_t new_mask_bytes,
                 uint8_t* old_mask,
-                int old_mask_bytes,
-                int num_fec_packets,
-                int new_bit_index,
-                int old_bit_index) {
+                int32_t old_mask_bytes,
+                int32_t num_fec_packets,
+                int32_t new_bit_index,
+                int32_t old_bit_index) {
   AVE_CHECK_LT(new_bit_index, 8 * new_mask_bytes);
 
   // Copy column from the old mask to the beginning of the new mask and shift it
   // out from the old mask.
-  for (uint16_t row = 0; row < num_fec_packets; ++row) {
-    int new_byte_index = row * new_mask_bytes + new_bit_index / 8;
-    int old_byte_index = row * old_mask_bytes + old_bit_index / 8;
+  for (uint16_t row = 0; std::cmp_less(row, num_fec_packets); ++row) {
+    int32_t new_byte_index = row * new_mask_bytes + new_bit_index / 8;
+    int32_t old_byte_index = row * old_mask_bytes + old_bit_index / 8;
     new_mask[new_byte_index] |= ((old_mask[old_byte_index] & 0x80) >> 7);
     if (new_bit_index % 8 != 7) {
       new_mask[new_byte_index] <<= 1;

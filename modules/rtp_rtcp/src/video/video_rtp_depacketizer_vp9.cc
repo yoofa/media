@@ -8,7 +8,7 @@
 #include "media/modules/rtp_rtcp/src/video/video_rtp_depacketizer_vp9.h"
 #include <span>
 
-#include <string.h>
+#include <cstring>
 
 #include <optional>
 
@@ -35,10 +35,10 @@ namespace {
 //
 void ParsePictureId(base::BitstreamReader& parser, RTPVideoHeaderVP9* vp9) {
   if (parser.ReadBit()) {  // m_bit
-    vp9->picture_id = parser.ReadBits(15);
+    vp9->picture_id = static_cast<int16_t>(parser.ReadBits(15));
     vp9->max_picture_id = kMaxTwoBytePictureId;
   } else {
-    vp9->picture_id = parser.ReadBits(7);
+    vp9->picture_id = static_cast<int16_t>(parser.ReadBits(7));
     vp9->max_picture_id = kMaxOneBytePictureId;
   }
 }
@@ -52,9 +52,9 @@ void ParsePictureId(base::BitstreamReader& parser, RTPVideoHeaderVP9* vp9) {
 //      +-+-+-+-+-+-+-+-+
 //
 void ParseLayerInfo(base::BitstreamReader& parser, RTPVideoHeaderVP9* vp9) {
-  vp9->temporal_idx = parser.ReadBits(3);
+  vp9->temporal_idx = static_cast<uint8_t>(parser.ReadBits(3));
   vp9->temporal_up_switch = parser.Read<bool>();
-  vp9->spatial_idx = parser.ReadBits(3);
+  vp9->spatial_idx = static_cast<uint8_t>(parser.ReadBits(3));
   vp9->inter_layer_predicted = parser.Read<bool>();
   if (vp9->spatial_idx >= kMaxSpatialLayers) {
     parser.Invalidate();
@@ -80,14 +80,14 @@ void ParseRefIndices(base::BitstreamReader& parser, RTPVideoHeaderVP9* vp9) {
   }
 
   vp9->num_ref_pics = 0;
-  bool n_bit;
+  bool n_bit = false;
   do {
     if (vp9->num_ref_pics == kMaxVp9RefPics) {
       parser.Invalidate();
       return;
     }
 
-    uint8_t p_diff = parser.ReadBits(7);
+    uint8_t p_diff = static_cast<uint8_t>(parser.ReadBits(7));
     n_bit = parser.Read<bool>();
 
     vp9->pid_diff[vp9->num_ref_pics] = p_diff;
@@ -121,7 +121,7 @@ void ParseRefIndices(base::BitstreamReader& parser, RTPVideoHeaderVP9* vp9) {
 //      +-+-+-+-+-+-+-+-+              -|           -|
 //
 void ParseSsData(base::BitstreamReader& parser, RTPVideoHeaderVP9* vp9) {
-  vp9->num_spatial_layers = parser.ReadBits(3) + 1;
+  vp9->num_spatial_layers = static_cast<size_t>(parser.ReadBits(3)) + 1;
   vp9->spatial_layer_resolution_present = parser.Read<bool>();
   bool g_bit = parser.Read<bool>();
   parser.ConsumeBits(3);
@@ -137,9 +137,9 @@ void ParseSsData(base::BitstreamReader& parser, RTPVideoHeaderVP9* vp9) {
     vp9->gof.num_frames_in_gof = parser.Read<uint8_t>();
   }
   for (size_t i = 0; i < vp9->gof.num_frames_in_gof; ++i) {
-    vp9->gof.temporal_idx[i] = parser.ReadBits(3);
+    vp9->gof.temporal_idx[i] = static_cast<uint8_t>(parser.ReadBits(3));
     vp9->gof.temporal_up_switch[i] = parser.Read<bool>();
-    vp9->gof.num_ref_pics[i] = parser.ReadBits(2);
+    vp9->gof.num_ref_pics[i] = static_cast<uint8_t>(parser.ReadBits(2));
     parser.ConsumeBits(2);
 
     for (uint8_t p = 0; p < vp9->gof.num_ref_pics[i]; ++p) {
@@ -152,23 +152,24 @@ void ParseSsData(base::BitstreamReader& parser, RTPVideoHeaderVP9* vp9) {
 std::optional<VideoRtpDepacketizer::ParsedRtpPayload>
 VideoRtpDepacketizerVp9::Parse(base::CopyOnWriteBuffer rtp_payload) {
   std::optional<ParsedRtpPayload> result(std::in_place);
-  int offset = ParseRtpPayload(
+  int32_t offset = ParseRtpPayload(
       std::span(rtp_payload.data(), rtp_payload.size()), &result->video_header);
-  if (offset == 0)
+  if (offset == 0) {
     return std::nullopt;
+  }
   AVE_DCHECK_LT(offset, rtp_payload.size());
   result->video_payload =
       rtp_payload.Slice(offset, rtp_payload.size() - offset);
   return result;
 }
 
-int VideoRtpDepacketizerVp9::ParseRtpPayload(
+int32_t VideoRtpDepacketizerVp9::ParseRtpPayload(
     std::span<const uint8_t> rtp_payload,
     RTPVideoHeader* video_header) {
   AVE_DCHECK(video_header);
   // Parse mandatory first byte of payload descriptor.
   base::BitstreamReader parser(rtp_payload);
-  uint8_t first_byte = parser.Read<uint8_t>();
+  auto first_byte = parser.Read<uint8_t>();
   bool i_bit = first_byte & 0b1000'0000;  // PictureId present .
   bool p_bit = first_byte & 0b0100'0000;  // Inter-picture predicted.
   bool l_bit = first_byte & 0b0010'0000;  // Layer indices present.
@@ -218,7 +219,7 @@ int VideoRtpDepacketizerVp9::ParseRtpPayload(
   video_header->is_first_packet_in_frame = b_bit;
   video_header->is_last_packet_in_frame = e_bit;
 
-  int num_remaining_bits = parser.RemainingBitCount();
+  int32_t num_remaining_bits = parser.RemainingBitCount();
   if (num_remaining_bits <= 0) {
     // Failed to parse or empty vp9 payload data.
     return 0;

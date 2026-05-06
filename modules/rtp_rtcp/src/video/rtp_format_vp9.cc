@@ -8,7 +8,7 @@
 #include "media/modules/rtp_rtcp/src/video/rtp_format_vp9.h"
 #include <span>
 
-#include <string.h>
+#include <cstring>
 
 #include "base/buffer/bit_buffer.h"
 #include "base/checks.h"
@@ -52,8 +52,9 @@ int16_t Tl0PicIdxField(const RTPVideoHeaderVP9& hdr, uint8_t def) {
 //      +-+-+-+-+-+-+-+-+
 //
 size_t PictureIdLength(const RTPVideoHeaderVP9& hdr) {
-  if (hdr.picture_id == kNoPictureId)
+  if (hdr.picture_id == kNoPictureId) {
     return 0;
+  }
   return (hdr.max_picture_id == kMaxOneBytePictureId) ? 1 : 2;
 }
 
@@ -90,8 +91,9 @@ bool LayerInfoPresent(const RTPVideoHeaderVP9& hdr) {
 //                                                current P_DIFF.
 //
 size_t RefIndicesLength(const RTPVideoHeaderVP9& hdr) {
-  if (!hdr.inter_pic_predicted || !hdr.flexible_mode)
+  if (!hdr.inter_pic_predicted || !hdr.flexible_mode) {
     return 0;
+  }
 
   AVE_CHECK_GT(hdr.num_ref_pics, 0U);
   AVE_CHECK_LE(hdr.num_ref_pics, kMaxVp9RefPics);
@@ -119,8 +121,9 @@ size_t RefIndicesLength(const RTPVideoHeaderVP9& hdr) {
 //      +-+-+-+-+-+-+-+-+              -|           -|
 //
 size_t SsDataLength(const RTPVideoHeaderVP9& hdr) {
-  if (!hdr.ss_data_available)
+  if (!hdr.ss_data_available) {
     return 0;
+  }
 
   AVE_CHECK_GT(hdr.num_spatial_layers, 0U);
   AVE_CHECK_LE(hdr.num_spatial_layers, kMaxVp9NumberOfSpatialLayers);
@@ -196,11 +199,13 @@ bool WriteLayerInfoNonFlexibleMode(const RTPVideoHeaderVP9& vp9,
 
 bool WriteLayerInfo(const RTPVideoHeaderVP9& vp9,
                     base::BitBufferWriter* writer) {
-  if (!WriteLayerInfoCommon(vp9, writer))
+  if (!WriteLayerInfoCommon(vp9, writer)) {
     return false;
+  }
 
-  if (vp9.flexible_mode)
+  if (vp9.flexible_mode) {
     return true;
+  }
 
   return WriteLayerInfoNonFlexibleMode(vp9, writer);
 }
@@ -290,8 +295,9 @@ RTPVideoHeaderVP9 RemoveInactiveSpatialLayers(
   AVE_CHECK_LE(original_header.num_spatial_layers,
                kMaxVp9NumberOfSpatialLayers);
   RTPVideoHeaderVP9 hdr(original_header);
-  if (original_header.first_active_layer == 0)
+  if (original_header.first_active_layer == 0) {
     return hdr;
+  }
   for (size_t i = hdr.first_active_layer; i < hdr.num_spatial_layers; ++i) {
     hdr.width[i - hdr.first_active_layer] = hdr.width[i];
     hdr.height[i - hdr.first_active_layer] = hdr.height[i];
@@ -339,19 +345,21 @@ bool RtpPacketizerVp9::NextPacket(RtpPacketToSend* packet) {
   }
 
   bool layer_begin = current_packet_ == payload_sizes_.begin();
-  int packet_payload_len = *current_packet_;
+  int32_t packet_payload_len = *current_packet_;
   ++current_packet_;
   bool layer_end = current_packet_ == payload_sizes_.end();
 
-  int header_size = header_size_;
-  if (layer_begin)
+  int32_t header_size = header_size_;
+  if (layer_begin) {
     header_size += first_packet_extra_header_size_;
+  }
 
   uint8_t* buffer = packet->AllocatePayload(header_size + packet_payload_len);
   AVE_CHECK(buffer);
 
-  if (!WriteHeader(layer_begin, layer_end, std::span(buffer, header_size)))
+  if (!WriteHeader(layer_begin, layer_end, std::span(buffer, header_size))) {
     return false;
+  }
 
   memcpy(buffer + header_size, remaining_payload_.data(), packet_payload_len);
   remaining_payload_ = remaining_payload_.subspan(packet_payload_len);

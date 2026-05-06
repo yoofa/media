@@ -48,7 +48,7 @@ class Bye : public RtcpPacket {
               PacketReadyCallback callback) const override;
 
  private:
-  static constexpr int kMaxNumberOfCsrcs =
+  static constexpr int32_t kMaxNumberOfCsrcs =
       0x1f - 1;  // First item is sender SSRC.
 
   std::vector<uint32_t> csrcs_;

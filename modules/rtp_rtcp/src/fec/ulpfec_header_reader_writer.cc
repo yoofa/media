@@ -10,7 +10,7 @@
 #include "media/modules/rtp_rtcp/src/fec/ulpfec_header_reader_writer.h"
 #include <span>
 
-#include <string.h>
+#include <cstring>
 
 #include "base/checks.h"
 #include "media/modules/rtp_rtcp/src/fec/forward_error_correction_internal.h"
@@ -47,9 +47,8 @@ size_t UlpfecHeaderSize(size_t packet_mask_size) {
   AVE_DCHECK_LE(packet_mask_size, kUlpfecPacketMaskSizeLBitSet);
   if (packet_mask_size <= kUlpfecPacketMaskSizeLBitClear) {
     return kFecLevel0HeaderSize + kFecLevel1HeaderSizeLBitClear;
-  } else {
-    return kFecLevel0HeaderSize + kFecLevel1HeaderSizeLBitSet;
   }
+  return kFecLevel0HeaderSize + kFecLevel1HeaderSizeLBitSet;
 }
 
 }  // namespace

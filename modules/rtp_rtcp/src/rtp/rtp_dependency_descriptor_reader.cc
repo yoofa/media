@@ -27,8 +27,9 @@ RtpDependencyDescriptorReader::RtpDependencyDescriptorReader(
   AVE_DCHECK(descriptor);
 
   ReadMandatoryFields();
-  if (raw_data.size() > 3)
+  if (raw_data.size() > 3) {
     ReadExtendedFields();
+  }
 
   structure_ = descriptor->attached_structure
                    ? descriptor->attached_structure.get()
@@ -48,16 +49,19 @@ RtpDependencyDescriptorReader::RtpDependencyDescriptorReader(
 void RtpDependencyDescriptorReader::ReadTemplateDependencyStructure() {
   descriptor_->attached_structure =
       std::make_unique<FrameDependencyStructure>();
-  descriptor_->attached_structure->structure_id = buffer_.ReadBits(6);
-  descriptor_->attached_structure->num_decode_targets = buffer_.ReadBits(5) + 1;
+  descriptor_->attached_structure->structure_id =
+      static_cast<int32_t>(buffer_.ReadBits(6));
+  descriptor_->attached_structure->num_decode_targets =
+      static_cast<int32_t>(buffer_.ReadBits(5)) + 1;
 
   ReadTemplateLayers();
   ReadTemplateDtis();
   ReadTemplateFdiffs();
   ReadTemplateChains();
 
-  if (buffer_.Read<bool>())
+  if (buffer_.Read<bool>()) {
     ReadResolutions();
+  }
 }
 
 void RtpDependencyDescriptorReader::ReadTemplateLayers() {
@@ -69,8 +73,8 @@ void RtpDependencyDescriptorReader::ReadTemplateLayers() {
   };
   std::vector<FrameDependencyTemplate> templates;
 
-  int temporal_id = 0;
-  int spatial_id = 0;
+  int32_t temporal_id = 0;
+  int32_t spatial_id = 0;
   NextLayerIdc next_layer_idc;
   do {
     if (templates.size() == DependencyDescriptor::kMaxTemplates) {
@@ -107,7 +111,7 @@ void RtpDependencyDescriptorReader::ReadTemplateDtis() {
   for (FrameDependencyTemplate& current_template : structure->templates) {
     current_template.decode_target_indications.resize(
         structure->num_decode_targets);
-    for (int i = 0; i < structure->num_decode_targets; ++i) {
+    for (int32_t i = 0; i < structure->num_decode_targets; ++i) {
       current_template.decode_target_indications[i] =
           static_cast<DecodeTargetIndication>(buffer_.ReadBits(2));
     }
@@ -129,16 +133,18 @@ void RtpDependencyDescriptorReader::ReadTemplateChains() {
   FrameDependencyStructure* structure = descriptor_->attached_structure.get();
   structure->num_chains =
       buffer_.ReadNonSymmetric(structure->num_decode_targets + 1);
-  if (structure->num_chains == 0)
+  if (structure->num_chains == 0) {
     return;
-  for (int i = 0; i < structure->num_decode_targets; ++i) {
+  }
+  for (int32_t i = 0; i < structure->num_decode_targets; ++i) {
     uint32_t protected_by_chain =
         buffer_.ReadNonSymmetric(structure->num_chains);
     structure->decode_target_protected_by_chain.push_back(protected_by_chain);
   }
   for (FrameDependencyTemplate& frame_template : structure->templates) {
-    for (int chain_id = 0; chain_id < structure->num_chains; ++chain_id) {
-      frame_template.chain_diffs.push_back(buffer_.ReadBits(4));
+    for (int32_t chain_id = 0; chain_id < structure->num_chains; ++chain_id) {
+      frame_template.chain_diffs.push_back(
+          static_cast<int32_t>(buffer_.ReadBits(4)));
     }
   }
 }
@@ -146,11 +152,11 @@ void RtpDependencyDescriptorReader::ReadTemplateChains() {
 void RtpDependencyDescriptorReader::ReadResolutions() {
   FrameDependencyStructure* structure = descriptor_->attached_structure.get();
   // The way templates are bitpacked, they are always ordered by spatial_id.
-  int spatial_layers = structure->templates.back().spatial_id + 1;
+  int32_t spatial_layers = structure->templates.back().spatial_id + 1;
   structure->resolutions.reserve(spatial_layers);
-  for (int sid = 0; sid < spatial_layers; ++sid) {
-    uint16_t width_minus_1 = buffer_.Read<uint16_t>();
-    uint16_t height_minus_1 = buffer_.Read<uint16_t>();
+  for (int32_t sid = 0; sid < spatial_layers; ++sid) {
+    auto width_minus_1 = buffer_.Read<uint16_t>();
+    auto height_minus_1 = buffer_.Read<uint16_t>();
     structure->resolutions.emplace_back(width_minus_1 + 1, height_minus_1 + 1);
   }
 }
@@ -158,7 +164,7 @@ void RtpDependencyDescriptorReader::ReadResolutions() {
 void RtpDependencyDescriptorReader::ReadMandatoryFields() {
   descriptor_->first_packet_in_frame = buffer_.Read<bool>();
   descriptor_->last_packet_in_frame = buffer_.Read<bool>();
-  frame_dependency_template_id_ = buffer_.ReadBits(6);
+  frame_dependency_template_id_ = static_cast<int32_t>(buffer_.ReadBits(6));
   descriptor_->frame_number = buffer_.Read<uint16_t>();
 }
 
@@ -191,12 +197,15 @@ void RtpDependencyDescriptorReader::ReadFrameDependencyDefinition() {
   // Copy all the fields from the matching template
   descriptor_->frame_dependencies = structure_->templates[template_index];
 
-  if (custom_dtis_flag_)
+  if (custom_dtis_flag_) {
     ReadFrameDtis();
-  if (custom_fdiffs_flag_)
+  }
+  if (custom_fdiffs_flag_) {
     ReadFrameFdiffs();
-  if (custom_chains_flag_)
+  }
+  if (custom_chains_flag_) {
     ReadFrameChains();
+  }
 
   if (structure_->resolutions.empty()) {
     descriptor_->resolution = std::nullopt;
@@ -204,7 +213,7 @@ void RtpDependencyDescriptorReader::ReadFrameDependencyDefinition() {
     // Format guarantees that if there were resolutions in the last structure,
     // then each spatial layer got one.
     AVE_DCHECK_LE(descriptor_->frame_dependencies.spatial_id,
-                  static_cast<int>(structure_->resolutions.size()));
+                  static_cast<int32_t>(structure_->resolutions.size()));
     descriptor_->resolution =
         structure_->resolutions[descriptor_->frame_dependencies.spatial_id];
   }

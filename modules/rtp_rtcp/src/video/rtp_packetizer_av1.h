@@ -38,25 +38,25 @@ class RtpPacketizerAv1 : public RtpPacketizer {
     uint8_t header;
     uint8_t extension_header;  // undefined if (header & kXbit) == 0
     std::span<const uint8_t> payload;
-    int size;  // size of the header and payload combined.
+    int32_t size;  // size of the header and payload combined.
   };
   struct Packet {
-    explicit Packet(int first_obu_index) : first_obu(first_obu_index) {}
+    explicit Packet(int32_t first_obu_index) : first_obu(first_obu_index) {}
     // Indexes into obus_ vector of the first and last obus that should put into
     // the packet.
-    int first_obu;
-    int num_obu_elements = 0;
-    int first_obu_offset = 0;
-    int last_obu_size;
+    int32_t first_obu;
+    int32_t num_obu_elements = 0;
+    int32_t first_obu_offset = 0;
+    int32_t last_obu_size;
     // Total size consumed by the packet.
-    int packet_size = 0;
+    int32_t packet_size = 0;
   };
 
   // Parses the payload into serie of OBUs.
   static std::vector<Obu> ParseObus(std::span<const uint8_t> payload);
   // Returns the number of additional bytes needed to store the previous OBU
   // element if an additonal OBU element is added to the packet.
-  static int AdditionalBytesForPreviousObuElement(const Packet& packet);
+  static int32_t AdditionalBytesForPreviousObuElement(const Packet& packet);
   // Packetize and try to distribute the payload evenly across packets.
   static std::vector<Packet> PacketizeAboutEqually(const std::vector<Obu>& obus,
                                                    PayloadSizeLimits limits);

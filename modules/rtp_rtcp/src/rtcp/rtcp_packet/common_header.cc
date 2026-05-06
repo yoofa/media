@@ -43,8 +43,8 @@ bool CommonHeader::Parse(const uint8_t* buffer, size_t size_bytes) {
   uint8_t version = buffer[0] >> 6;
   if (version != kVersion) {
     AVE_LOG(LS_WARNING) << "Invalid RTCP header: Version must be "
-                        << static_cast<int>(kVersion) << " but was "
-                        << static_cast<int>(version);
+                        << static_cast<int32_t>(kVersion) << " but was "
+                        << static_cast<int32_t>(version);
     return false;
   }
 

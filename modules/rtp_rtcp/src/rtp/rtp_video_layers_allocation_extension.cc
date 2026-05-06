@@ -13,10 +13,11 @@
  */
 
 #include "media/modules/rtp_rtcp/src/rtp/rtp_video_layers_allocation_extension.h"
+#include <algorithm>
 #include <span>
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 #include <algorithm>
 
@@ -30,15 +31,15 @@ namespace media {
 namespace rtp_rtcp {
 namespace {
 
-constexpr int kMaxNumRtpStreams = 4;
+constexpr int32_t kMaxNumRtpStreams = 4;
 
 bool AllocationIsValid(const VideoLayersAllocation& allocation) {
   // Since all multivalue fields are stored in (rtp_stream_id, spatial_id) order
   // assume `allocation.active_spatial_layers` is already sorted. It is simpler
   // to assemble it in the sorted way than to resort during serialization.
-  if (!std::is_sorted(
-          allocation.active_spatial_layers.begin(),
-          allocation.active_spatial_layers.end(),
+  if (!std::ranges::is_sorted(
+          allocation.active_spatial_layers,
+
           [](const VideoLayersAllocation::SpatialLayer& lhs,
              const VideoLayersAllocation::SpatialLayer& rhs) {
             return std::make_tuple(lhs.rtp_stream_index, lhs.spatial_id) <
@@ -47,7 +48,7 @@ bool AllocationIsValid(const VideoLayersAllocation& allocation) {
     return false;
   }
 
-  int max_rtp_stream_idx = 0;
+  int32_t max_rtp_stream_idx = 0;
   for (const auto& spatial_layer : allocation.active_spatial_layers) {
     if (spatial_layer.rtp_stream_index < 0 ||
         spatial_layer.rtp_stream_index >= 4) {
@@ -75,16 +76,13 @@ bool AllocationIsValid(const VideoLayersAllocation& allocation) {
       }
     }
   }
-  if (allocation.rtp_stream_index < 0 ||
-      (!allocation.active_spatial_layers.empty() &&
-       allocation.rtp_stream_index > max_rtp_stream_idx)) {
-    return false;
-  }
-  return true;
+  return allocation.rtp_stream_index >= 0 &&
+         (allocation.active_spatial_layers.empty() ||
+          allocation.rtp_stream_index <= max_rtp_stream_idx);
 }
 
 struct SpatialLayersBitmasks {
-  int max_rtp_stream_id = 0;
+  int32_t max_rtp_stream_id = 0;
   uint8_t spatial_layer_bitmask[kMaxNumRtpStreams] = {};
   bool bitmasks_are_the_same = true;
 };
@@ -100,7 +98,7 @@ SpatialLayersBitmasks SpatialLayersBitmasksPerRtpStream(
       result.max_rtp_stream_id = layer.rtp_stream_index;
     }
   }
-  for (int i = 1; i <= result.max_rtp_stream_id; ++i) {
+  for (int32_t i = 1; i <= result.max_rtp_stream_id; ++i) {
     if (result.spatial_layer_bitmask[i] != result.spatial_layer_bitmask[0]) {
       result.bitmasks_are_the_same = false;
       break;
@@ -146,7 +144,7 @@ bool RtpVideoLayersAllocationExtension::Write(
   ++write_at;
 
   {  // Number of temporal layers.
-    int bit_offset = 8;
+    int32_t bit_offset = 8;
     *write_at = 0;
     for (const auto& layer : allocation.active_spatial_layers) {
       if (bit_offset == 0) {
@@ -204,12 +202,12 @@ bool RtpVideoLayersAllocationExtension::Parse(
 
   // Header byte.
   allocation->rtp_stream_index = *read_at >> 6;
-  int num_rtp_streams = 1 + ((*read_at >> 4) & 0b11);
+  int32_t num_rtp_streams = 1 + ((*read_at >> 4) & 0b11);
   uint8_t spatial_layers_bitmasks[kMaxNumRtpStreams];
   spatial_layers_bitmasks[0] = *read_at & 0b1111;
 
   if (spatial_layers_bitmasks[0] != 0) {
-    for (int i = 1; i < num_rtp_streams; ++i) {
+    for (int32_t i = 1; i < num_rtp_streams; ++i) {
       spatial_layers_bitmasks[i] = spatial_layers_bitmasks[0];
     }
   } else {
@@ -233,9 +231,9 @@ bool RtpVideoLayersAllocationExtension::Parse(
 
   // Read number of temporal layers,
   // Create `allocation->active_spatial_layers` while iterating though it.
-  int bit_offset = 8;
-  for (int stream_idx = 0; stream_idx < num_rtp_streams; ++stream_idx) {
-    for (int sid = 0; sid < VideoLayersAllocation::kMaxSpatialIds; ++sid) {
+  int32_t bit_offset = 8;
+  for (int32_t stream_idx = 0; stream_idx < num_rtp_streams; ++stream_idx) {
+    for (int32_t sid = 0; sid < VideoLayersAllocation::kMaxSpatialIds; ++sid) {
       if ((spatial_layers_bitmasks[stream_idx] & (1 << sid)) == 0) {
         continue;
       }
@@ -248,7 +246,7 @@ bool RtpVideoLayersAllocationExtension::Parse(
       } else {
         bit_offset -= 2;
       }
-      int num_temporal_layers = 1 + ((*read_at >> bit_offset) & 0b11);
+      int32_t num_temporal_layers = 1 + ((*read_at >> bit_offset) & 0b11);
       allocation->active_spatial_layers.emplace_back();
       auto& layer = allocation->active_spatial_layers.back();
       layer.rtp_stream_index = stream_idx;

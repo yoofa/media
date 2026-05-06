@@ -101,8 +101,9 @@ bool ExtendedReports::Parse(const CommonHeader& packet) {
 }
 
 void ExtendedReports::SetRrtr(const Rrtr& rrtr) {
-  if (rrtr_block_)
+  if (rrtr_block_) {
     AVE_LOG(LS_WARNING) << "Rrtr already set, overwriting.";
+  }
   rrtr_block_.emplace(rrtr);
 }
 
@@ -116,8 +117,9 @@ bool ExtendedReports::AddDlrrItem(const ReceiveTimeInfo& time_info) {
 }
 
 void ExtendedReports::SetTargetBitrate(const TargetBitrate& bitrate) {
-  if (target_bitrate_)
+  if (target_bitrate_) {
     AVE_LOG(LS_WARNING) << "TargetBitrate already set, overwriting.";
+  }
 
   target_bitrate_ = bitrate;
 }
@@ -132,8 +134,9 @@ bool ExtendedReports::Create(uint8_t* packet,
                              size_t max_length,
                              PacketReadyCallback callback) const {
   while (*index + BlockLength() > max_length) {
-    if (!OnBufferFull(packet, index, callback))
+    if (!OnBufferFull(packet, index, callback)) {
       return false;
+    }
   }
   size_t index_end = *index + BlockLength();
   const uint8_t kReserved = 0;
@@ -157,8 +160,9 @@ bool ExtendedReports::Create(uint8_t* packet,
 }
 
 size_t ExtendedReports::TargetBitrateLength() const {
-  if (target_bitrate_)
+  if (target_bitrate_) {
     return target_bitrate_->BlockLength();
+  }
   return 0;
 }
 

@@ -244,7 +244,8 @@ void RtpSenderEgress::SendPacket(std::unique_ptr<RtpPacketToSend> packet,
   //   }
   // }
 
-  auto compound_packet = Packet{std::move(packet), pacing_info, now};
+  auto compound_packet =
+      Packet{.rtp_packet = std::move(packet), .info = pacing_info, .now = now};
   if (enable_send_packet_batching_ && !is_audio_) {
     packets_to_send_.push_back(std::move(compound_packet));
   } else {
@@ -261,7 +262,7 @@ void RtpSenderEgress::OnBatchComplete() {
 
 void RtpSenderEgress::CompleteSendPacket(const Packet& compound_packet,
                                          bool last_in_batch) {
-  auto& [packet, pacing_info, now] = compound_packet;
+  const auto& [packet, pacing_info, now] = compound_packet;
   AVE_CHECK(packet);
 
   PacketOptions options;
@@ -322,7 +323,7 @@ void RtpSenderEgress::CompleteSendPacket(const Packet& compound_packet,
 RtpSendRates RtpSenderEgress::GetSendRates(base::Timestamp now) const {
   RtpSendRates current_rates;
   for (size_t i = 0; i < kNumMediaTypes; ++i) {
-    RtpPacketMediaType type = static_cast<RtpPacketMediaType>(i);
+    auto type = static_cast<RtpPacketMediaType>(i);
     current_rates[type] = send_rates_[i].Rate(now).value_or(DataRate::Zero());
   }
   return current_rates;
@@ -355,7 +356,7 @@ std::vector<RtpSequenceNumberMap::Info> RtpSenderEgress::GetSentRtpPacketInfos(
     std::span<const uint16_t> sequence_numbers) const {
   AVE_DCHECK(!sequence_numbers.empty());
   if (!need_rtp_packet_infos_) {
-    return std::vector<RtpSequenceNumberMap::Info>();
+    return {};
   }
 
   std::vector<RtpSequenceNumberMap::Info> results;
@@ -364,7 +365,7 @@ std::vector<RtpSequenceNumberMap::Info> RtpSenderEgress::GetSentRtpPacketInfos(
   for (uint16_t sequence_number : sequence_numbers) {
     const auto& info = rtp_sequence_number_map_->Get(sequence_number);
     if (!info) {
-      return std::vector<RtpSequenceNumberMap::Info>();
+      return {};
     }
     results.push_back(*info);
   }
@@ -413,9 +414,10 @@ bool RtpSenderEgress::HasCorrectSsrc(const RtpPacketToSend& packet) const {
   return false;
 }
 
-bool RtpSenderEgress::SendPacketToNetwork(const RtpPacketToSend& packet,
-                                          const PacketOptions& options,
-                                          const PacedPacketInfo& pacing_info) {
+bool RtpSenderEgress::SendPacketToNetwork(
+    const RtpPacketToSend& packet,
+    const PacketOptions& options,
+    const PacedPacketInfo& /*pacing_info*/) {
   if (transport_ == nullptr ||
       !transport_->SendRtp(
           std::span<const uint8_t>(packet.data(), packet.size()), options)) {

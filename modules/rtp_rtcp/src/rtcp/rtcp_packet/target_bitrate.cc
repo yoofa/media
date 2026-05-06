@@ -90,8 +90,7 @@ void TargetBitrate::AddTargetBitrate(uint8_t spatial_layer,
   AVE_DCHECK_LE(spatial_layer, 0x0F);
   AVE_DCHECK_LE(temporal_layer, 0x0F);
   AVE_DCHECK_LE(target_bitrate_kbps, 0x00FFFFFFU);
-  bitrates_.push_back(
-      BitrateItem(spatial_layer, temporal_layer, target_bitrate_kbps));
+  bitrates_.emplace_back(spatial_layer, temporal_layer, target_bitrate_kbps);
 }
 
 const std::vector<TargetBitrate::BitrateItem>&
@@ -107,7 +106,7 @@ size_t TargetBitrate::BlockLength() const {
 void TargetBitrate::Create(uint8_t* buffer) const {
   buffer[0] = kBlockType;
   buffer[1] = 0;  // Reserved.
-  uint16_t block_length_words = static_cast<uint16_t>((BlockLength() / 4) - 1);
+  auto block_length_words = static_cast<uint16_t>((BlockLength() / 4) - 1);
   ByteWriter<uint16_t>::WriteBigEndian(&buffer[2], block_length_words);
 
   size_t index = kTargetBitrateHeaderSizeBytes;

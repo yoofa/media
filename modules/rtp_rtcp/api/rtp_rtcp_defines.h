@@ -50,11 +50,11 @@ constexpr size_t kIpPacketSize = 1500;
 // For backward compatibility
 constexpr size_t IP_PACKET_SIZE = 1500;
 
-constexpr int kVideoPayloadTypeFrequency = 90000;
+constexpr int32_t kVideoPayloadTypeFrequency = 90000;
 
 // TODO(bugs.webrtc.org/6458): Remove this when all the depending projects are
 // updated to correctly set rtp rate for RtcpSender.
-constexpr int kBogusRtpRateForAudioRtcp = 8000;
+constexpr int32_t kBogusRtpRateForAudioRtcp = 8000;
 
 // Minimum RTP header size in bytes.
 constexpr uint8_t kRtpHeaderSize = 12;
@@ -65,7 +65,7 @@ bool IsLegalRsidName(std::string_view name);
 // This enum must not have any gaps, i.e., all integers between
 // kRtpExtensionNone and kRtpExtensionNumberOfExtensions must be valid enum
 // entries.
-enum RTPExtensionType : int {
+enum RTPExtensionType : int32_t {
   kRtpExtensionNone,
   kRtpExtensionTransmissionTimeOffset,
   kRtpExtensionAudioLevel,
@@ -161,7 +161,7 @@ struct PacedPacketInfo;
 
 // Struct with info about a sent RTP packet, used for transport feedback.
 struct RtpPacketSendInfo {
-  static RtpPacketSendInfo From(const RtpPacketToSend& rtp_packet_to_send,
+  static RtpPacketSendInfo From(const RtpPacketToSend& packet,
                                 const PacedPacketInfo& pacing_info);
 
   uint16_t transport_sequence_number = 0;
@@ -173,11 +173,11 @@ struct RtpPacketSendInfo {
   // PacedPacketInfo is defined in transport/network_types.h
   // For now, we inline a simplified version here to avoid circular deps.
   struct PacingInfo {
-    static constexpr int kNotAProbe = -1;
-    int probe_cluster_id = kNotAProbe;
-    int probe_cluster_min_probes = -1;
-    int probe_cluster_min_bytes = -1;
-    int probe_cluster_bytes_sent = 0;
+    static constexpr int32_t kNotAProbe = -1;
+    int32_t probe_cluster_id = kNotAProbe;
+    int32_t probe_cluster_min_probes = -1;
+    int32_t probe_cluster_min_bytes = -1;
+    int32_t probe_cluster_bytes_sent = 0;
   } pacing_info;
 };
 

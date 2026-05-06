@@ -531,7 +531,7 @@ MediaMeta& MediaMeta::SetColorSpace(const ColorSpace& color_space) {
 ColorSpace MediaMeta::color_space() const {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "color_space failed, stream type is not video";
-    return ColorSpace();
+    return {};
   }
 
   if (format_type_ == FormatType::kTrack) {

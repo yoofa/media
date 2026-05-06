@@ -26,11 +26,14 @@ constexpr int64_t kNumMicrosecsPerSec = 1000000;
 
 uint32_t SaturatedToCompactNtp(base::TimeDelta delta) {
   constexpr uint32_t kMaxCompactNtp = 0xFFFFFFFF;
-  constexpr int kCompactNtpInSecond = 0x10000;
-  if (delta <= base::TimeDelta::Zero())
+  constexpr int32_t kCompactNtpInSecond = 0x10000;
+  if (delta <= base::TimeDelta::Zero()) {
     return 0;
-  if (delta.us() >= kMaxCompactNtp * kNumMicrosecsPerSec / kCompactNtpInSecond)
+  }
+  if (delta.us() >=
+      kMaxCompactNtp * kNumMicrosecsPerSec / kCompactNtpInSecond) {
     return kMaxCompactNtp;
+  }
   // To convert to compact ntp need to divide by 1e6 to get seconds,
   // then multiply by 0x10000 to get the final result.
   // To avoid float operations, multiplication and division swapped.
@@ -40,7 +43,7 @@ uint32_t SaturatedToCompactNtp(base::TimeDelta delta) {
 
 base::TimeDelta CompactNtpIntervalToTimeDelta(uint32_t compact_ntp_interval) {
   // Convert to 64bit value to avoid multiplication overflow.
-  int64_t value = int64_t{compact_ntp_interval};
+  auto value = int64_t{compact_ntp_interval};
   if (compact_ntp_interval > 0x8000'0000) {
     value -= (int64_t{1} << 32);
   }

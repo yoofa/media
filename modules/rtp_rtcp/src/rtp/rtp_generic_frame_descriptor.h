@@ -27,9 +27,9 @@ class RtpGenericFrameDescriptorExtension;
 // Data to put on the wire for FrameDescriptor rtp header extension.
 class RtpGenericFrameDescriptor {
  public:
-  static constexpr int kMaxNumFrameDependencies = 8;
-  static constexpr int kMaxTemporalLayers = 8;
-  static constexpr int kMaxSpatialLayers = 8;
+  static constexpr int32_t kMaxNumFrameDependencies = 8;
+  static constexpr int32_t kMaxTemporalLayers = 8;
+  static constexpr int32_t kMaxSpatialLayers = 8;
 
   RtpGenericFrameDescriptor();
   RtpGenericFrameDescriptor(const RtpGenericFrameDescriptor&);
@@ -42,18 +42,18 @@ class RtpGenericFrameDescriptor {
 
   // Properties below undefined if !FirstPacketInSubFrame()
   // Valid range for temporal layer: [0, 7]
-  int TemporalLayer() const;
-  void SetTemporalLayer(int temporal_layer);
+  int32_t TemporalLayer() const;
+  void SetTemporalLayer(int32_t temporal_layer);
 
   // Frame might by used, possible indirectly, for spatial layer sid iff
   // (bitmask & (1 << sid)) != 0
-  int SpatialLayer() const;
+  int32_t SpatialLayer() const;
   uint8_t SpatialLayersBitmask() const;
   void SetSpatialLayersBitmask(uint8_t spatial_layers);
 
-  int Width() const { return width_; }
-  int Height() const { return height_; }
-  void SetResolution(int width, int height);
+  int32_t Width() const { return width_; }
+  int32_t Height() const { return height_; }
+  void SetResolution(int32_t width, int32_t height);
 
   uint16_t FrameId() const;
   void SetFrameId(uint16_t frame_id);
@@ -71,9 +71,9 @@ class RtpGenericFrameDescriptor {
   uint8_t spatial_layers_ = 1;
   uint8_t temporal_layer_ = 0;
   size_t num_frame_deps_ = 0;
-  uint16_t frame_deps_id_diffs_[kMaxNumFrameDependencies];
-  int width_ = 0;
-  int height_ = 0;
+  uint16_t frame_deps_id_diffs_[kMaxNumFrameDependencies]{};
+  int32_t width_ = 0;
+  int32_t height_ = 0;
 };
 
 }  // namespace rtp_rtcp

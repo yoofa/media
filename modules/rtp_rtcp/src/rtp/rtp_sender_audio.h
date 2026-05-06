@@ -56,7 +56,7 @@ class RTPSenderAudio {
     std::span<const uint8_t> payload;
 
     // Payload id to write to the payload type field of the rtp packet.
-    int payload_id = -1;
+    int32_t payload_id = -1;
 
     // capture time of the audio frame represented as rtp timestamp.
     uint32_t rtp_timestamp = 0;
@@ -67,7 +67,7 @@ class RTPSenderAudio {
     // Audio level in dBov for
     // header-extension-for-audio-level-indication.
     // Valid range is [0,127]. Actual value is negative.
-    std::optional<int> audio_level_dbov;
+    std::optional<int32_t> audio_level_dbov;
 
     // Contributing sources list.
     std::span<const uint32_t> csrcs;
@@ -114,7 +114,7 @@ class RTPSenderAudio {
 
   bool first_packet_sent_ = false;
 
-  std::optional<int> encoder_rtp_timestamp_frequency_;
+  std::optional<int32_t> encoder_rtp_timestamp_frequency_;
 
   AbsoluteCaptureTimeSender absolute_capture_time_sender_;
 };

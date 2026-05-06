@@ -11,6 +11,7 @@
  */
 
 #include "media/modules/rtp_rtcp/src/rtp/rtp_packet_history.h"
+#include <ranges>
 #include <span>
 
 #include <algorithm>
@@ -65,12 +66,12 @@ RtpPacketHistory::RtpPacketHistory(base::Clock* clock, PaddingMode padding_mode)
       rtt_(base::TimeDelta::MinusInfinity()),
       packets_inserted_(0) {}
 
-RtpPacketHistory::~RtpPacketHistory() {}
+RtpPacketHistory::~RtpPacketHistory() = default;
 
 void RtpPacketHistory::SetStorePacketsStatus(StorageMode mode,
                                              size_t number_to_store) {
   AVE_DCHECK_LE(number_to_store, kMaxCapacity);
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (mode != StorageMode::kDisabled && mode_ != StorageMode::kDisabled) {
     AVE_LOG(LS_WARNING) << "Purging packet history in order to re-set status.";
   }
@@ -80,12 +81,12 @@ void RtpPacketHistory::SetStorePacketsStatus(StorageMode mode,
 }
 
 RtpPacketHistory::StorageMode RtpPacketHistory::GetStorageMode() const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   return mode_;
 }
 
 void RtpPacketHistory::SetRtt(base::TimeDelta rtt) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   AVE_DCHECK_GE(rtt, base::TimeDelta::Zero());
   rtt_ = rtt;
   // If storage is not disabled,  packets will be removed after a timeout
@@ -99,7 +100,7 @@ void RtpPacketHistory::SetRtt(base::TimeDelta rtt) {
 void RtpPacketHistory::PutRtpPacket(std::unique_ptr<RtpPacketToSend> packet,
                                     base::Timestamp send_time) {
   AVE_DCHECK(packet);
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (mode_ == StorageMode::kDisabled) {
     return;
   }
@@ -109,7 +110,7 @@ void RtpPacketHistory::PutRtpPacket(std::unique_ptr<RtpPacketToSend> packet,
 
   // Store packet.
   const uint16_t rtp_seq_no = packet->SequenceNumber();
-  int packet_index = GetPacketIndex(rtp_seq_no);
+  int32_t packet_index = GetPacketIndex(rtp_seq_no);
   if (packet_index >= 0 &&
       static_cast<size_t>(packet_index) < packet_history_.size() &&
       packet_history_[packet_index].packet_ != nullptr) {
@@ -124,12 +125,12 @@ void RtpPacketHistory::PutRtpPacket(std::unique_ptr<RtpPacketToSend> packet,
     packet_history_.emplace_front();
   }
   // Packet to be inserted behind last packet, expand back.
-  while (static_cast<int>(packet_history_.size()) <= packet_index) {
+  while (std::cmp_less_equal(packet_history_.size(), packet_index)) {
     packet_history_.emplace_back();
   }
 
   AVE_DCHECK_GE(packet_index, 0);
-  AVE_DCHECK_LT(packet_index, static_cast<int>(packet_history_.size()));
+  AVE_DCHECK_LT(packet_index, static_cast<int32_t>(packet_history_.size()));
   AVE_DCHECK(packet_history_[packet_index].packet_ == nullptr);
 
   if (padding_mode_ == PaddingMode::kRecentLargePacket) {
@@ -159,7 +160,7 @@ std::unique_ptr<RtpPacketToSend> RtpPacketHistory::GetPacketAndMarkAsPending(
     uint16_t sequence_number,
     base::FunctionView<std::unique_ptr<RtpPacketToSend>(const RtpPacketToSend&)>
         encapsulate) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (mode_ == StorageMode::kDisabled) {
     return nullptr;
   }
@@ -190,7 +191,7 @@ std::unique_ptr<RtpPacketToSend> RtpPacketHistory::GetPacketAndMarkAsPending(
 }
 
 void RtpPacketHistory::MarkPacketAsSent(uint16_t sequence_number) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (mode_ == StorageMode::kDisabled) {
     return;
   }
@@ -208,12 +209,12 @@ void RtpPacketHistory::MarkPacketAsSent(uint16_t sequence_number) {
 }
 
 bool RtpPacketHistory::GetPacketState(uint16_t sequence_number) const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (mode_ == StorageMode::kDisabled) {
     return false;
   }
 
-  int packet_index = GetPacketIndex(sequence_number);
+  int32_t packet_index = GetPacketIndex(sequence_number);
   if (packet_index < 0 ||
       static_cast<size_t>(packet_index) >= packet_history_.size()) {
     return false;
@@ -253,7 +254,7 @@ std::unique_ptr<RtpPacketToSend> RtpPacketHistory::GetPayloadPaddingPacket() {
 std::unique_ptr<RtpPacketToSend> RtpPacketHistory::GetPayloadPaddingPacket(
     base::FunctionView<std::unique_ptr<RtpPacketToSend>(const RtpPacketToSend&)>
         encapsulate) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (mode_ == StorageMode::kDisabled) {
     return nullptr;
   }
@@ -265,10 +266,9 @@ std::unique_ptr<RtpPacketToSend> RtpPacketHistory::GetPayloadPaddingPacket(
   StoredPacket* best_packet = nullptr;
   if (!packet_history_.empty()) {
     // Pick the last packet.
-    for (auto it = packet_history_.rbegin(); it != packet_history_.rend();
-         ++it) {
-      if (it->packet_ != nullptr) {
-        best_packet = &(*it);
+    for (auto& it : std::views::reverse(packet_history_)) {
+      if (it.packet_ != nullptr) {
+        best_packet = &it;
         break;
       }
     }
@@ -298,9 +298,9 @@ std::unique_ptr<RtpPacketToSend> RtpPacketHistory::GetPayloadPaddingPacket(
 
 void RtpPacketHistory::CullAcknowledgedPackets(
     std::span<const uint16_t> sequence_numbers) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   for (uint16_t sequence_number : sequence_numbers) {
-    int packet_index = GetPacketIndex(sequence_number);
+    int32_t packet_index = GetPacketIndex(sequence_number);
     if (packet_index < 0 ||
         static_cast<size_t>(packet_index) >= packet_history_.size()) {
       continue;
@@ -310,7 +310,7 @@ void RtpPacketHistory::CullAcknowledgedPackets(
 }
 
 void RtpPacketHistory::Clear() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   Reset();
 }
 
@@ -359,7 +359,7 @@ void RtpPacketHistory::CullOldPackets() {
 }
 
 std::unique_ptr<RtpPacketToSend> RtpPacketHistory::RemovePacket(
-    int packet_index) {
+    int32_t packet_index) {
   // Move the packet out from the StoredPacket container.
   std::unique_ptr<RtpPacketToSend> rtp_packet =
       std::move(packet_history_[packet_index].packet_);
@@ -373,26 +373,26 @@ std::unique_ptr<RtpPacketToSend> RtpPacketHistory::RemovePacket(
   return rtp_packet;
 }
 
-int RtpPacketHistory::GetPacketIndex(uint16_t sequence_number) const {
+int32_t RtpPacketHistory::GetPacketIndex(uint16_t sequence_number) const {
   if (packet_history_.empty()) {
     return 0;
   }
 
   AVE_DCHECK(packet_history_.front().packet_ != nullptr);
-  int first_seq = packet_history_.front().packet_->SequenceNumber();
-  if (first_seq == sequence_number) {
+  int32_t first_seq = packet_history_.front().packet_->SequenceNumber();
+  if (std::cmp_equal(first_seq, sequence_number)) {
     return 0;
   }
 
-  int packet_index = sequence_number - first_seq;
-  constexpr int kSeqNumSpan = std::numeric_limits<uint16_t>::max() + 1;
+  int32_t packet_index = sequence_number - first_seq;
+  constexpr int32_t kSeqNumSpan = std::numeric_limits<uint16_t>::max() + 1;
 
   if (IsNewerSequenceNumber(sequence_number, first_seq)) {
-    if (sequence_number < first_seq) {
+    if (std::cmp_less(sequence_number, first_seq)) {
       // Forward wrap.
       packet_index += kSeqNumSpan;
     }
-  } else if (sequence_number > first_seq) {
+  } else if (std::cmp_greater(sequence_number, first_seq)) {
     // Backwards wrap.
     packet_index -= kSeqNumSpan;
   }
@@ -402,7 +402,7 @@ int RtpPacketHistory::GetPacketIndex(uint16_t sequence_number) const {
 
 RtpPacketHistory::StoredPacket* RtpPacketHistory::GetStoredPacket(
     uint16_t sequence_number) {
-  int index = GetPacketIndex(sequence_number);
+  int32_t index = GetPacketIndex(sequence_number);
   if (index < 0 || static_cast<size_t>(index) >= packet_history_.size() ||
       packet_history_[index].packet_ == nullptr) {
     return nullptr;

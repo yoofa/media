@@ -48,8 +48,8 @@ struct RTPVideoHeaderVP8 {
   uint8_t temporalIdx;        // Temporal layer index, or kNoTemporalIdx.
   bool layerSync;             // This frame is a layer sync frame.
                               // Disabled if temporalIdx == kNoTemporalIdx.
-  int keyIdx;                 // 5 bits; kNoKeyIdx means not used.
-  int partitionId;            // VP8 partition ID
+  int32_t keyIdx;             // 5 bits; kNoKeyIdx means not used.
+  int32_t partitionId;        // VP8 partition ID
   bool beginningOfPartition;  // True if this packet is the first
                               // in a VP8 partition. Otherwise false
 };

@@ -78,7 +78,7 @@ bool Remb::Parse(const CommonHeader& packet) {
       (static_cast<uint64_t>(bitrate_bps_) >> exponent) != mantissa;
   if (bitrate_bps_ < 0 || shift_overflow) {
     AVE_LOG(LS_ERROR) << "Invalid remb bitrate value : " << mantissa << "*2^"
-                      << static_cast<int>(exponent);
+                      << static_cast<int32_t>(exponent);
     return false;
   }
 
@@ -111,8 +111,9 @@ bool Remb::Create(uint8_t* packet,
                   size_t max_length,
                   PacketReadyCallback callback) const {
   while (*index + BlockLength() > max_length) {
-    if (!OnBufferFull(packet, index, callback))
+    if (!OnBufferFull(packet, index, callback)) {
       return false;
+    }
   }
   size_t index_end = *index + BlockLength();
   CreateHeader(Psfb::kAfbMessageType, kPacketType, HeaderLength(), packet,

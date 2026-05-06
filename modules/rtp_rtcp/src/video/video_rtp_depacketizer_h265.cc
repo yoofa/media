@@ -37,14 +37,16 @@ bool ParseApStartOffsets(const uint8_t* nalu_ptr,
   size_t offset = 0;
   while (length_remaining > 0) {
     // Buffer doesn't contain room for additional NALU length.
-    if (length_remaining < kH265LengthFieldSizeBytes)
+    if (length_remaining < kH265LengthFieldSizeBytes) {
       return false;
+    }
     // Read 16-bit NALU size defined in RFC7798 section 4.4.2.
     uint16_t nalu_size = ByteReader<uint16_t>::ReadBigEndian(nalu_ptr);
     nalu_ptr += kH265LengthFieldSizeBytes;
     length_remaining -= kH265LengthFieldSizeBytes;
-    if (nalu_size > length_remaining)
+    if (nalu_size > length_remaining) {
       return false;
+    }
     nalu_ptr += nalu_size;
     length_remaining -= nalu_size;
 
@@ -262,14 +264,13 @@ VideoRtpDepacketizerH265::Parse(base::CopyOnWriteBuffer rtp_payload) {
   if (nal_type == H265::NaluType::kFu) {
     // Fragmented NAL units (FU).
     return ParseFuNalu(std::move(rtp_payload));
-  } else if (nal_type == H265::NaluType::kPaci) {
+  }
+  if (nal_type == H265::NaluType::kPaci) {
     // TODO(bugs.webrtc.org/13485): Implement PACI parse for H265
     AVE_LOG(LS_ERROR) << "Not support type:" << nal_type;
     return std::nullopt;
-  } else {
-    // Single NAL unit packet or Aggregated packets (AP).
-    return ProcessApOrSingleNalu(std::move(rtp_payload));
-  }
+  }  // Single NAL unit packet or Aggregated packets (AP).
+  return ProcessApOrSingleNalu(std::move(rtp_payload));
 }
 
 }  // namespace rtp_rtcp

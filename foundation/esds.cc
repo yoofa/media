@@ -119,9 +119,9 @@ status_t ESDS::parseESDescriptor(size_t offset, size_t size) {
   offset += 2;  // skip ES_ID
   size -= 2;
 
-  unsigned streamDependenceFlag = mData[offset] & 0x80;
-  unsigned URL_Flag = mData[offset] & 0x40;
-  unsigned OCRstreamFlag = mData[offset] & 0x20;
+  uint32_t streamDependenceFlag = mData[offset] & 0x80;
+  uint32_t URL_Flag = mData[offset] & 0x40;
+  uint32_t OCRstreamFlag = mData[offset] & 0x20;
 
   ++offset;
   --size;
@@ -138,7 +138,7 @@ status_t ESDS::parseESDescriptor(size_t offset, size_t size) {
     if (offset >= size) {
       return ERROR_MALFORMED;
     }
-    unsigned URLlength = mData[offset];
+    uint32_t URLlength = mData[offset];
     if (URLlength >= size) {
       return ERROR_MALFORMED;
     }
@@ -206,8 +206,8 @@ status_t ESDS::parseDecoderConfigDescriptor(size_t offset, size_t size) {
   }
 
   mObjectTypeIndication = mData[offset];
-  mBitRateMax = U32_AT(mData + offset + 5);
-  mBitRateAvg = U32_AT(mData + offset + 9);
+  mBitRateMax = base::U32_AT(mData + offset + 5);
+  mBitRateAvg = base::U32_AT(mData + offset + 9);
 
   offset += 13;
   size -= 13;

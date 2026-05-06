@@ -62,10 +62,7 @@ std::vector<RtpSource> SourceTracker::GetSources() const {
   PruneEntries(clock_->CurrentTime());
 
   std::vector<RtpSource> sources;
-  for (const auto& pair : list_) {
-    const SourceKey& key = pair.first;
-    const SourceEntry& entry = pair.second;
-
+  for (const auto& [key, entry] : list_) {
     sources.emplace_back(
         entry.timestamp, key.source, key.source_type, entry.rtp_timestamp,
         RtpSource::Extensions{

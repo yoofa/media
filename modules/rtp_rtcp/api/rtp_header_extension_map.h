@@ -30,7 +30,7 @@ using std::span;
 class RtpHeaderExtensionMap {
  public:
   static constexpr RTPExtensionType kInvalidType = kRtpExtensionNone;
-  static constexpr int kInvalidId = 0;
+  static constexpr int32_t kInvalidId = 0;
 
   RtpHeaderExtensionMap();
   explicit RtpHeaderExtensionMap(bool extmap_allow_mixed);
@@ -39,17 +39,17 @@ class RtpHeaderExtensionMap {
   void Reset(std::span<const RtpExtension> extensions);
 
   template <typename Extension>
-  bool Register(int id) {
+  bool Register(int32_t id) {
     return Register(id, Extension::kId, Extension::Uri());
   }
-  bool RegisterByType(int id, RTPExtensionType type);
-  bool RegisterByUri(int id, std::string_view uri);
+  bool RegisterByType(int32_t id, RTPExtensionType type);
+  bool RegisterByUri(int32_t id, std::string_view uri);
 
   bool IsRegistered(RTPExtensionType type) const {
     return GetId(type) != kInvalidId;
   }
   // Return kInvalidType if not found.
-  RTPExtensionType GetType(int id) const;
+  RTPExtensionType GetType(int32_t id) const;
   // Return kInvalidId if not found.
   uint8_t GetId(RTPExtensionType type) const {
     AVE_DCHECK_GT(type, kRtpExtensionNone);
@@ -68,9 +68,9 @@ class RtpHeaderExtensionMap {
   }
 
  private:
-  bool Register(int id, RTPExtensionType type, std::string_view uri);
+  bool Register(int32_t id, RTPExtensionType type, std::string_view uri);
 
-  uint8_t ids_[kRtpExtensionNumberOfExtensions];
+  uint8_t ids_[kRtpExtensionNumberOfExtensions]{};
   bool extmap_allow_mixed_;
 };
 

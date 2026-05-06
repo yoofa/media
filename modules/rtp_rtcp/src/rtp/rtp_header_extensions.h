@@ -177,9 +177,9 @@ class VideoOrientation {
     return RtpExtension::kVideoRotationUri;
   }
 
-  static bool Parse(std::span<const uint8_t> data, VideoRotation* value);
+  static bool Parse(std::span<const uint8_t> data, VideoRotation* rotation);
   static size_t ValueSize(VideoRotation) { return kValueSizeBytes; }
-  static bool Write(std::span<uint8_t> data, VideoRotation value);
+  static bool Write(std::span<uint8_t> data, VideoRotation rotation);
   static bool Parse(std::span<const uint8_t> data, uint8_t* value);
   static size_t ValueSize(uint8_t /* value */) { return kValueSizeBytes; }
   static bool Write(std::span<uint8_t> data, uint8_t value);
@@ -195,8 +195,8 @@ class PlayoutDelayLimits {
   }
 
   // Playout delay in milliseconds. Maximum 40950 ms.
-  static constexpr int kGranularityMs = 10;
-  static constexpr int kMaxMs = 0xfff * kGranularityMs;  // 40950 ms.
+  static constexpr int32_t kGranularityMs = 10;
+  static constexpr int32_t kMaxMs = 0xfff * kGranularityMs;  // 40950 ms.
 
   static bool Parse(std::span<const uint8_t> data,
                     VideoPlayoutDelay* playout_delay);
@@ -336,9 +336,11 @@ class ColorSpaceExtension {
   static bool Write(std::span<uint8_t> data, const ColorSpace& color_space);
 
  private:
-  static constexpr int kChromaticityDenominator = 50000;  // 0.00002 resolution.
-  static constexpr int kLuminanceMaxDenominator = 1;      // 1 resolution.
-  static constexpr int kLuminanceMinDenominator = 10000;  // 0.0001 resolution.
+  static constexpr int32_t kChromaticityDenominator =
+      50000;                                              // 0.00002 resolution.
+  static constexpr int32_t kLuminanceMaxDenominator = 1;  // 1 resolution.
+  static constexpr int32_t kLuminanceMinDenominator =
+      10000;  // 0.0001 resolution.
 
   static uint8_t CombineRangeAndChromaSiting(
       ColorSpace::RangeID range,

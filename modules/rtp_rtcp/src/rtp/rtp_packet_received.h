@@ -65,8 +65,8 @@ class RtpPacketReceived : public RtpPacket {
   bool recovered() const { return recovered_; }
   void set_recovered(bool value) { recovered_ = value; }
 
-  int payload_type_frequency() const { return payload_type_frequency_; }
-  void set_payload_type_frequency(int value) {
+  int32_t payload_type_frequency() const { return payload_type_frequency_; }
+  void set_payload_type_frequency(int32_t value) {
     payload_type_frequency_ = value;
   }
 
@@ -80,7 +80,7 @@ class RtpPacketReceived : public RtpPacket {
  private:
   base::Timestamp arrival_time_ = base::Timestamp::MinusInfinity();
   EcnMarking ecn_ = EcnMarking::kNotEct;
-  int payload_type_frequency_ = 0;
+  int32_t payload_type_frequency_ = 0;
   bool recovered_ = false;
   std::shared_ptr<void> additional_data_;
 };

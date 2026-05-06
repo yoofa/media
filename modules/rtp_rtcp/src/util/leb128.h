@@ -18,7 +18,7 @@ namespace media {
 namespace rtp_rtcp {
 
 // Returns number of bytes needed to store `value` in leb128 format.
-int Leb128Size(uint64_t value);
+int32_t Leb128Size(uint64_t value);
 
 // Reads leb128 encoded value and advance read_at by number of bytes consumed.
 // Sets read_at to nullptr on error.
@@ -26,7 +26,7 @@ uint64_t ReadLeb128(const uint8_t*& read_at, const uint8_t* end);
 
 // Encodes `value` in leb128 format. Assumes buffer has size of at least
 // Leb128Size(value). Returns number of bytes consumed.
-int WriteLeb128(uint64_t value, uint8_t* buffer);
+int32_t WriteLeb128(uint64_t value, uint8_t* buffer);
 
 }  // namespace rtp_rtcp
 }  // namespace media

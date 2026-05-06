@@ -55,7 +55,7 @@ class FlexfecHeaderWriter : public FecHeaderWriter {
   size_t MinPacketMaskSize(const uint8_t* packet_mask,
                            size_t packet_mask_size) const override;
 
-  size_t FecHeaderSize(size_t packet_mask_row_size) const override;
+  size_t FecHeaderSize(size_t packet_mask_size) const override;
 
   void FinalizeFecHeader(
       std::span<const ProtectedStream> protected_streams,

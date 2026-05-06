@@ -16,8 +16,8 @@ namespace media {
 
 struct MediaSinkWants {
   struct FrameSize {
-    int width = 0;
-    int height = 0;
+    int32_t width = 0;
+    int32_t height = 0;
   };
   MediaSinkWants() = default;
   MediaSinkWants(const MediaSinkWants&) = default;
@@ -33,22 +33,22 @@ struct MediaSinkWants {
   bool black_frames = false;
 
   // Tells the source the maximum number of pixels the sink wants.
-  int max_pixel_count = std::numeric_limits<int>::max();
+  int32_t max_pixel_count = std::numeric_limits<int32_t>::max();
   // Tells the source the desired number of pixels the sinks wants. This will
   // typically be used when stepping the resolution up again when conditions
   // have improved after an earlier downgrade. The source should select the
   // closest resolution to this pixel count, but if max_pixel_count is set, it
   // still sets the absolute upper bound.
-  std::optional<int> target_pixel_count;
+  std::optional<int32_t> target_pixel_count;
   // Tells the source the maximum framerate the sink wants.
-  int max_framerate_fps = std::numeric_limits<int>::max();
+  int32_t max_framerate_fps = std::numeric_limits<int32_t>::max();
 
   // Tells the source that the sink wants width and height of the video frames
   // to be divisible by `resolution_alignment`.
   // For example: With I420, this value would be a multiple of 2.
   // Note that this field is unrelated to any horizontal or vertical stride
   // requirements the encoder has on the incoming video frame buffers.
-  int resolution_alignment = 1;
+  int32_t resolution_alignment = 1;
 
   // The resolutions that sink is configured to consume. If the sink is an
   // encoder this is what the encoder is configured to encode. In singlecast we

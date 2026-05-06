@@ -25,7 +25,7 @@ class LossNotification : public Psfb {
   LossNotification(uint16_t last_decoded,
                    uint16_t last_received,
                    bool decodability_flag);
-  LossNotification(const LossNotification& other);
+  LossNotification(const LossNotification& rhs);
   ~LossNotification() override;
 
   size_t BlockLength() const override;

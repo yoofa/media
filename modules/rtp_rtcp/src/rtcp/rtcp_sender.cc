@@ -10,7 +10,7 @@
 
 #include "media/modules/rtp_rtcp/src/rtcp/rtcp_sender.h"
 
-#include <string.h>
+#include <cstring>
 
 #include <algorithm>
 #include <cstdint>
@@ -82,7 +82,7 @@ class RTCPSender::PacketSender {
  public:
   PacketSender(rtcp::RtcpPacket::PacketReadyCallback callback,
                size_t max_packet_size)
-      : callback_(callback), max_packet_size_(max_packet_size) {
+      : callback_(std::move(callback)), max_packet_size_(max_packet_size) {
     AVE_CHECK_LE(max_packet_size, IP_PACKET_SIZE);
   }
   ~PacketSender() { AVE_DCHECK_EQ(index_, 0) << "Unsent rtcp packet."; }
@@ -105,7 +105,7 @@ class RTCPSender::PacketSender {
   const rtcp::RtcpPacket::PacketReadyCallback callback_;
   const size_t max_packet_size_;
   size_t index_ = 0;
-  uint8_t buffer_[IP_PACKET_SIZE];
+  uint8_t buffer_[IP_PACKET_SIZE]{};
 };
 
 RTCPSender::FeedbackState::FeedbackState()
@@ -203,15 +203,15 @@ RTCPSender::RTCPSender(base::Clock* clock, Configuration config)
   builders_[kRtcpAnyExtendedReports] = &RTCPSender::BuildExtendedReports;
 }
 
-RTCPSender::~RTCPSender() {}
+RTCPSender::~RTCPSender() = default;
 
 RtcpMode RTCPSender::Status() const {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   return method_;
 }
 
 void RTCPSender::SetRTCPStatus(RtcpMode new_method) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
 
   if (new_method == RtcpMode::kOff) {
     next_time_to_send_rtcp_ = std::nullopt;
@@ -223,18 +223,18 @@ void RTCPSender::SetRTCPStatus(RtcpMode new_method) {
 }
 
 bool RTCPSender::Sending() const {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   return sending_;
 }
 
 void RTCPSender::SetSendingStatus(const FeedbackState& /* feedback_state */,
                                   bool sending) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   sending_ = sending;
 }
 
 void RTCPSender::SetNonSenderRttMeasurement(bool enabled) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   xr_send_receiver_reference_time_enabled_ = enabled;
 }
 
@@ -250,7 +250,7 @@ int32_t RTCPSender::SendLossNotification(const FeedbackState& feedback_state,
   };
   std::optional<PacketSender> sender;
   {
-    std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+    std::scoped_lock lock(mutex_rtcp_sender_);
 
     if (!loss_notification_.Set(last_decoded_seq_num, last_received_seq_num,
                                 decodability_flag)) {
@@ -280,7 +280,7 @@ int32_t RTCPSender::SendLossNotification(const FeedbackState& feedback_state,
 
 void RTCPSender::SetRemb(int64_t bitrate_bps, std::vector<uint32_t> ssrcs) {
   AVE_CHECK_GE(bitrate_bps, 0);
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   if (method_ == RtcpMode::kOff) {
     AVE_LOG(LS_WARNING) << "Can't send RTCP if it is disabled.";
     return;
@@ -294,30 +294,30 @@ void RTCPSender::SetRemb(int64_t bitrate_bps, std::vector<uint32_t> ssrcs) {
 }
 
 void RTCPSender::UnsetRemb() {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   // Stop sending REMB each report until it is reenabled and REMB data set.
   ConsumeFlag(kRtcpRemb, /*forced=*/true);
 }
 
 bool RTCPSender::TMMBR() const {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   return IsFlagPresent(RTCPPacketType::kRtcpTmmbr);
 }
 
 void RTCPSender::SetMaxRtpPacketSize(size_t max_packet_size) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   max_packet_size_ = max_packet_size;
 }
 
 void RTCPSender::SetTimestampOffset(uint32_t timestamp_offset) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   timestamp_offset_ = timestamp_offset;
 }
 
 void RTCPSender::SetLastRtpTime(uint32_t rtp_timestamp,
                                 std::optional<Timestamp> capture_time,
                                 std::optional<int8_t> payload_type) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   if (payload_type.has_value()) {
     last_payload_type_ = *payload_type;
   }
@@ -329,29 +329,30 @@ void RTCPSender::SetLastRtpTime(uint32_t rtp_timestamp,
   }
 }
 
-void RTCPSender::SetRtpClockRate(int8_t payload_type, int rtp_clock_rate_hz) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+void RTCPSender::SetRtpClockRate(int8_t payload_type,
+                                 int32_t rtp_clock_rate_hz) {
+  std::scoped_lock lock(mutex_rtcp_sender_);
   rtp_clock_rates_khz_[payload_type] = rtp_clock_rate_hz / 1000;
 }
 
 uint32_t RTCPSender::SSRC() const {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   return ssrc_;
 }
 
 void RTCPSender::SetSsrc(uint32_t ssrc) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   ssrc_ = ssrc;
 }
 
 void RTCPSender::SetRemoteSSRC(uint32_t ssrc) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   remote_ssrc_ = ssrc;
 }
 
 int32_t RTCPSender::SetCNAME(std::string_view c_name) {
   AVE_DCHECK_LT(c_name.size(), kRtcpCnameSize);
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   cname_ = std::string(c_name);
   return 0;
 }
@@ -359,12 +360,13 @@ int32_t RTCPSender::SetCNAME(std::string_view c_name) {
 bool RTCPSender::TimeToSendRTCPReport(bool send_keyframe_before_rtp) const {
   Timestamp now = clock_->CurrentTime();
 
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   AVE_DCHECK(
       (method_ == RtcpMode::kOff && !next_time_to_send_rtcp_.has_value()) ||
       (method_ != RtcpMode::kOff && next_time_to_send_rtcp_.has_value()));
-  if (method_ == RtcpMode::kOff)
+  if (method_ == RtcpMode::kOff) {
     return false;
+  }
 
   if (!audio_ && send_keyframe_before_rtp) {
     // For video key-frames we want to send the RTCP before the large key-frame
@@ -379,7 +381,7 @@ void RTCPSender::BuildSR(const RtcpContext& ctx, PacketSender& sender) {
   // Timestamp shouldn't be estimated before first media frame.
   AVE_DCHECK(last_frame_capture_time_.has_value());
 
-  int rtp_rate = rtp_clock_rates_khz_[last_payload_type_];
+  int32_t rtp_rate = rtp_clock_rates_khz_[last_payload_type_];
   if (rtp_rate <= 0) {
     rtp_rate =
         (audio_ ? kBogusRtpRateForAudioRtcp : kVideoPayloadTypeFrequency) /
@@ -446,14 +448,15 @@ void RTCPSender::BuildREMB(const RtcpContext& /* ctx */, PacketSender& sender) {
   sender.AppendPacket(remb);
 }
 
-void RTCPSender::SetTargetBitrate(unsigned int target_bitrate) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+void RTCPSender::SetTargetBitrate(uint32_t target_bitrate) {
+  std::scoped_lock lock(mutex_rtcp_sender_);
   tmmbr_send_bps_ = target_bitrate;
 }
 
 void RTCPSender::BuildTMMBR(const RtcpContext& ctx, PacketSender& sender) {
-  if (ctx.feedback_state_.receiver == nullptr)
+  if (ctx.feedback_state_.receiver == nullptr) {
     return;
+  }
 
   bool tmmbr_owner = false;
 
@@ -479,8 +482,9 @@ void RTCPSender::BuildTMMBR(const RtcpContext& ctx, PacketSender& sender) {
     }
   }
 
-  if (!tmmbr_send_bps_)
+  if (!tmmbr_send_bps_) {
     return;
+  }
 
   rtcp::Tmmbr tmmbr;
   tmmbr.SetSenderSsrc(ssrc_);
@@ -524,7 +528,7 @@ void RTCPSender::BuildNACK(const RtcpContext& ctx, PacketSender& sender) {
   nack.SetPacketIds(ctx.nack_list_, ctx.nack_size_);
 
   // Report stats.
-  for (int idx = 0; idx < ctx.nack_size_; ++idx) {
+  for (int32_t idx = 0; idx < ctx.nack_size_; ++idx) {
     nack_stats_.ReportRequest(ctx.nack_list_[idx]);
   }
   packet_type_counter_.nack_requests = nack_stats_.requests();
@@ -559,8 +563,8 @@ void RTCPSender::BuildExtendedReports(const RtcpContext& ctx,
   if (send_video_bitrate_allocation_) {
     rtcp::TargetBitrate target_bitrate;
 
-    for (int sl = 0; sl < kMaxSpatialLayers; ++sl) {
-      for (int tl = 0; tl < kMaxTemporalStreams; ++tl) {
+    for (int32_t sl = 0; sl < kMaxSpatialLayers; ++sl) {
+      for (int32_t tl = 0; tl < kMaxTemporalStreams; ++tl) {
         if (video_bitrate_allocation_.HasBitrate(sl, tl)) {
           target_bitrate.AddTargetBitrate(
               sl, tl, video_bitrate_allocation_.GetBitrate(sl, tl) / 1000);
@@ -586,7 +590,7 @@ int32_t RTCPSender::SendRTCP(const FeedbackState& feedback_state,
   };
   std::optional<PacketSender> sender;
   {
-    std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+    std::scoped_lock lock(mutex_rtcp_sender_);
     sender.emplace(callback, max_packet_size_);
     auto result = ComputeCompoundRTCPPacket(feedback_state, packet_type,
                                             nack_size, nack_list, *sender);
@@ -676,7 +680,7 @@ TimeDelta RTCPSender::ComputeTimeUntilNextReport(DataRate send_bitrate) {
                             report_interval_);
   }
 
-  int min_interval_int = base::checked_cast<int>(min_interval.ms());
+  int32_t min_interval_int = base::checked_cast<int32_t>(min_interval.ms());
   TimeDelta time_to_next = TimeDelta::Millis(
       random_.Rand(min_interval_int * 1 / 2, min_interval_int * 3 / 2));
 
@@ -684,7 +688,7 @@ TimeDelta RTCPSender::ComputeTimeUntilNextReport(DataRate send_bitrate) {
 }
 
 void RTCPSender::PrepareReport(const FeedbackState& feedback_state) {
-  bool generate_report;
+  bool generate_report = false;
   if (IsFlagPresent(kRtcpSr) || IsFlagPresent(kRtcpRr)) {
     generate_report = true;
     AVE_DCHECK(ConsumeFlag(kRtcpReport) == false);
@@ -692,12 +696,14 @@ void RTCPSender::PrepareReport(const FeedbackState& feedback_state) {
     generate_report =
         (ConsumeFlag(kRtcpReport) && method_ == RtcpMode::kReducedSize) ||
         method_ == RtcpMode::kCompound;
-    if (generate_report)
+    if (generate_report) {
       SetFlag(sending_ ? kRtcpSr : kRtcpRr, true);
+    }
   }
 
-  if (IsFlagPresent(kRtcpSr) || (IsFlagPresent(kRtcpRr) && !cname_.empty()))
+  if (IsFlagPresent(kRtcpSr) || (IsFlagPresent(kRtcpRr) && !cname_.empty())) {
     SetFlag(kRtcpSdes, true);
+  }
 
   if (generate_report) {
     if ((!sending_ && xr_send_receiver_reference_time_enabled_) ||
@@ -716,8 +722,9 @@ void RTCPSender::PrepareReport(const FeedbackState& feedback_state) {
 std::vector<rtcp::ReportBlock> RTCPSender::CreateReportBlocks(
     const FeedbackState& feedback_state) {
   std::vector<rtcp::ReportBlock> result;
-  if (!receive_statistics_)
+  if (!receive_statistics_) {
     return result;
+  }
 
   result = receive_statistics_->RtcpReportBlocks(RTCP_MAX_REPORT_BLOCKS);
 
@@ -736,12 +743,12 @@ std::vector<rtcp::ReportBlock> RTCPSender::CreateReportBlocks(
 
 void RTCPSender::SetCsrcs(const std::vector<uint32_t>& csrcs) {
   AVE_DCHECK_LE(csrcs.size(), kRtpCsrcSize);
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   csrcs_ = csrcs;
 }
 
 void RTCPSender::SetTmmbn(std::vector<rtcp::TmmbItem> bounding_set) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   tmmbn_to_send_ = std::move(bounding_set);
   SetFlag(kRtcpTmmbn, true);
 }
@@ -760,24 +767,27 @@ bool RTCPSender::IsFlagPresent(uint32_t type) const {
 
 bool RTCPSender::ConsumeFlag(uint32_t type, bool forced) {
   auto it = report_flags_.find(ReportFlag(type, false));
-  if (it == report_flags_.end())
+  if (it == report_flags_.end()) {
     return false;
-  if (it->is_volatile || forced)
+  }
+  if (it->is_volatile || forced) {
     report_flags_.erase((it));
+  }
   return true;
 }
 
 bool RTCPSender::AllVolatileFlagsConsumed() const {
   for (const ReportFlag& flag : report_flags_) {
-    if (flag.is_volatile)
+    if (flag.is_volatile) {
       return false;
+    }
   }
   return true;
 }
 
 void RTCPSender::SetVideoBitrateAllocation(
     const VideoBitrateAllocation& bitrate) {
-  std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+  std::scoped_lock lock(mutex_rtcp_sender_);
   if (method_ == RtcpMode::kOff) {
     AVE_LOG(LS_WARNING) << "Can't send RTCP if it is disabled.";
     return;
@@ -822,10 +832,10 @@ std::optional<VideoBitrateAllocation> RTCPSender::CheckAndUpdateLayerStructure(
 
 void RTCPSender::SendCombinedRtcpPacket(
     std::vector<std::unique_ptr<rtcp::RtcpPacket>> rtcp_packets) {
-  size_t max_packet_size;
-  uint32_t ssrc;
+  size_t max_packet_size = 0;
+  uint32_t ssrc = 0;
   {
-    std::lock_guard<std::mutex> lock(mutex_rtcp_sender_);
+    std::scoped_lock lock(mutex_rtcp_sender_);
     if (method_ == RtcpMode::kOff) {
       AVE_LOG(LS_WARNING) << "Can't send RTCP if it is disabled.";
       return;

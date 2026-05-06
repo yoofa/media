@@ -22,7 +22,7 @@ HandlerRoster::HandlerRoster() : next_handler_id_(static_cast<int32_t>(1)) {}
 Looper::handler_id HandlerRoster::registerHandler(
     const std::shared_ptr<Looper>& looper,
     const std::shared_ptr<Handler>& handler) {
-  std::lock_guard<std::mutex> guard(mutex_);
+  std::scoped_lock guard(mutex_);
   if (handler->id() != 0) {
     return static_cast<int32_t>(-1);
   }
@@ -40,7 +40,7 @@ Looper::handler_id HandlerRoster::registerHandler(
 }
 
 void HandlerRoster::unregisterHandler(Looper::handler_id handler_id) {
-  std::lock_guard<std::mutex> guard(mutex_);
+  std::scoped_lock guard(mutex_);
 
   auto it = handlers_.find(handler_id);
   if (it != handlers_.end()) {

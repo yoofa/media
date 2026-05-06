@@ -33,7 +33,7 @@ using RtpTimestampUnwrapper = ::ave::base::RtpTimestampUnwrapper;
 // RTCP sender reports before the convertion can be done.
 class RtpToNtpEstimator {
  public:
-  static constexpr int kMaxInvalidSamples = 3;
+  static constexpr int32_t kMaxInvalidSamples = 3;
 
   RtpToNtpEstimator() = default;
   RtpToNtpEstimator(const RtpToNtpEstimator&) = delete;
@@ -68,7 +68,7 @@ class RtpToNtpEstimator {
 
   void UpdateParameters();
 
-  int consecutive_invalid_samples_ = 0;
+  int32_t consecutive_invalid_samples_ = 0;
   std::list<RtcpMeasurement> measurements_;
   std::optional<Parameters> params_;
   mutable RtpTimestampUnwrapper unwrapper_;

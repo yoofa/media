@@ -13,15 +13,15 @@ namespace ave {
 namespace media {
 namespace rtp_rtcp {
 
-std::vector<int> RtpPacketizer::SplitAboutEqually(
-    int payload_len,
+std::vector<int32_t> RtpPacketizer::SplitAboutEqually(
+    int32_t payload_len,
     const PayloadSizeLimits& limits) {
   AVE_DCHECK_GT(payload_len, 0);
   // First or last packet larger than normal are unsupported.
   AVE_DCHECK_GE(limits.first_packet_reduction_len, 0);
   AVE_DCHECK_GE(limits.last_packet_reduction_len, 0);
 
-  std::vector<int> result;
+  std::vector<int32_t> result;
   if (limits.max_payload_len >=
       limits.single_packet_reduction_len + payload_len) {
     result.push_back(payload_len);
@@ -36,10 +36,10 @@ std::vector<int> RtpPacketizer::SplitAboutEqually(
   // the same size, but we must write more payload to it.
   // Assume frame fits in single packet if packet has extra space for sum
   // of first and last packets reductions.
-  int total_bytes = payload_len + limits.first_packet_reduction_len +
-                    limits.last_packet_reduction_len;
+  int32_t total_bytes = payload_len + limits.first_packet_reduction_len +
+                        limits.last_packet_reduction_len;
   // Integer divisions with rounding up.
-  int num_packets_left =
+  int32_t num_packets_left =
       (total_bytes + limits.max_payload_len - 1) / limits.max_payload_len;
   if (num_packets_left == 1) {
     // Single packet is a special case handled above.
@@ -54,23 +54,25 @@ std::vector<int> RtpPacketizer::SplitAboutEqually(
     return result;
   }
 
-  int bytes_per_packet = total_bytes / num_packets_left;
-  int num_larger_packets = total_bytes % num_packets_left;
-  int remaining_data = payload_len;
+  int32_t bytes_per_packet = total_bytes / num_packets_left;
+  int32_t num_larger_packets = total_bytes % num_packets_left;
+  int32_t remaining_data = payload_len;
 
   result.reserve(num_packets_left);
   bool first_packet = true;
   while (remaining_data > 0) {
     // Last num_larger_packets are 1 byte wider than the rest. Increase
     // per-packet payload size when needed.
-    if (num_packets_left == num_larger_packets)
+    if (num_packets_left == num_larger_packets) {
       ++bytes_per_packet;
-    int current_packet_bytes = bytes_per_packet;
+    }
+    int32_t current_packet_bytes = bytes_per_packet;
     if (first_packet) {
-      if (current_packet_bytes > limits.first_packet_reduction_len + 1)
+      if (current_packet_bytes > limits.first_packet_reduction_len + 1) {
         current_packet_bytes -= limits.first_packet_reduction_len;
-      else
+      } else {
         current_packet_bytes = 1;
+      }
     }
     if (current_packet_bytes > remaining_data) {
       current_packet_bytes = remaining_data;

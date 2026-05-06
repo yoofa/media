@@ -29,7 +29,7 @@ class RapidResyncRequest : public Rtpfb {
   ~RapidResyncRequest() override {}
 
   // Parse assumes header is already parsed and validated.
-  bool Parse(const CommonHeader& header);
+  bool Parse(const CommonHeader& packet);
 
   size_t BlockLength() const override;
 

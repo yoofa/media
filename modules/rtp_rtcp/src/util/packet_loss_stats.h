@@ -31,27 +31,27 @@ class PacketLossStats {
 
   // Queries the number of packets that were lost by themselves, no neighboring
   // packets were lost.
-  int GetSingleLossCount() const;
+  int32_t GetSingleLossCount() const;
 
   // Queries the number of times that multiple packets with sequential numbers
   // were lost. This is the number of events with more than one packet lost,
   // regardless of the size of the event;
-  int GetMultipleLossEventCount() const;
+  int32_t GetMultipleLossEventCount() const;
 
   // Queries the number of packets lost in multiple packet loss events. Combined
   // with the event count, this can be used to determine the average event size.
-  int GetMultipleLossPacketCount() const;
+  int32_t GetMultipleLossPacketCount() const;
 
  private:
   std::set<uint16_t> lost_packets_buffer_;
   std::set<uint16_t> lost_packets_wrapped_buffer_;
-  int single_loss_historic_count_;
-  int multiple_loss_historic_event_count_;
-  int multiple_loss_historic_packet_count_;
+  int32_t single_loss_historic_count_;
+  int32_t multiple_loss_historic_event_count_;
+  int32_t multiple_loss_historic_packet_count_;
 
-  void ComputeLossCounts(int* out_single_loss_count,
-                         int* out_multiple_loss_event_count,
-                         int* out_multiple_loss_packet_count) const;
+  void ComputeLossCounts(int32_t* out_single_loss_count,
+                         int32_t* out_multiple_loss_event_count,
+                         int32_t* out_multiple_loss_packet_count) const;
   void PruneBuffer();
 };
 

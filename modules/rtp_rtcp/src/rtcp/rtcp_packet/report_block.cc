@@ -80,7 +80,7 @@ void ReportBlock::Create(uint8_t* buffer) const {
 }
 
 bool ReportBlock::SetCumulativeLost(int32_t cumulative_lost) {
-  // We have only 3 bytes to store it, and it's a signed value.
+  // We have only 3 bytes to store it, and it's a int32_t value.
   if (cumulative_lost >= (1 << 23) || cumulative_lost < -(1 << 23)) {
     AVE_LOG(LS_WARNING)
         << "Cumulative lost is too big to fit into Report Block";

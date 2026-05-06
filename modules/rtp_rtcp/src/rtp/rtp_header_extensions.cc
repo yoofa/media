@@ -11,7 +11,7 @@
 #include "media/modules/rtp_rtcp/src/rtp/rtp_header_extensions.h"
 #include <span>
 
-#include <string.h>
+#include <cstring>
 
 #include <cstddef>
 #include <cstdint>
@@ -31,8 +31,9 @@ namespace rtp_rtcp {
 // Absolute send time in RTP streams.
 bool AbsoluteSendTime::Parse(std::span<const uint8_t> data,
                              uint32_t* time_24bits) {
-  if (data.size() != 3)
+  if (data.size() != 3) {
     return false;
+  }
   *time_24bits = ByteReader<uint32_t, 3>::ReadBigEndian(data.data());
   return true;
 }
@@ -67,9 +68,8 @@ size_t AbsoluteCaptureTimeExtension::ValueSize(
     const AbsoluteCaptureTime& extension) {
   if (extension.estimated_capture_clock_offset != std::nullopt) {
     return kValueSizeBytes;
-  } else {
-    return kValueSizeBytesWithoutEstimatedCaptureClockOffset;
   }
+  return kValueSizeBytesWithoutEstimatedCaptureClockOffset;
 }
 
 bool AbsoluteCaptureTimeExtension::Write(std::span<uint8_t> data,
@@ -90,10 +90,11 @@ bool AbsoluteCaptureTimeExtension::Write(std::span<uint8_t> data,
 // Audio Level Extension
 bool AudioLevelExtension::Parse(std::span<const uint8_t> data,
                                 AudioLevel* extension) {
-  if (data.size() != 1)
+  if (data.size() != 1) {
     return false;
+  }
   bool voice_activity = (data[0] & 0x80) != 0;
-  int audio_level = data[0] & 0x7F;
+  int32_t audio_level = data[0] & 0x7F;
   *extension = AudioLevel(voice_activity, audio_level);
   return true;
 }
@@ -139,8 +140,9 @@ bool CsrcAudioLevel::Write(std::span<uint8_t> data,
 // Transmission Offset
 bool TransmissionOffset::Parse(std::span<const uint8_t> data,
                                int32_t* rtp_time) {
-  if (data.size() != 3)
+  if (data.size() != 3) {
     return false;
+  }
   *rtp_time = ByteReader<int32_t, 3>::ReadBigEndian(data.data());
   return true;
 }
@@ -155,8 +157,9 @@ bool TransmissionOffset::Write(std::span<uint8_t> data, int32_t rtp_time) {
 // TransportSequenceNumber
 bool TransportSequenceNumber::Parse(std::span<const uint8_t> data,
                                     uint16_t* transport_sequence_number) {
-  if (data.size() != kValueSizeBytes)
+  if (data.size() != kValueSizeBytes) {
     return false;
+  }
   *transport_sequence_number = ByteReader<uint16_t>::ReadBigEndian(data.data());
   return true;
 }
@@ -174,8 +177,9 @@ bool TransportSequenceNumberV2::Parse(
     uint16_t* transport_sequence_number,
     std::optional<FeedbackRequest>* feedback_request) {
   if (data.size() != kValueSizeBytes &&
-      data.size() != kValueSizeBytesWithoutFeedbackRequest)
+      data.size() != kValueSizeBytesWithoutFeedbackRequest) {
     return false;
+  }
 
   *transport_sequence_number = ByteReader<uint16_t>::ReadBigEndian(data.data());
 
@@ -188,8 +192,9 @@ bool TransportSequenceNumberV2::Parse(
     uint16_t sequence_count = feedback_request_raw & ~kIncludeTimestampsBit;
 
     if (sequence_count != 0) {
-      *feedback_request = {include_timestamps,
-                           static_cast<int>(sequence_count)};
+      *feedback_request = {
+          .include_timestamps = include_timestamps,
+          .sequence_count = static_cast<int32_t>(sequence_count)};
     }
   }
   return true;
@@ -250,8 +255,9 @@ static uint8_t ConvertVideoRotationToCVOByte(VideoRotation rotation) {
 // Video Orientation
 bool VideoOrientation::Parse(std::span<const uint8_t> data,
                              VideoRotation* rotation) {
-  if (data.size() != 1)
+  if (data.size() != 1) {
     return false;
+  }
   *rotation = ConvertCVOByteToVideoRotation(data[0]);
   return true;
 }
@@ -263,8 +269,9 @@ bool VideoOrientation::Write(std::span<uint8_t> data, VideoRotation rotation) {
 }
 
 bool VideoOrientation::Parse(std::span<const uint8_t> data, uint8_t* value) {
-  if (data.size() != 1)
+  if (data.size() != 1) {
     return false;
+  }
   *value = data[0];
   return true;
 }
@@ -279,8 +286,9 @@ bool VideoOrientation::Write(std::span<uint8_t> data, uint8_t value) {
 bool PlayoutDelayLimits::Parse(std::span<const uint8_t> data,
                                VideoPlayoutDelay* playout_delay) {
   AVE_DCHECK(playout_delay);
-  if (data.size() != 3)
+  if (data.size() != 3) {
     return false;
+  }
   uint32_t raw = ByteReader<uint32_t, 3>::ReadBigEndian(data.data());
   uint16_t min_raw = (raw >> 12);
   uint16_t max_raw = (raw & 0xfff);
@@ -389,8 +397,9 @@ bool VideoTimingExtension::Write(std::span<uint8_t> data,
 // Base RTP String Extension
 bool BaseRtpStringExtension::Parse(std::span<const uint8_t> data,
                                    std::string* str) {
-  if (data.empty() || data[0] == 0)  // Valid string extension can't be empty.
+  if (data.empty() || data[0] == 0) {  // Valid string extension can't be empty.
     return false;
+  }
   const char* cstr = reinterpret_cast<const char*>(data.data());
   str->assign(cstr, strnlen(cstr, data.size()));
   AVE_DCHECK(!str->empty());
@@ -411,8 +420,9 @@ bool BaseRtpStringExtension::Write(std::span<uint8_t> data,
 // Inband Comfort Noise Extension
 bool InbandComfortNoiseExtension::Parse(std::span<const uint8_t> data,
                                         std::optional<uint8_t>* level) {
-  if (data.size() != kValueSizeBytes)
+  if (data.size() != kValueSizeBytes) {
     return false;
+  }
   *level = (data[0] & 0b1000'0000) != 0
                ? std::nullopt
                : std::make_optional(data[0] & 0b0111'1111);
@@ -468,22 +478,28 @@ bool ColorSpaceExtension::Parse(std::span<const uint8_t> data,
 
   size_t offset = 0;
   // Read primaries, transfer, matrix, range/chroma siting
-  if (!color_space->set_primaries_from_uint8(data[offset++]))
+  if (!color_space->set_primaries_from_uint8(data[offset++])) {
     return false;
-  if (!color_space->set_transfer_from_uint8(data[offset++]))
+  }
+  if (!color_space->set_transfer_from_uint8(data[offset++])) {
     return false;
-  if (!color_space->set_matrix_from_uint8(data[offset++]))
+  }
+  if (!color_space->set_matrix_from_uint8(data[offset++])) {
     return false;
+  }
 
   uint8_t range_and_chroma_siting = data[offset++];
-  if (!color_space->set_range_from_uint8(range_and_chroma_siting >> 4))
+  if (!color_space->set_range_from_uint8(range_and_chroma_siting >> 4)) {
     return false;
+  }
   if (!color_space->set_chroma_siting_horizontal_from_uint8(
-          (range_and_chroma_siting >> 2) & 0x3))
+          (range_and_chroma_siting >> 2) & 0x3)) {
     return false;
+  }
   if (!color_space->set_chroma_siting_vertical_from_uint8(
-          range_and_chroma_siting & 0x3))
+          range_and_chroma_siting & 0x3)) {
     return false;
+  }
 
   // Read HDR metadata if present
   if (data.size() == kValueSizeBytesWithHdrMetadata) {

@@ -111,7 +111,7 @@ class RTCPSender final {
   void SetRTCPStatus(RtcpMode method);
 
   bool Sending() const;
-  void SetSendingStatus(const FeedbackState& feedback_state, bool enabled);
+  void SetSendingStatus(const FeedbackState& feedback_state, bool sending);
 
   void SetNonSenderRttMeasurement(bool enabled);
 
@@ -121,21 +121,21 @@ class RTCPSender final {
                       std::optional<Timestamp> capture_time,
                       std::optional<int8_t> payload_type);
 
-  void SetRtpClockRate(int8_t payload_type, int rtp_clock_rate_hz);
+  void SetRtpClockRate(int8_t payload_type, int32_t rtp_clock_rate_hz);
 
   uint32_t SSRC() const;
   void SetSsrc(uint32_t ssrc);
 
   void SetRemoteSSRC(uint32_t ssrc);
 
-  int32_t SetCNAME(std::string_view cName);
+  int32_t SetCNAME(std::string_view c_name);
 
   bool TimeToSendRTCPReport(bool send_keyframe_before_rtp = false) const;
 
   int32_t SendRTCP(const FeedbackState& feedback_state,
-                   RTCPPacketType packetType,
-                   int32_t nackSize = 0,
-                   const uint16_t* nackList = 0);
+                   RTCPPacketType packet_type,
+                   int32_t nack_size = 0,
+                   const uint16_t* nack_list = 0);
 
   int32_t SendLossNotification(const FeedbackState& feedback_state,
                                uint16_t last_decoded_seq_num,
@@ -155,7 +155,7 @@ class RTCPSender final {
 
   void SetCsrcs(const std::vector<uint32_t>& csrcs);
 
-  void SetTargetBitrate(unsigned int target_bitrate);
+  void SetTargetBitrate(uint32_t target_bitrate);
   void SetVideoBitrateAllocation(const VideoBitrateAllocation& bitrate);
   void SendCombinedRtcpPacket(
       std::vector<std::unique_ptr<rtcp::RtcpPacket>> rtcp_packets);
@@ -179,19 +179,19 @@ class RTCPSender final {
   std::vector<rtcp::ReportBlock> CreateReportBlocks(
       const FeedbackState& feedback_state);
 
-  void BuildSR(const RtcpContext& context, PacketSender& sender);
-  void BuildRR(const RtcpContext& context, PacketSender& sender);
+  void BuildSR(const RtcpContext& ctx, PacketSender& sender);
+  void BuildRR(const RtcpContext& ctx, PacketSender& sender);
   void BuildSDES(const RtcpContext& context, PacketSender& sender);
   void BuildPLI(const RtcpContext& context, PacketSender& sender);
   void BuildREMB(const RtcpContext& context, PacketSender& sender);
-  void BuildTMMBR(const RtcpContext& context, PacketSender& sender);
+  void BuildTMMBR(const RtcpContext& ctx, PacketSender& sender);
   void BuildTMMBN(const RtcpContext& context, PacketSender& sender);
   void BuildAPP(const RtcpContext& context, PacketSender& sender);
   void BuildLossNotification(const RtcpContext& context, PacketSender& sender);
-  void BuildExtendedReports(const RtcpContext& context, PacketSender& sender);
+  void BuildExtendedReports(const RtcpContext& ctx, PacketSender& sender);
   void BuildBYE(const RtcpContext& context, PacketSender& sender);
   void BuildFIR(const RtcpContext& context, PacketSender& sender);
-  void BuildNACK(const RtcpContext& context, PacketSender& sender);
+  void BuildNACK(const RtcpContext& ctx, PacketSender& sender);
 
   // `duration` being TimeDelta::Zero() means schedule immediately.
   void SetNextRtcpSendEvaluationDuration(TimeDelta duration);
@@ -252,7 +252,7 @@ class RTCPSender final {
   VideoBitrateAllocation video_bitrate_allocation_;
   bool send_video_bitrate_allocation_;
 
-  std::map<int8_t, int> rtp_clock_rates_khz_;
+  std::map<int8_t, int32_t> rtp_clock_rates_khz_;
   int8_t last_payload_type_;
 
   std::optional<VideoBitrateAllocation> CheckAndUpdateLayerStructure(

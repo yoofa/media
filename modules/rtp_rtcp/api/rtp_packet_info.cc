@@ -10,7 +10,7 @@
 
 #include "media/modules/rtp_rtcp/api/rtp_packet_info.h"
 
-#include <stddef.h>
+#include <cstddef>
 
 #include <algorithm>
 #include <cstdint>

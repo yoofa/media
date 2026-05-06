@@ -8,6 +8,7 @@
 #include "media/modules/rtp_rtcp/api/encoded_image_buffer.h"
 
 #include <cstring>
+#include <memory>
 #include <utility>
 
 namespace ave {
@@ -15,20 +16,18 @@ namespace media {
 namespace rtp_rtcp {
 
 std::shared_ptr<EncodedImageBuffer> EncodedImageBuffer::Create(size_t size) {
-  return std::shared_ptr<EncodedImageBuffer>(new EncodedImageBuffer(size));
+  return std::make_shared<EncodedImageBuffer>(size);
 }
 
 std::shared_ptr<EncodedImageBuffer> EncodedImageBuffer::Create(
     const uint8_t* data,
     size_t size) {
-  return std::shared_ptr<EncodedImageBuffer>(
-      new EncodedImageBuffer(data, size));
+  return std::make_shared<EncodedImageBuffer>(data, size);
 }
 
 std::shared_ptr<EncodedImageBuffer> EncodedImageBuffer::Create(
     base::Buffer buffer) {
-  return std::shared_ptr<EncodedImageBuffer>(
-      new EncodedImageBuffer(std::move(buffer)));
+  return std::make_shared<EncodedImageBuffer>(std::move(buffer));
 }
 
 EncodedImageBuffer::EncodedImageBuffer(size_t size) : buffer_(size) {}

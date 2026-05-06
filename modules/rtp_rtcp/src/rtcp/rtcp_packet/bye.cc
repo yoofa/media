@@ -10,8 +10,8 @@
 
 #include "media/modules/rtp_rtcp/src/rtcp/rtcp_packet/bye.h"
 
-#include <string.h>
 #include <cstdint>
+#include <cstring>
 #include <utility>
 
 #include "base/checks.h"
@@ -68,8 +68,9 @@ bool Bye::Parse(const CommonHeader& packet) {
   } else {
     SetSenderSsrc(ByteReader<uint32_t>::ReadBigEndian(payload));
     csrcs_.resize(src_count - 1);
-    for (size_t i = 1; i < src_count; ++i)
+    for (size_t i = 1; i < src_count; ++i) {
       csrcs_[i - 1] = ByteReader<uint32_t>::ReadBigEndian(&payload[4 * i]);
+    }
   }
 
   if (has_reason) {
@@ -87,8 +88,9 @@ bool Bye::Create(uint8_t* packet,
                  size_t max_length,
                  PacketReadyCallback callback) const {
   while (*index + BlockLength() > max_length) {
-    if (!OnBufferFull(packet, index, callback))
+    if (!OnBufferFull(packet, index, callback)) {
       return false;
+    }
   }
   const size_t index_end = *index + BlockLength();
 
@@ -102,7 +104,7 @@ bool Bye::Create(uint8_t* packet,
   }
   // Store the reason to leave.
   if (!reason_.empty()) {
-    uint8_t reason_length = static_cast<uint8_t>(reason_.size());
+    auto reason_length = static_cast<uint8_t>(reason_.size());
     packet[(*index)++] = reason_length;
     memcpy(&packet[*index], reason_.data(), reason_length);
     *index += reason_length;

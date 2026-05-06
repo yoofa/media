@@ -24,20 +24,20 @@ RtpGenericFrameDescriptor::RtpGenericFrameDescriptor(
     const RtpGenericFrameDescriptor&) = default;
 RtpGenericFrameDescriptor::~RtpGenericFrameDescriptor() = default;
 
-int RtpGenericFrameDescriptor::TemporalLayer() const {
+int32_t RtpGenericFrameDescriptor::TemporalLayer() const {
   AVE_DCHECK(FirstPacketInSubFrame());
   return temporal_layer_;
 }
 
-void RtpGenericFrameDescriptor::SetTemporalLayer(int temporal_layer) {
+void RtpGenericFrameDescriptor::SetTemporalLayer(int32_t temporal_layer) {
   AVE_DCHECK_GE(temporal_layer, 0);
   AVE_DCHECK_LT(temporal_layer, kMaxTemporalLayers);
   temporal_layer_ = temporal_layer;
 }
 
-int RtpGenericFrameDescriptor::SpatialLayer() const {
+int32_t RtpGenericFrameDescriptor::SpatialLayer() const {
   AVE_DCHECK(FirstPacketInSubFrame());
-  int layer = 0;
+  int32_t layer = 0;
   uint8_t spatial_layers = spatial_layers_;
   while (spatial_layers_ != 0 && !(spatial_layers & 1)) {
     spatial_layers >>= 1;
@@ -57,7 +57,7 @@ void RtpGenericFrameDescriptor::SetSpatialLayersBitmask(
   spatial_layers_ = spatial_layers;
 }
 
-void RtpGenericFrameDescriptor::SetResolution(int width, int height) {
+void RtpGenericFrameDescriptor::SetResolution(int32_t width, int32_t height) {
   AVE_DCHECK(FirstPacketInSubFrame());
   AVE_DCHECK_GE(width, 0);
   AVE_DCHECK_LE(width, 0xFFFF);
@@ -80,15 +80,17 @@ void RtpGenericFrameDescriptor::SetFrameId(uint16_t frame_id) {
 std::span<const uint16_t> RtpGenericFrameDescriptor::FrameDependenciesDiffs()
     const {
   AVE_DCHECK(FirstPacketInSubFrame());
-  return std::span(frame_deps_id_diffs_, num_frame_deps_);
+  return {frame_deps_id_diffs_, num_frame_deps_};
 }
 
 bool RtpGenericFrameDescriptor::AddFrameDependencyDiff(uint16_t fdiff) {
   AVE_DCHECK(FirstPacketInSubFrame());
-  if (num_frame_deps_ == kMaxNumFrameDependencies)
+  if (num_frame_deps_ == kMaxNumFrameDependencies) {
     return false;
-  if (fdiff == 0)
+  }
+  if (fdiff == 0) {
     return false;
+  }
   AVE_DCHECK_LT(fdiff, 1 << 14);
   AVE_DCHECK_GT(fdiff, 0);
   frame_deps_id_diffs_[num_frame_deps_] = fdiff;

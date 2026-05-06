@@ -46,8 +46,8 @@ class H265SpsParser {
   struct ProfileTierLevel {
     ProfileTierLevel();
     // Syntax elements.
-    int general_profile_idc = 0;
-    int general_level_idc = 0;  // 30x the actual level.
+    int32_t general_profile_idc = 0;
+    int32_t general_level_idc = 0;  // 30x the actual level.
     uint32_t general_profile_compatibility_flags = 0;
     bool general_progressive_source_flag = false;
     bool general_interlaced_source_flag = false;
@@ -123,7 +123,7 @@ class H265SpsParser {
 
   static std::optional<H265SpsParser::ProfileTierLevel> ParseProfileTierLevel(
       bool profile_present,
-      int max_num_sub_layers_minus1,
+      int32_t max_num_sub_layers_minus1,
       base::BitstreamReader& reader);
 
  protected:
@@ -133,9 +133,9 @@ class H265SpsParser {
       std::span<const uint8_t> buffer);
 
   // From Table A.8 - General tier and level limits.
-  static int GetMaxLumaPs(int general_level_idc);
+  static int32_t GetMaxLumaPs(int32_t general_level_idc);
   // From A.4.2 - Profile-specific level limits for the video profiles.
-  static size_t GetDpbMaxPicBuf(int general_profile_idc);
+  static size_t GetDpbMaxPicBuf(int32_t general_profile_idc);
 };
 
 }  // namespace media

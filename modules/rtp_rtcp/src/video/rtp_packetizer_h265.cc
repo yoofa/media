@@ -54,8 +54,8 @@ size_t RtpPacketizerH265::NumPackets() const {
 
 bool RtpPacketizerH265::GeneratePackets() {
   for (size_t i = 0; i < input_fragments_.size();) {
-    int fragment_len = input_fragments_[i].size();
-    int single_packet_capacity = limits_.max_payload_len;
+    int32_t fragment_len = input_fragments_[i].size();
+    int32_t single_packet_capacity = limits_.max_payload_len;
     if (input_fragments_.size() == 1) {
       single_packet_capacity -= limits_.single_packet_reduction_len;
     } else if (i == 0) {
@@ -110,15 +110,15 @@ bool RtpPacketizerH265::PacketizeFu(size_t fragment_index) {
 
   // Strip out the original header.
   size_t payload_left = fragment.size() - kH265NalHeaderSizeBytes;
-  int offset = kH265NalHeaderSizeBytes;
+  int32_t offset = kH265NalHeaderSizeBytes;
 
-  std::vector<int> payload_sizes = SplitAboutEqually(payload_left, limits);
+  std::vector<int32_t> payload_sizes = SplitAboutEqually(payload_left, limits);
   if (payload_sizes.empty()) {
     return false;
   }
 
   for (size_t i = 0; i < payload_sizes.size(); ++i) {
-    int packet_length = payload_sizes[i];
+    int32_t packet_length = payload_sizes[i];
     AVE_CHECK_GT(packet_length, 0);
     uint16_t header = (fragment[0] << 8) | fragment[1];
     packets_.push({.source_fragment = fragment.subspan(offset, packet_length),
@@ -134,7 +134,7 @@ bool RtpPacketizerH265::PacketizeFu(size_t fragment_index) {
   return true;
 }
 
-int RtpPacketizerH265::PacketizeAp(size_t fragment_index) {
+int32_t RtpPacketizerH265::PacketizeAp(size_t fragment_index) {
   // Aggregate fragments into one packet.
   size_t payload_size_left = limits_.max_payload_len;
   if (input_fragments_.size() == 1) {
@@ -142,7 +142,7 @@ int RtpPacketizerH265::PacketizeAp(size_t fragment_index) {
   } else if (fragment_index == 0) {
     payload_size_left -= limits_.first_packet_reduction_len;
   }
-  int aggregated_fragments = 0;
+  int32_t aggregated_fragments = 0;
   size_t fragment_headers_length = 0;
   std::span<const uint8_t> fragment = input_fragments_[fragment_index];
   AVE_CHECK_GE(payload_size_left, fragment.size());
@@ -240,7 +240,7 @@ void RtpPacketizerH265::NextAggregatePacket(RtpPacketToSend* rtp_packet) {
   // Refer to section 4.4.2 for aggregation packets and modify type to
   // 48 in PayloadHdr for aggregate packet. Do not support DONL for aggregation
   // packets, DONL field is not present.
-  int index = kH265PayloadHeaderSizeBytes;
+  int32_t index = kH265PayloadHeaderSizeBytes;
   bool is_last_fragment = packet->last_fragment;
 
   // Refer to section 4.4.2 for aggregation packets and calculate the lowest

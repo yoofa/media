@@ -32,7 +32,7 @@ class H265BitstreamParser {
 
   // New interface.
   void ParseBitstream(std::span<const uint8_t> bitstream);
-  std::optional<int> GetLastSliceQp() const;
+  std::optional<int32_t> GetLastSliceQp() const;
 
   std::optional<uint32_t> GetLastSlicePpsId() const;
 

@@ -13,6 +13,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/checks.h"
@@ -37,7 +38,7 @@ bool VideoBitrateAllocation::SetBitrate(size_t spatial_index,
     new_bitrate_sum_bps -= *layer_bitrate;
   }
   new_bitrate_sum_bps += bitrate_bps;
-  if (new_bitrate_sum_bps > kMaxBitrateBps) {
+  if (std::cmp_greater(new_bitrate_sum_bps, kMaxBitrateBps)) {
     return false;
   }
 
@@ -119,7 +120,7 @@ VideoBitrateAllocation::GetSimulcastAllocations() const {
     std::optional<VideoBitrateAllocation> layer_bitrate;
     if (IsSpatialLayerUsed(si)) {
       layer_bitrate = VideoBitrateAllocation();
-      for (int tl = 0; tl < kMaxTemporalStreams; ++tl) {
+      for (int32_t tl = 0; tl < kMaxTemporalStreams; ++tl) {
         if (HasBitrate(si, tl)) {
           layer_bitrate->SetBitrate(0, tl, GetBitrate(si, tl));
         }

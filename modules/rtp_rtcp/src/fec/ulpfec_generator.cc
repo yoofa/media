@@ -7,7 +7,7 @@
 
 #include "media/modules/rtp_rtcp/src/fec/ulpfec_generator.h"
 
-#include <string.h>
+#include <cstring>
 
 #include <cstdint>
 #include <memory>
@@ -29,7 +29,7 @@ constexpr size_t kRedForFecHeaderLength = 1;
 // This controls the maximum amount of excess overhead (actual - target)
 // allowed in order to trigger EncodeFec(), before `params_.max_fec_frames`
 // is reached. Overhead here is defined as relative to number of media packets.
-constexpr int kMaxExcessOverhead = 50;  // Q8.
+constexpr int32_t kMaxExcessOverhead = 50;  // Q8.
 
 // This is the minimum number of media packets required (above some protection
 // level) in order to trigger EncodeFec(), before `params_.max_fec_frames` is
@@ -65,8 +65,8 @@ UlpfecGenerator::Params::Params(FecProtectionParams delta_params,
     : delta_params(delta_params), keyframe_params(keyframe_params) {}
 
 UlpfecGenerator::UlpfecGenerator(base::Clock* clock,
-                                 int red_payload_type,
-                                 int ulpfec_payload_type)
+                                 int32_t red_payload_type,
+                                 int32_t ulpfec_payload_type)
     : clock_(clock),
       red_payload_type_(red_payload_type),
       ulpfec_payload_type_(ulpfec_payload_type),
@@ -99,7 +99,7 @@ void UlpfecGenerator::SetProtectionParameters(
   AVE_DCHECK_LE(key_params.fec_rate, 255);
   // Store the new params and apply them for the next set of FEC packets being
   // produced.
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   pending_params_.emplace(delta_params, key_params);
 }
 
@@ -107,12 +107,13 @@ void UlpfecGenerator::AddPacketAndGenerateFec(const RtpPacketToSend& packet) {
   AVE_DCHECK(generated_fec_packets_.empty());
 
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (pending_params_) {
       current_params_ = *pending_params_;
       pending_params_.reset();
 
-      if (CurrentParams().fec_rate > kHighProtectionThreshold) {
+      if (std::cmp_greater(CurrentParams().fec_rate,
+                           kHighProtectionThreshold)) {
         min_num_media_packets_ = kMinMediaPackets;
       } else {
         min_num_media_packets_ = 1;
@@ -150,7 +151,7 @@ void UlpfecGenerator::AddPacketAndGenerateFec(const RtpPacketToSend& packet) {
       (num_protected_frames_ >= params.max_fec_frames ||
        (ExcessOverheadBelowMax() && MinimumMediaPacketsReached()))) {
     // We are not using Unequal Protection feature of the parity erasure code.
-    constexpr int kNumImportantPackets = 0;
+    constexpr int32_t kNumImportantPackets = 0;
     constexpr bool kUseUnequalProtection = false;
     fec_->EncodeFec(media_packets_, params.fec_rate, kNumImportantPackets,
                     kUseUnequalProtection, params.fec_mask_type,
@@ -168,14 +169,12 @@ bool UlpfecGenerator::ExcessOverheadBelowMax() const {
 bool UlpfecGenerator::MinimumMediaPacketsReached() const {
   float average_num_packets_per_frame =
       static_cast<float>(media_packets_.size()) / num_protected_frames_;
-  int num_media_packets = static_cast<int>(media_packets_.size());
+  int32_t num_media_packets = static_cast<int32_t>(media_packets_.size());
   if (average_num_packets_per_frame < kMinMediaPacketsAdaptationThreshold) {
     return num_media_packets >= min_num_media_packets_;
-  } else {
-    // For larger rates (more packets/frame), increase the threshold.
-    // TODO(brandtr): Investigate what impact this adaptation has.
-    return num_media_packets >= min_num_media_packets_ + 1;
-  }
+  }  // For larger rates (more packets/frame), increase the threshold.
+  // TODO(brandtr): Investigate what impact this adaptation has.
+  return num_media_packets >= min_num_media_packets_ + 1;
 }
 
 const FecProtectionParams& UlpfecGenerator::CurrentParams() const {
@@ -189,7 +188,7 @@ size_t UlpfecGenerator::MaxPacketOverhead() const {
 
 std::vector<std::unique_ptr<RtpPacketToSend>> UlpfecGenerator::GetFecPackets() {
   if (generated_fec_packets_.empty()) {
-    return std::vector<std::unique_ptr<RtpPacketToSend>>();
+    return {};
   }
 
   // Wrap FEC packet (including FEC headers) in a RED packet. Since the
@@ -224,20 +223,20 @@ std::vector<std::unique_ptr<RtpPacketToSend>> UlpfecGenerator::GetFecPackets() {
 
   ResetState();
 
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   fec_bitrate_.Update(total_fec_size_bytes, clock_->CurrentTime());
 
   return fec_packets;
 }
 
 DataRate UlpfecGenerator::CurrentFecRate() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   return fec_bitrate_.Rate(clock_->CurrentTime()).value_or(DataRate::Zero());
 }
 
-int UlpfecGenerator::Overhead() const {
+int32_t UlpfecGenerator::Overhead() const {
   AVE_DCHECK(!media_packets_.empty());
-  int num_fec_packets =
+  int32_t num_fec_packets =
       fec_->NumFecPackets(media_packets_.size(), CurrentParams().fec_rate);
 
   // Return the overhead in Q8.

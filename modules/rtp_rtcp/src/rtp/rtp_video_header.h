@@ -49,11 +49,11 @@ struct RTPVideoHeader {
     ~GenericDescriptorInfo();
 
     int64_t frame_id = 0;
-    int spatial_index = 0;
-    int temporal_index = 0;
+    int32_t spatial_index = 0;
+    int32_t temporal_index = 0;
     ::std::vector<DecodeTargetIndication> decode_target_indications;
     ::std::vector<int64_t> dependencies;
-    ::std::vector<int> chain_diffs;
+    ::std::vector<int32_t> chain_diffs;
     ::std::bitset<32> active_decode_targets = ~uint32_t{0};
   };
 

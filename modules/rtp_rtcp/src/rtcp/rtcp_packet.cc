@@ -35,16 +35,18 @@ bool RtcpPacket::Build(size_t max_length, PacketReadyCallback callback) const {
   AVE_CHECK_LE(max_length, kIpPacketSize);
   uint8_t buffer[kIpPacketSize];
   size_t index = 0;
-  if (!Create(buffer, &index, max_length, callback))
+  if (!Create(buffer, &index, max_length, callback)) {
     return false;
+  }
   return OnBufferFull(buffer, &index, callback);
 }
 
 bool RtcpPacket::OnBufferFull(uint8_t* packet,
                               size_t* index,
-                              PacketReadyCallback callback) const {
-  if (*index == 0)
+                              PacketReadyCallback callback) {
+  if (*index == 0) {
     return false;
+  }
   AVE_DCHECK(callback) << "Fragmentation not supported.";
   callback(std::span<const uint8_t>(packet, *index));
   *index = 0;

@@ -52,7 +52,7 @@ class RtpPacketizerH265 : public RtpPacketizer {
 
   bool GeneratePackets();
   bool PacketizeFu(size_t fragment_index);
-  int PacketizeAp(size_t fragment_index);
+  int32_t PacketizeAp(size_t fragment_index);
 
   void NextAggregatePacket(RtpPacketToSend* rtp_packet);
   void NextFragmentPacket(RtpPacketToSend* rtp_packet);

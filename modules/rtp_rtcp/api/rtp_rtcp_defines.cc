@@ -10,9 +10,9 @@
 
 #include "media/modules/rtp_rtcp/api/rtp_rtcp_defines.h"
 
-#include <string.h>
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 
 namespace ave {
 namespace media {
@@ -34,13 +34,12 @@ bool IsTokenChar(char ch) {
 
 bool IsLegalMidName(std::string_view name) {
   return (name.size() <= kMidRsidMaxSize && !name.empty() &&
-          std::all_of(name.begin(), name.end(), IsTokenChar));
+          std::ranges::all_of(name, IsTokenChar));
 }
 
 bool IsLegalRsidName(std::string_view name) {
   return (name.size() <= kMidRsidMaxSize && !name.empty() &&
-          std::all_of(name.begin(), name.end(),
-                      [](char c) { return std::isalnum(c); }));
+          std::ranges::all_of(name, [](char c) { return std::isalnum(c); }));
 }
 
 }  // namespace rtp_rtcp

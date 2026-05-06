@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <numeric>
 #include <utility>
 
@@ -97,20 +98,24 @@ void TransportFeedback::LastChunk::Clear() {
 
 bool TransportFeedback::LastChunk::CanAdd(DeltaSize delta_size) const {
   AVE_DCHECK_LE(delta_size, 2);
-  if (size_ < kMaxTwoBitCapacity)
+  if (size_ < kMaxTwoBitCapacity) {
     return true;
-  if (size_ < kMaxOneBitCapacity && !has_large_delta_ && delta_size != kLarge)
+  }
+  if (size_ < kMaxOneBitCapacity && !has_large_delta_ && delta_size != kLarge) {
     return true;
+  }
   if (size_ < kMaxRunLengthCapacity && all_same_ &&
-      delta_sizes_[0] == delta_size)
+      delta_sizes_[0] == delta_size) {
     return true;
+  }
   return false;
 }
 
 void TransportFeedback::LastChunk::Add(DeltaSize delta_size) {
   AVE_DCHECK(CanAdd(delta_size));
-  if (size_ < kMaxVectorCapacity)
+  if (size_ < kMaxVectorCapacity) {
     delta_sizes_[size_] = delta_size;
+  }
   size_++;
   all_same_ = all_same_ && delta_size == delta_sizes_[0];
   has_large_delta_ = has_large_delta_ || delta_size == kLarge;
@@ -121,7 +126,7 @@ void TransportFeedback::LastChunk::AddMissingPackets(size_t num_missing) {
   AVE_DCHECK(all_same_);
   AVE_DCHECK(!has_large_delta_);
   AVE_DCHECK_LT(num_missing, kMaxRunLengthCapacity);
-  std::fill(delta_sizes_.begin(), delta_sizes_.end(), DeltaSize(0));
+  std::ranges::fill(delta_sizes_, static_cast<DeltaSize>(0));
   size_ = num_missing;
 }
 
@@ -156,10 +161,12 @@ uint16_t TransportFeedback::LastChunk::Emit() {
 
 uint16_t TransportFeedback::LastChunk::EncodeLast() const {
   AVE_DCHECK_GT(size_, 0u);
-  if (all_same_)
+  if (all_same_) {
     return EncodeRunLength();
-  if (size_ <= kMaxTwoBitCapacity)
+  }
+  if (size_ <= kMaxTwoBitCapacity) {
     return EncodeTwoBit(size_);
+  }
   return EncodeOneBit();
 }
 
@@ -199,8 +206,9 @@ uint16_t TransportFeedback::LastChunk::EncodeOneBit() const {
   AVE_DCHECK(!has_large_delta_);
   AVE_DCHECK_LE(size_, kMaxOneBitCapacity);
   uint16_t chunk = 0x8000;
-  for (size_t i = 0; i < size_; ++i)
+  for (size_t i = 0; i < size_; ++i) {
     chunk |= delta_sizes_[i] << (kMaxOneBitCapacity - 1 - i);
+  }
   return chunk;
 }
 
@@ -210,8 +218,9 @@ void TransportFeedback::LastChunk::DecodeOneBit(uint16_t chunk,
   size_ = std::min(kMaxOneBitCapacity, max_size);
   has_large_delta_ = false;
   all_same_ = false;
-  for (size_t i = 0; i < size_; ++i)
+  for (size_t i = 0; i < size_; ++i) {
     delta_sizes_[i] = (chunk >> (kMaxOneBitCapacity - 1 - i)) & 0x01;
+  }
 }
 
 //  Two Bit Status Vector Chunk
@@ -228,8 +237,9 @@ void TransportFeedback::LastChunk::DecodeOneBit(uint16_t chunk,
 uint16_t TransportFeedback::LastChunk::EncodeTwoBit(size_t size) const {
   AVE_DCHECK_LE(size, size_);
   uint16_t chunk = 0xc000;
-  for (size_t i = 0; i < size; ++i)
+  for (size_t i = 0; i < size; ++i) {
     chunk |= delta_sizes_[i] << 2 * (kMaxTwoBitCapacity - 1 - i);
+  }
   return chunk;
 }
 
@@ -239,8 +249,9 @@ void TransportFeedback::LastChunk::DecodeTwoBit(uint16_t chunk,
   size_ = std::min(kMaxTwoBitCapacity, max_size);
   has_large_delta_ = true;
   all_same_ = false;
-  for (size_t i = 0; i < size_; ++i)
+  for (size_t i = 0; i < size_; ++i) {
     delta_sizes_[i] = (chunk >> 2 * (kMaxTwoBitCapacity - 1 - i)) & 0x03;
+  }
 }
 
 //  Run Length Status Vector Chunk
@@ -268,8 +279,9 @@ void TransportFeedback::LastChunk::DecodeRunLength(uint16_t chunk,
   has_large_delta_ = delta_size >= kLarge;
   all_same_ = true;
   // To make it consistent with Add function, populate delta_sizes_ beyond 1st.
-  for (size_t i = 0; i < std::min<size_t>(size_, kMaxVectorCapacity); ++i)
+  for (size_t i = 0; i < std::min<size_t>(size_, kMaxVectorCapacity); ++i) {
     delta_sizes_[i] = delta_size;
+  }
 }
 
 TransportFeedback::TransportFeedback()
@@ -301,7 +313,7 @@ TransportFeedback::TransportFeedback(TransportFeedback&& other)
   other.Clear();
 }
 
-TransportFeedback::~TransportFeedback() {}
+TransportFeedback::~TransportFeedback() = default;
 
 void TransportFeedback::SetBase(uint16_t base_sequence,
                                 base::Timestamp ref_timestamp) {
@@ -338,7 +350,7 @@ bool TransportFeedback::AddReceivedPacket(uint16_t sequence_number,
     delta_full /= kDeltaTick.us();
 
     delta = static_cast<int16_t>(delta_full);
-    // If larger than 16bit signed, we can't represent it - need new fb packet.
+    // If larger than 16bit int32_t, we can't represent it - need new fb packet.
     if (delta != delta_full) {
       AVE_LOG(LS_WARNING) << "Delta value too large ( >= 2^16 ticks )";
       return false;
@@ -348,16 +360,19 @@ bool TransportFeedback::AddReceivedPacket(uint16_t sequence_number,
   uint16_t next_seq_no = base_seq_no_ + num_seq_no_;
   if (sequence_number != next_seq_no) {
     uint16_t last_seq_no = next_seq_no - 1;
-    if (!IsNewerSequenceNumber(sequence_number, last_seq_no))
+    if (!IsNewerSequenceNumber(sequence_number, last_seq_no)) {
       return false;
+    }
     uint16_t num_missing_packets = sequence_number - next_seq_no;
-    if (!AddMissingPackets(num_missing_packets))
+    if (!AddMissingPackets(num_missing_packets)) {
       return false;
+    }
   }
 
   DeltaSize delta_size = (delta >= 0 && delta <= 0xff) ? 1 : 2;
-  if (!AddDeltaSize(delta_size))
+  if (!AddDeltaSize(delta_size)) {
     return false;
+  }
 
   received_packets_.emplace_back(sequence_number, delta);
   last_timestamp_ += delta * kDeltaTick;
@@ -519,13 +534,17 @@ std::unique_ptr<TransportFeedback> TransportFeedback::ParseFrom(
     const uint8_t* buffer,
     size_t length) {
   CommonHeader header;
-  if (!header.Parse(buffer, length))
+  if (!header.Parse(buffer, length)) {
     return nullptr;
-  if (header.type() != kPacketType || header.fmt() != kFeedbackMessageType)
+  }
+  if (header.type() != kPacketType || header.fmt() != kFeedbackMessageType) {
     return nullptr;
-  std::unique_ptr<TransportFeedback> parsed(new TransportFeedback);
-  if (!parsed->Parse(header))
+  }
+  std::unique_ptr<TransportFeedback> parsed =
+      std::make_unique<TransportFeedback>();
+  if (!parsed->Parse(header)) {
     return nullptr;
+  }
   return parsed;
 }
 
@@ -609,12 +628,14 @@ bool TransportFeedback::Create(uint8_t* packet,
                                size_t* position,
                                size_t max_length,
                                PacketReadyCallback callback) const {
-  if (num_seq_no_ == 0)
+  if (num_seq_no_ == 0) {
     return false;
+  }
 
   while (*position + BlockLength() > max_length) {
-    if (!OnBufferFull(packet, position, callback))
+    if (!OnBufferFull(packet, position, callback)) {
       return false;
+    }
   }
   const size_t position_end = *position + BlockLength();
   const size_t padding_length = PaddingLength();
@@ -678,11 +699,13 @@ void TransportFeedback::Clear() {
 }
 
 bool TransportFeedback::AddDeltaSize(DeltaSize delta_size) {
-  if (num_seq_no_ == kMaxReportedPackets)
+  if (num_seq_no_ == kMaxReportedPackets) {
     return false;
+  }
   size_t add_chunk_size = last_chunk_.Empty() ? kChunkSizeBytes : 0;
-  if (size_bytes_ + delta_size + add_chunk_size > kMaxSizeBytes)
+  if (size_bytes_ + delta_size + add_chunk_size > kMaxSizeBytes) {
     return false;
+  }
 
   if (last_chunk_.CanAdd(delta_size)) {
     size_bytes_ += add_chunk_size;
@@ -690,8 +713,9 @@ bool TransportFeedback::AddDeltaSize(DeltaSize delta_size) {
     ++num_seq_no_;
     return true;
   }
-  if (size_bytes_ + delta_size + kChunkSizeBytes > kMaxSizeBytes)
+  if (size_bytes_ + delta_size + kChunkSizeBytes > kMaxSizeBytes) {
     return false;
+  }
 
   encoded_chunks_.push_back(last_chunk_.Emit());
   size_bytes_ += kChunkSizeBytes;

@@ -64,21 +64,21 @@ class ModuleRtpRtcpImpl2 final : public RtpRtcpInterface,
   // Receiver part.
 
   // Called when we receive an RTCP packet.
-  void IncomingRtcpPacket(std::span<const uint8_t> incoming_packet) override;
+  void IncomingRtcpPacket(std::span<const uint8_t> rtcp_packet) override;
 
   void SetRemoteSSRC(uint32_t ssrc) override;
 
   void SetLocalSsrc(uint32_t local_ssrc) override;
 
   // Sender part.
-  void RegisterSendPayloadFrequency(int payload_type,
-                                    int payload_frequency) override;
+  void RegisterSendPayloadFrequency(int32_t payload_type,
+                                    int32_t payload_frequency) override;
 
   int32_t DeRegisterSendPayload(int8_t payload_type) override;
 
   void SetExtmapAllowMixed(bool extmap_allow_mixed) override;
 
-  void RegisterRtpHeaderExtension(std::string_view uri, int id) override;
+  void RegisterRtpHeaderExtension(std::string_view uri, int32_t id) override;
   void DeregisterSendRtpHeaderExtension(std::string_view uri) override;
 
   bool SupportsPadding() const override;
@@ -113,12 +113,12 @@ class ModuleRtpRtcpImpl2 final : public RtpRtcpInterface,
 
   RTCPSender::FeedbackState GetFeedbackState();
 
-  void SetRtxSendStatus(int mode) override;
-  int RtxSendStatus() const override;
+  void SetRtxSendStatus(int32_t mode) override;
+  int32_t RtxSendStatus() const override;
   std::optional<uint32_t> RtxSsrc() const override;
 
-  void SetRtxSendPayloadType(int payload_type,
-                             int associated_payload_type) override;
+  void SetRtxSendPayloadType(int32_t payload_type,
+                             int32_t associated_payload_type) override;
 
   std::optional<uint32_t> FlexfecSsrc() const override;
 
@@ -138,7 +138,7 @@ class ModuleRtpRtcpImpl2 final : public RtpRtcpInterface,
 
   bool OnSendingRtpFrame(uint32_t timestamp,
                          int64_t capture_time_ms,
-                         int payload_type,
+                         int32_t payload_type,
                          bool force_sender_report) override;
 
   bool CanSendPacket(const RtpPacketToSend& packet) const override;
@@ -192,7 +192,7 @@ class ModuleRtpRtcpImpl2 final : public RtpRtcpInterface,
   // Force a send of an RTCP packet.
   // Normal SR and RR are triggered via the task queue that's current when this
   // object is created.
-  int32_t SendRTCP(RTCPPacketType rtcpPacketType) override;
+  int32_t SendRTCP(RTCPPacketType packet_type) override;
 
   void GetSendStreamDataCounters(
       StreamDataCounters* rtp_counters,
@@ -214,7 +214,7 @@ class ModuleRtpRtcpImpl2 final : public RtpRtcpInterface,
 
   size_t MaxRtpPacketSize() const override;
 
-  void SetMaxRtpPacketSize(size_t max_packet_size) override;
+  void SetMaxRtpPacketSize(size_t rtp_packet_size) override;
 
   // (NACK) Negative acknowledgment part.
 

@@ -46,8 +46,8 @@ struct FrameTiming {
 
 // Playout delay for video frames.
 struct PlayoutDelay {
-  int min_ms = -1;
-  int max_ms = -1;
+  int32_t min_ms = -1;
+  int32_t max_ms = -1;
 };
 
 // RtpFrameObject represents an assembled video frame from RTP packets.
@@ -57,7 +57,7 @@ class RtpFrameObject {
   RtpFrameObject(uint16_t first_seq_num,
                  uint16_t last_seq_num,
                  bool marker_bit,
-                 int times_nacked,
+                 int32_t times_nacked,
                  int64_t first_packet_received_time,
                  int64_t last_packet_received_time,
                  uint32_t rtp_timestamp,
@@ -77,7 +77,7 @@ class RtpFrameObject {
   // Accessors for RTP-related information
   uint16_t first_seq_num() const { return first_seq_num_; }
   uint16_t last_seq_num() const { return last_seq_num_; }
-  int times_nacked() const { return times_nacked_; }
+  int32_t times_nacked() const { return times_nacked_; }
   bool delayed_by_retransmission() const { return times_nacked_ > 0; }
 
   // Frame information
@@ -149,12 +149,12 @@ class RtpFrameObject {
 
   // Spatial layer
   bool is_last_spatial_layer() const { return is_last_spatial_layer_; }
-  int spatial_index() const { return spatial_index_; }
-  void set_spatial_index(int index) { spatial_index_ = index; }
+  int32_t spatial_index() const { return spatial_index_; }
+  void set_spatial_index(int32_t index) { spatial_index_ = index; }
 
   // Temporal layer
-  int temporal_index() const { return temporal_index_; }
-  void set_temporal_index(int index) { temporal_index_ = index; }
+  int32_t temporal_index() const { return temporal_index_; }
+  void set_temporal_index(int32_t index) { temporal_index_ = index; }
 
   // Dependencies
   const std::vector<int64_t>& dependencies() const { return dependencies_; }
@@ -196,7 +196,7 @@ class RtpFrameObject {
   FrameTiming timing_;
 
   // Packet statistics
-  int times_nacked_;
+  int32_t times_nacked_;
 
   // Video properties
   uint16_t encoded_width_ = 0;
@@ -220,8 +220,8 @@ class RtpFrameObject {
 
   // Spatial/temporal layer info
   bool is_last_spatial_layer_ = true;
-  int spatial_index_ = 0;
-  int temporal_index_ = 0;
+  int32_t spatial_index_ = 0;
+  int32_t temporal_index_ = 0;
 };
 
 }  // namespace rtp_rtcp

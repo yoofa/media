@@ -9,6 +9,7 @@
 
 #include <gtest/gtest.h>
 #include <memory>
+#include <numbers>
 
 namespace ave {
 namespace media {
@@ -70,7 +71,7 @@ TEST_F(MessageTest, SetAndFindSize) {
 
 TEST_F(MessageTest, SetAndFindFloat) {
   const char* name = "float_value";
-  float expected = 3.14159f;
+  float expected = std::numbers::pi_v<float>;
 
   message_->setFloat(name, expected);
   EXPECT_TRUE(message_->contains(name));
@@ -86,7 +87,7 @@ TEST_F(MessageTest, SetAndFindFloat) {
 
 TEST_F(MessageTest, SetAndFindDouble) {
   const char* name = "double_value";
-  double expected = 2.718281828;
+  double expected = std::numbers::e;
 
   message_->setDouble(name, expected);
   EXPECT_TRUE(message_->contains(name));
@@ -102,7 +103,7 @@ TEST_F(MessageTest, SetAndFindDouble) {
 
 TEST_F(MessageTest, SetAndFindPointer) {
   const char* name = "pointer_value";
-  int dummy = 42;
+  int32_t dummy = 42;
   void* expected = &dummy;
 
   message_->setPointer(name, expected);
@@ -203,12 +204,12 @@ TEST_F(MessageTest, SetAndFindRect) {
 TEST_F(MessageTest, SetAndFindObject) {
   const char* name = "object_value";
 
-  // Test with int
-  int expected_int = 42;
+  // Test with int32_t
+  int32_t expected_int = 42;
   message_->setObject(name, expected_int);
   EXPECT_TRUE(message_->contains(name));
 
-  int actual_int = 0;
+  int32_t actual_int = 0;
   EXPECT_TRUE(message_->findObject(name, actual_int));
   EXPECT_EQ(expected_int, actual_int);
 
@@ -226,7 +227,7 @@ TEST_F(MessageTest, SetAndFindObject) {
   EXPECT_FALSE(message_->findObject(name, wrong_type));
 
   // Test not found
-  int not_found = 0;
+  int32_t not_found = 0;
   EXPECT_FALSE(message_->findObject("not_exist", not_found));
 }
 

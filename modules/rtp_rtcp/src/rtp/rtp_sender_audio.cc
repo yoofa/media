@@ -42,8 +42,8 @@ bool EqualsIgnoreCase(std::string_view a, std::string_view b) {
     return false;
   }
   for (size_t i = 0; i < a.size(); ++i) {
-    if (std::tolower(static_cast<unsigned char>(a[i])) !=
-        std::tolower(static_cast<unsigned char>(b[i]))) {
+    if (std::tolower(static_cast<uint8_t>(a[i])) !=
+        std::tolower(static_cast<uint8_t>(b[i]))) {
       return false;
     }
   }
@@ -59,7 +59,7 @@ RTPSenderAudio::RTPSenderAudio(base::Clock* clock, RTPSender* rtp_sender)
   AVE_DCHECK(clock_);
 }
 
-RTPSenderAudio::~RTPSenderAudio() {}
+RTPSenderAudio::~RTPSenderAudio() = default;
 
 int32_t RTPSenderAudio::RegisterAudioPayload(std::string_view payload_name,
                                              const int8_t payload_type,
@@ -67,7 +67,7 @@ int32_t RTPSenderAudio::RegisterAudioPayload(std::string_view payload_name,
                                              const size_t /* channels */,
                                              const uint32_t /* rate */) {
   if (EqualsIgnoreCase(payload_name, "cn")) {
-    std::lock_guard<std::mutex> lock(send_audio_mutex_);
+    std::scoped_lock lock(send_audio_mutex_);
     //  we can have multiple CNG payload types
     switch (frequency) {
       case 8000:
@@ -86,22 +86,22 @@ int32_t RTPSenderAudio::RegisterAudioPayload(std::string_view payload_name,
         return -1;
     }
   } else if (EqualsIgnoreCase(payload_name, "telephone-event")) {
-    std::lock_guard<std::mutex> lock(send_audio_mutex_);
+    std::scoped_lock lock(send_audio_mutex_);
     // Don't add it to the list
     // we dont want to allow send with a DTMF payloadtype
     dtmf_payload_type_ = payload_type;
     dtmf_payload_freq_ = frequency;
     return 0;
   } else if (payload_name == "audio") {
-    std::lock_guard<std::mutex> lock(send_audio_mutex_);
-    encoder_rtp_timestamp_frequency_ = static_cast<int>(frequency);
+    std::scoped_lock lock(send_audio_mutex_);
+    encoder_rtp_timestamp_frequency_ = static_cast<int32_t>(frequency);
     return 0;
   }
   return 0;
 }
 
 bool RTPSenderAudio::MarkerBit(AudioFrameType frame_type, int8_t payload_type) {
-  std::lock_guard<std::mutex> lock(send_audio_mutex_);
+  std::scoped_lock lock(send_audio_mutex_);
   // for audio true for first packet in a speech burst
   bool marker_bit = false;
   if (last_payload_type_ != payload_type) {
@@ -118,11 +118,9 @@ bool RTPSenderAudio::MarkerBit(AudioFrameType frame_type, int8_t payload_type) {
       if (frame_type != AudioFrameType::kAudioFrameCN) {
         // first packet and NOT CNG
         return true;
-      } else {
-        // first packet and CNG
-        inband_vad_active_ = true;
-        return false;
-      }
+      }  // first packet and CNG
+      inband_vad_active_ = true;
+      return false;
     }
 
     // not first packet AND
@@ -152,11 +150,11 @@ bool RTPSenderAudio::SendAudio(const RtpAudioFrame& frame) {
   // natural interval is the spacing between non-event audio packets. [...]
   // Alternatively, a source MAY decide to use a different spacing for event
   // updates, with a value of 50 ms RECOMMENDED.
-  constexpr int kDtmfIntervalTimeMs = 50;
+  constexpr int32_t kDtmfIntervalTimeMs = 50;
   uint32_t dtmf_payload_freq = 0;
   std::optional<AbsoluteCaptureTime> absolute_capture_time;
   {
-    std::lock_guard<std::mutex> lock(send_audio_mutex_);
+    std::scoped_lock lock(send_audio_mutex_);
     dtmf_payload_freq = dtmf_payload_freq_;
     if (frame.capture_time.has_value()) {
       // Send absolute capture time periodically in order to optimize and save
@@ -194,7 +192,7 @@ bool RTPSenderAudio::SendAudio(const RtpAudioFrame& frame) {
       // kEmptyFrame is used to drive the DTMF when in CN mode
       // it can be triggered more frequently than we want to send the
       // DTMF packets.
-      const unsigned int dtmf_interval_time_rtp =
+      const uint32_t dtmf_interval_time_rtp =
           dtmf_payload_freq * kDtmfIntervalTimeMs / 1000;
       if ((frame.rtp_timestamp - dtmf_timestamp_last_sent_) <
           dtmf_interval_time_rtp) {
@@ -231,15 +229,14 @@ bool RTPSenderAudio::SendAudio(const RtpAudioFrame& frame) {
         return SendTelephoneEventPacket(
             ended, dtmf_timestamp_,
             static_cast<uint16_t>(dtmf_duration_samples), false);
-      } else {
-        if (!SendTelephoneEventPacket(ended, dtmf_timestamp_,
-                                      dtmf_duration_samples,
-                                      !dtmf_event_first_packet_sent_)) {
-          return false;
-        }
-        dtmf_event_first_packet_sent_ = true;
-        return true;
       }
+      if (!SendTelephoneEventPacket(ended, dtmf_timestamp_,
+                                    dtmf_duration_samples,
+                                    !dtmf_event_first_packet_sent_)) {
+        return false;
+      }
+      dtmf_event_first_packet_sent_ = true;
+      return true;
     }
     return true;
   }
@@ -275,7 +272,7 @@ bool RTPSenderAudio::SendAudio(const RtpAudioFrame& frame) {
   memcpy(payload, frame.payload.data(), frame.payload.size());
 
   {
-    std::lock_guard<std::mutex> lock(send_audio_mutex_);
+    std::scoped_lock lock(send_audio_mutex_);
     last_payload_type_ = frame.payload_id;
   }
   packet->set_packet_type(RtpPacketMediaType::kAudio);
@@ -296,7 +293,7 @@ int32_t RTPSenderAudio::SendTelephoneEvent(uint8_t key,
                                            uint8_t level) {
   DtmfQueue::Event event;
   {
-    std::lock_guard<std::mutex> lock(send_audio_mutex_);
+    std::scoped_lock lock(send_audio_mutex_);
     if (dtmf_payload_type_ < 0) {
       // TelephoneEvent payloadtype not configured
       return -1;

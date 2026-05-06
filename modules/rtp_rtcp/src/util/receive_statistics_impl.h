@@ -46,7 +46,7 @@ class StreamStatisticianImplInterface : public StreamStatistician {
   virtual ~StreamStatisticianImplInterface() = default;
   virtual void MaybeAppendReportBlockAndReset(
       std::vector<rtcp::ReportBlock>& report_blocks) = 0;
-  virtual void SetMaxReorderingThreshold(int max_reordering_threshold) = 0;
+  virtual void SetMaxReorderingThreshold(int32_t max_reordering_threshold) = 0;
   virtual void EnableRetransmitDetection(bool enable) = 0;
   virtual void UpdateCounters(const RtpPacketReceived& packet) = 0;
 };
@@ -59,14 +59,14 @@ class StreamStatisticianImpl : public StreamStatisticianImplInterface {
 
   // Implements StreamStatistician
   RtpReceiveStats GetStats() const override;
-  std::optional<int> GetFractionLostInPercent() const override;
+  std::optional<int32_t> GetFractionLostInPercent() const override;
   StreamDataCounters GetReceiveStreamDataCounters() const override;
   uint32_t BitrateReceived() const override;
 
   // Implements StreamStatisticianImplInterface
   void MaybeAppendReportBlockAndReset(
       std::vector<rtcp::ReportBlock>& report_blocks) override;
-  void SetMaxReorderingThreshold(int max_reordering_threshold) override;
+  void SetMaxReorderingThreshold(int32_t max_reordering_threshold) override;
   void EnableRetransmitDetection(bool enable) override;
   // Updates StreamStatistician for incoming packets.
   void UpdateCounters(const RtpPacketReceived& packet) override;
@@ -75,7 +75,7 @@ class StreamStatisticianImpl : public StreamStatisticianImplInterface {
   bool IsRetransmitOfOldPacket(const RtpPacketReceived& packet,
                                Timestamp now) const;
   void UpdateJitter(const RtpPacketReceived& packet, Timestamp receive_time);
-  void ReviseFrequencyAndJitter(int payload_type_frequency);
+  void ReviseFrequencyAndJitter(int32_t payload_type_frequency);
   // Updates StreamStatistician for out of order packets.
   // Returns true if packet considered to be out of order.
   bool UpdateOutOfOrder(const RtpPacketReceived& packet,
@@ -90,7 +90,7 @@ class StreamStatisticianImpl : public StreamStatisticianImplInterface {
   const TimeDelta delta_internal_unix_epoch_;
   BitrateTracker incoming_bitrate_;
   // In number of packets or sequence numbers.
-  int max_reordering_threshold_;
+  int32_t max_reordering_threshold_;
   bool enable_retransmit_detection_;
   bool cumulative_loss_is_capped_;
 
@@ -121,7 +121,7 @@ class StreamStatisticianImpl : public StreamStatisticianImplInterface {
   int64_t last_report_seq_max_;
 
   // The sample frequency of the last received packet.
-  int last_payload_type_frequency_;
+  int32_t last_payload_type_frequency_;
 };
 
 // Thread-safe implementation of StreamStatisticianImplInterface.
@@ -134,7 +134,7 @@ class StreamStatisticianLocked : public StreamStatisticianImplInterface {
     std::lock_guard<std::mutex> lock(stream_lock_);
     return impl_.GetStats();
   }
-  std::optional<int> GetFractionLostInPercent() const override {
+  std::optional<int32_t> GetFractionLostInPercent() const override {
     std::lock_guard<std::mutex> lock(stream_lock_);
     return impl_.GetFractionLostInPercent();
   }
@@ -151,7 +151,7 @@ class StreamStatisticianLocked : public StreamStatisticianImplInterface {
     std::lock_guard<std::mutex> lock(stream_lock_);
     impl_.MaybeAppendReportBlockAndReset(report_blocks);
   }
-  void SetMaxReorderingThreshold(int max_reordering_threshold) override {
+  void SetMaxReorderingThreshold(int32_t max_reordering_threshold) override {
     std::lock_guard<std::mutex> lock(stream_lock_);
     return impl_.SetMaxReorderingThreshold(max_reordering_threshold);
   }
@@ -188,7 +188,7 @@ class ReceiveStatisticsImpl : public ReceiveStatistics {
   // Implements ReceiveStatistics.
   StreamStatistician* GetStatistician(uint32_t ssrc) const override;
   void SetMaxReorderingThreshold(uint32_t ssrc,
-                                 int max_reordering_threshold) override;
+                                 int32_t max_reordering_threshold) override;
   void EnableRetransmitDetection(uint32_t ssrc, bool enable) override;
 
  private:
@@ -229,7 +229,7 @@ class ReceiveStatisticsLocked : public ReceiveStatistics {
     return impl_.GetStatistician(ssrc);
   }
   void SetMaxReorderingThreshold(uint32_t ssrc,
-                                 int max_reordering_threshold) override {
+                                 int32_t max_reordering_threshold) override {
     std::lock_guard<std::mutex> lock(receive_statistics_lock_);
     return impl_.SetMaxReorderingThreshold(ssrc, max_reordering_threshold);
   }

@@ -35,7 +35,7 @@ struct FeedbackRequest {
   // Include feedback of received packets in the range [sequence_number -
   // sequence_count + 1, sequence_number]. That is, no feedback will be sent if
   // sequence_count is zero.
-  int sequence_count;
+  int32_t sequence_count;
 };
 
 // The Absolute Capture Time extension is used to stamp RTP packets with a NTP
@@ -56,7 +56,7 @@ struct AbsoluteCaptureTime {
   // (e.g. from hardware buffers) subtracted from the readout to make the final
   // timestamp as close to the actual capture time as possible.
   //
-  // This field is encoded as a 64-bit unsigned fixed-point number with the high
+  // This field is encoded as a 64-bit uint32_t fixed-point number with the high
   // 32 bits for the timestamp in seconds and low 32 bits for the fractional
   // part. This is also known as the UQ32.32 format and is what the RTP
   // specification defines as the canonical format to represent NTP timestamps.
@@ -68,7 +68,7 @@ struct AbsoluteCaptureTime {
   // timestamps for the RTCP sender reports on this stream. The sender system is
   // typically either the capture system or a mixer.
   //
-  // This field is encoded as a 64-bit two's complement signed fixed-point
+  // This field is encoded as a 64-bit two's complement int32_t fixed-point
   // number with the high 32 bits for the seconds and low 32 bits for the
   // fractional part. It's intended to make it easy for a receiver, that knows
   // how to estimate the sender system's NTP clock, to also estimate the capture
@@ -84,7 +84,7 @@ struct AbsoluteCaptureTime {
 class AudioLevel {
  public:
   AudioLevel();
-  AudioLevel(bool voice_activity, int audio_level);
+  AudioLevel(bool voice_activity, int32_t audio_level);
   AudioLevel(const AudioLevel& other) = default;
   AudioLevel& operator=(const AudioLevel& other) = default;
 
@@ -94,11 +94,11 @@ class AudioLevel {
 
   // Audio level in -dBov. Values range from 0 to 127, representing 0 to -127
   // dBov. 127 represents digital silence.
-  int level() const { return audio_level_; }
+  int32_t level() const { return audio_level_; }
 
  private:
   bool voice_activity_;
-  int audio_level_;
+  int32_t audio_level_;
 };
 
 inline bool operator==(const AbsoluteCaptureTime& lhs,
@@ -132,8 +132,8 @@ struct VideoSendTiming {
 
 // Playout delay values
 struct VideoPlayoutDelay {
-  int min_ms = -1;
-  int max_ms = -1;
+  int32_t min_ms = -1;
+  int32_t max_ms = -1;
 
   bool operator==(const VideoPlayoutDelay& rhs) const {
     return min_ms == rhs.min_ms && max_ms == rhs.max_ms;
@@ -145,7 +145,7 @@ struct RTPHeaderExtension {
   RTPHeaderExtension(const RTPHeaderExtension& other);
   RTPHeaderExtension& operator=(const RTPHeaderExtension& other);
 
-  static constexpr int kAbsSendTimeFraction = 18;
+  static constexpr int32_t kAbsSendTimeFraction = 18;
 
   Timestamp GetAbsoluteSendTimestamp() const {
     AVE_DCHECK(hasAbsoluteSendTime);

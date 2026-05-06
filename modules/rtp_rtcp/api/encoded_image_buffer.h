@@ -51,7 +51,7 @@ class EncodedImageBuffer final : public EncodedImageBufferInterface {
   const uint8_t* data() const override;
   uint8_t* data() override;
   size_t size() const override;
-  void Realloc(size_t t);
+  void Realloc(size_t size);
 
   base::Buffer buffer_;
 };

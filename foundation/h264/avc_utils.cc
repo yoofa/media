@@ -8,6 +8,7 @@
 #include "avc_utils.h"
 
 #include <cstdint>
+#include <utility>
 
 #include "base/checks.h"
 #include "base/errors.h"
@@ -361,7 +362,7 @@ static std::shared_ptr<Buffer> FindNAL(const uint8_t* data,
   const uint8_t* nalStart = nullptr;
   size_t nalSize = 0;
   while (getNextNALUnit(&data, &size, &nalStart, &nalSize, true) == OK) {
-    if (nalSize > 0 && (nalStart[0] & 0x1f) == nalType) {
+    if (nalSize > 0 && std::cmp_equal((nalStart[0] & 0x1f), nalType)) {
       auto buffer = std::make_shared<Buffer>(nalSize);
       memcpy(buffer->data(), nalStart, nalSize);
       return buffer;
@@ -624,10 +625,10 @@ bool ExtractDimensionsFromVOLHeader(const uint8_t* data,
 
 bool GetMPEGAudioFrameSize(uint32_t header,
                            size_t* frame_size,
-                           int* out_sampling_rate,
-                           int* out_channels,
-                           int* out_bitrate,
-                           int* out_num_samples) {
+                           int32_t* out_sampling_rate,
+                           int32_t* out_channels,
+                           int32_t* out_bitrate,
+                           int32_t* out_num_samples) {
   *frame_size = 0;
 
   if (out_sampling_rate) {
@@ -678,9 +679,9 @@ bool GetMPEGAudioFrameSize(uint32_t header,
   }
 
   // NOLINTBEGIN(modernize-avoid-c-arrays)
-  static const int kSamplingRateV1[] = {44100, 48000, 32000};
+  static const int32_t kSamplingRateV1[] = {44100, 48000, 32000};
   // NOLINTEND(modernize-avoid-c-arrays)
-  int sampling_rate = kSamplingRateV1[sampling_rate_index];
+  int32_t sampling_rate = kSamplingRateV1[sampling_rate_index];
   if (version == 2 /* V2 */) {
     sampling_rate /= 2;
   } else if (version == 0 /* V2.5 */) {
@@ -692,14 +693,14 @@ bool GetMPEGAudioFrameSize(uint32_t header,
   if (layer == 3) {
     // layer I
     // NOLINTBEGIN(modernize-avoid-c-arrays)
-    static const int kBitrateV1[] = {32,  64,  96,  128, 160, 192, 224,
-                                     256, 288, 320, 352, 384, 416, 448};
-    static const int kBitrateV2[] = {32,  48,  56,  64,  80,  96,  112,
-                                     128, 144, 160, 176, 192, 224, 256};
+    static const int32_t kBitrateV1[] = {32,  64,  96,  128, 160, 192, 224,
+                                         256, 288, 320, 352, 384, 416, 448};
+    static const int32_t kBitrateV2[] = {32,  48,  56,  64,  80,  96,  112,
+                                         128, 144, 160, 176, 192, 224, 256};
     // NOLINTEND(modernize-avoid-c-arrays)
 
-    int bitrate = (version == 3 /* V1 */) ? kBitrateV1[bitrate_index - 1]
-                                          : kBitrateV2[bitrate_index - 1];
+    int32_t bitrate = (version == 3 /* V1 */) ? kBitrateV1[bitrate_index - 1]
+                                              : kBitrateV2[bitrate_index - 1];
 
     if (out_bitrate) {
       *out_bitrate = bitrate;
@@ -713,17 +714,17 @@ bool GetMPEGAudioFrameSize(uint32_t header,
   } else {
     // layer II or III
     // NOLINTBEGIN(modernize-avoid-c-arrays)
-    static const int kBitrateV1L2[] = {32,  48,  56,  64,  80,  96,  112,
-                                       128, 160, 192, 224, 256, 320, 384};
+    static const int32_t kBitrateV1L2[] = {32,  48,  56,  64,  80,  96,  112,
+                                           128, 160, 192, 224, 256, 320, 384};
 
-    static const int kBitrateV1L3[] = {32,  40,  48,  56,  64,  80,  96,
-                                       112, 128, 160, 192, 224, 256, 320};
+    static const int32_t kBitrateV1L3[] = {32,  40,  48,  56,  64,  80,  96,
+                                           112, 128, 160, 192, 224, 256, 320};
 
-    static const int kBitrateV2[] = {8,  16, 24, 32,  40,  48,  56,
-                                     64, 80, 96, 112, 128, 144, 160};
+    static const int32_t kBitrateV2[] = {8,  16, 24, 32,  40,  48,  56,
+                                         64, 80, 96, 112, 128, 144, 160};
     // NOLINTEND(modernize-avoid-c-arrays)
 
-    int bitrate = 0;
+    int32_t bitrate = 0;
     if (version == 3 /* V1 */) {
       bitrate = (layer == 2 /* L2 */) ? kBitrateV1L2[bitrate_index - 1]
                                       : kBitrateV1L3[bitrate_index - 1];
@@ -758,7 +759,7 @@ bool GetMPEGAudioFrameSize(uint32_t header,
   }
 
   if (out_channels) {
-    int channel_mode = static_cast<int>(header >> 6) & 3;
+    int32_t channel_mode = static_cast<int32_t>(header >> 6) & 3;
     *out_channels = (channel_mode == 3) ? 1 : 2;
   }
 

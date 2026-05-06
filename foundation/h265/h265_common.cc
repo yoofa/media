@@ -17,7 +17,7 @@ namespace H265 {
 namespace {
 constexpr uint8_t kNaluTypeMask = 0x7E;
 
-int CountLeadingZeros32(uint32_t n) {
+int32_t CountLeadingZeros32(uint32_t n) {
 #ifdef __GNUC__
   return n == 0 ? 32 : __builtin_clz(n);
 #else
@@ -45,8 +45,9 @@ std::vector<NaluIndex> FindNaluIndices(std::span<const uint8_t> buffer) {
   std::vector<H264::NaluIndex> indices = H264::FindNaluIndices(buffer);
   std::vector<NaluIndex> results;
   for (auto& index : indices) {
-    results.push_back(
-        {index.start_offset, index.payload_start_offset, index.payload_size});
+    results.push_back({.start_offset = index.start_offset,
+                       .payload_start_offset = index.payload_start_offset,
+                       .payload_size = index.payload_size});
   }
   return results;
 }

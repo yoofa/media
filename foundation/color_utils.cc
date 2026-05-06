@@ -771,10 +771,11 @@ void ColorUtils::setColorAspectsIntoFormat(const ColorAspects& aspects,
                       << "), T:" << aspects.mTransfer << "("
                       << asString(aspects.mTransfer) << ")) "
                       << "from format (out:R:" << range << "("
-                      << asString((ColorRange)range) << "), S:" << standard
-                      << "(" << asString((ColorStandard)standard)
+                      << asString(static_cast<ColorRange>(range))
+                      << "), S:" << standard << "("
+                      << asString(static_cast<ColorStandard>(standard))
                       << "), T:" << transfer << "("
-                      << asString((ColorTransfer)transfer) << "))";
+                      << asString(static_cast<ColorTransfer>(transfer)) << "))";
 }
 // static
 void ColorUtils::fillHdrStaticInfoBuffer(const HDRStaticInfo& info,

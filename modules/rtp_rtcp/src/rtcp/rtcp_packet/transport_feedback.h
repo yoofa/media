@@ -154,12 +154,12 @@ class TransportFeedback : public Rtpfb {
     void DecodeTwoBit(uint16_t chunk, size_t max_size);
 
     uint16_t EncodeRunLength() const;
-    void DecodeRunLength(uint16_t chunk, size_t max_size);
+    void DecodeRunLength(uint16_t chunk, size_t max_count);
 
-    std::array<DeltaSize, kMaxVectorCapacity> delta_sizes_;
-    size_t size_;
-    bool all_same_;
-    bool has_large_delta_;
+    std::array<DeltaSize, kMaxVectorCapacity> delta_sizes_{};
+    size_t size_{};
+    bool all_same_{};
+    bool has_large_delta_{};
   };
 
   // Reset packet to consistent empty state.

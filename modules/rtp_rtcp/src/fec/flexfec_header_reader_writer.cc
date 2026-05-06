@@ -8,7 +8,7 @@
 #include "media/modules/rtp_rtcp/src/fec/flexfec_header_reader_writer.h"
 #include <span>
 
-#include <string.h>
+#include <cstring>
 
 #include "base/logging.h"
 #include "media/modules/rtp_rtcp/src/fec/forward_error_correction_internal.h"
@@ -55,7 +55,8 @@ size_t FlexfecHeaderSize(size_t packet_mask_size) {
   AVE_DCHECK(packet_mask_size <= kFlexfecPacketMaskSizes[2]);
   if (packet_mask_size <= kFlexfecPacketMaskSizes[0]) {
     return kHeaderSizes[0];
-  } else if (packet_mask_size <= kFlexfecPacketMaskSizes[1]) {
+  }
+  if (packet_mask_size <= kFlexfecPacketMaskSizes[1]) {
     return kHeaderSizes[1];
   }
   return kHeaderSizes[2];
@@ -121,7 +122,7 @@ bool FlexfecHeaderReader::ReadFecHeader(
     // the packed packet masks out-of-band, thus leaving the FlexFEC header as
     // is.
     //
-    // We treat the mask parts as unsigned integers with host order endianness
+    // We treat the mask parts as uint32_t integers with host order endianness
     // in order to simplify the bit shifting between bytes.
     if (fec_packet->pkt->data.size() <
         (byte_index + kFlexfecPacketMaskSizes[0])) {
@@ -214,12 +215,14 @@ size_t FlexfecHeaderWriter::MinPacketMaskSize(const uint8_t* packet_mask,
     // Packet mask is 16 bits long, with bit 15 clear.
     // It can be used as is.
     return kFlexfecPacketMaskSizes[0];
-  } else if (packet_mask_size == kUlpfecPacketMaskSizeLBitClear) {
+  }
+  if (packet_mask_size == kUlpfecPacketMaskSizeLBitClear) {
     // Packet mask is 16 bits long, with bit 15 set.
     // We must expand the packet mask with zeros in the FlexFEC header.
     return kFlexfecPacketMaskSizes[1];
-  } else if (packet_mask_size == kUlpfecPacketMaskSizeLBitSet &&
-             (packet_mask[5] & 0x03) == 0) {
+  }
+  if (packet_mask_size == kUlpfecPacketMaskSizeLBitSet &&
+      (packet_mask[5] & 0x03) == 0) {
     // Packet mask is 48 bits long, with bits 46 and 47 clear.
     // It can be used as is.
     return kFlexfecPacketMaskSizes[1];
@@ -260,7 +263,7 @@ void FlexfecHeaderWriter::FinalizeFecHeader(
     write_at += kStreamSpecificHeaderSize;
     // Adapt ULPFEC packet mask to FlexFEC header.
     //
-    // We treat the mask parts as unsigned integers with host order endianness
+    // We treat the mask parts as uint32_t integers with host order endianness
     // in order to simplify the bit shifting between bytes.
     if (protected_stream.packet_mask.size() == kUlpfecPacketMaskSizeLBitSet) {
       // The packet mask is 48 bits long.
@@ -277,8 +280,9 @@ void FlexfecHeaderWriter::FinalizeFecHeader(
       ByteWriter<uint32_t>::WriteBigEndian(write_at, tmp_mask_part1);
 
       bool bit15 = (protected_stream.packet_mask[1] & 0x01) != 0;
-      if (bit15)
+      if (bit15) {
         *write_at |= 0x40;  // Set bit 15.
+      }
 
       bool bit46 = (protected_stream.packet_mask[5] & 0x02) != 0;
       bool bit47 = (protected_stream.packet_mask[5] & 0x01) != 0;
@@ -290,10 +294,12 @@ void FlexfecHeaderWriter::FinalizeFecHeader(
         // Clear all trailing bits.
         memset(write_at, 0,
                kFlexfecPacketMaskSizes[2] - kFlexfecPacketMaskSizes[1]);
-        if (bit46)
+        if (bit46) {
           *write_at |= 0x80;  // Set bit 46.
-        if (bit47)
+        }
+        if (bit47) {
           *write_at |= 0x40;  // Set bit 47.
+        }
         write_at += kFlexfecPacketMaskSizes[2] - kFlexfecPacketMaskSizes[1];
       }
     } else if (protected_stream.packet_mask.size() ==

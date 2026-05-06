@@ -91,10 +91,10 @@ struct HdrMetadata {
   HdrMasteringMetadata mastering_metadata;
   // Max content light level (CLL), i.e. maximum brightness level present in the
   // stream, in nits. 1 nit = 1 candela/m2. Valid range [0, 20000].
-  int max_content_light_level = 0;
+  int32_t max_content_light_level = 0;
   // Max frame-average light level (FALL), i.e. maximum average brightness of
   // the brightest frame in the stream, in nits. Valid range [0, 20000].
-  int max_frame_average_light_level = 0;
+  int32_t max_frame_average_light_level = 0;
 };
 
 }  // namespace media

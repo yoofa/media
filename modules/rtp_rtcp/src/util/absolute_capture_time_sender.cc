@@ -49,7 +49,7 @@ std::optional<AbsoluteCaptureTime> AbsoluteCaptureTimeSender::OnSendPacket(
 std::optional<AbsoluteCaptureTime> AbsoluteCaptureTimeSender::OnSendPacket(
     uint32_t source,
     uint32_t rtp_timestamp,
-    int rtp_clock_frequency_hz,
+    int32_t rtp_clock_frequency_hz,
     base::NtpTime absolute_capture_time,
     std::optional<int64_t> estimated_capture_clock_offset,
     bool force) {
@@ -77,7 +77,7 @@ bool AbsoluteCaptureTimeSender::ShouldSendExtension(
     base::Timestamp send_time,
     uint32_t source,
     uint32_t rtp_timestamp,
-    int rtp_clock_frequency_hz,
+    int32_t rtp_clock_frequency_hz,
     base::NtpTime absolute_capture_time,
     std::optional<int64_t> estimated_capture_clock_offset) const {
   // Should if the last sent extension is too old, in particular if we've never
@@ -111,15 +111,11 @@ bool AbsoluteCaptureTimeSender::ShouldSendExtension(
       AbsoluteCaptureTimeInterpolator::InterpolateAbsoluteCaptureTimestamp(
           rtp_timestamp, rtp_clock_frequency_hz, last_rtp_timestamp_,
           uint64_t{last_absolute_capture_time_});
-  const uint64_t absolute_capture_timestamp = uint64_t{absolute_capture_time};
+  const auto absolute_capture_timestamp = uint64_t{absolute_capture_time};
   const int64_t interpolation_error_ms = UQ32x32ToInt64Ms(std::min(
       interpolated_absolute_capture_timestamp - absolute_capture_timestamp,
       absolute_capture_timestamp - interpolated_absolute_capture_timestamp));
-  if (interpolation_error_ms > kInterpolationMaxError.ms()) {
-    return true;
-  }
-
-  return false;
+  return interpolation_error_ms > kInterpolationMaxError.ms();
 }
 
 }  // namespace rtp_rtcp

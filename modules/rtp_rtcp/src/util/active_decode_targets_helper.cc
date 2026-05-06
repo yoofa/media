@@ -11,7 +11,7 @@
 
 #include "media/modules/rtp_rtcp/src/util/active_decode_targets_helper.h"
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <span>
 #include "base/checks.h"
@@ -26,8 +26,8 @@ namespace {
 // Assumes for each chain frames are seen in order and no frame on any chain is
 // missing. That assumptions allows a simple detection when previous frame is
 // part of a chain.
-std::bitset<32> LastSendOnChain(int frame_diff,
-                                std::span<const int> chain_diffs) {
+std::bitset<32> LastSendOnChain(int32_t frame_diff,
+                                std::span<const int32_t> chain_diffs) {
   std::bitset<32> bitmask = 0;
   for (size_t i = 0; i < chain_diffs.size(); ++i) {
     if (frame_diff == chain_diffs[i]) {
@@ -45,15 +45,15 @@ std::bitset<32> AllActive(size_t num) {
 
 // Returns bitmask of chains that protect at least one active decode target.
 std::bitset<32> ActiveChains(
-    std::span<const int> decode_target_protected_by_chain,
-    int num_chains,
+    std::span<const int32_t> decode_target_protected_by_chain,
+    int32_t num_chains,
     std::bitset<32> active_decode_targets) {
   std::bitset<32> active_chains = 0;
   for (size_t dt = 0; dt < decode_target_protected_by_chain.size(); ++dt) {
     if (dt < active_decode_targets.size() && !active_decode_targets[dt]) {
       continue;
     }
-    int chain_idx = decode_target_protected_by_chain[dt];
+    int32_t chain_idx = decode_target_protected_by_chain[dt];
     AVE_DCHECK_LT(chain_idx, num_chains);
     active_chains.set(chain_idx);
   }
@@ -63,12 +63,12 @@ std::bitset<32> ActiveChains(
 }  // namespace
 
 void ActiveDecodeTargetsHelper::OnFrame(
-    std::span<const int> decode_target_protected_by_chain,
+    std::span<const int32_t> decode_target_protected_by_chain,
     std::bitset<32> active_decode_targets,
     bool is_keyframe,
     int64_t frame_id,
-    std::span<const int> chain_diffs) {
-  const int num_chains = chain_diffs.size();
+    std::span<const int32_t> chain_diffs) {
+  const int32_t num_chains = chain_diffs.size();
   if (num_chains == 0) {
     // Avoid printing the warning
     // when already printed the warning for the same active decode targets, or

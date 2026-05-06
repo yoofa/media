@@ -46,7 +46,7 @@ class StreamStatistician {
   virtual RtpReceiveStats GetStats() const = 0;
 
   // Returns average over the stream life time.
-  virtual std::optional<int> GetFractionLostInPercent() const = 0;
+  virtual std::optional<int32_t> GetFractionLostInPercent() const = 0;
 
   // TODO(bugs.webrtc.org/10679): Delete, migrate users to the above GetStats
   // method (and extend RtpReceiveStats if needed).
@@ -72,7 +72,7 @@ class ReceiveStatistics : public ReceiveStatisticsProvider,
 
   // Sets the max reordering threshold in number of packets.
   virtual void SetMaxReorderingThreshold(uint32_t ssrc,
-                                         int max_reordering_threshold) = 0;
+                                         int32_t max_reordering_threshold) = 0;
   // Detect retransmissions, enabling updates of the retransmitted counters. The
   // default is false.
   virtual void EnableRetransmitDetection(uint32_t ssrc, bool enable) = 0;

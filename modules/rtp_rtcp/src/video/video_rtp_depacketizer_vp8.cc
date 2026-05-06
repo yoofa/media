@@ -10,8 +10,8 @@
 
 #include "media/modules/rtp_rtcp/src/video/video_rtp_depacketizer_vp8.h"
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 #include <optional>
 
@@ -54,33 +54,35 @@ namespace media {
 namespace rtp_rtcp {
 namespace {
 
-constexpr int kFailedToParse = 0;
+constexpr int32_t kFailedToParse = 0;
 
-int ParseVP8Descriptor(RTPVideoHeaderVP8* vp8,
-                       const uint8_t* data,
-                       size_t data_length) {
+int32_t ParseVP8Descriptor(RTPVideoHeaderVP8* vp8,
+                           const uint8_t* data,
+                           size_t data_length) {
   AVE_DCHECK_GT(data_length, 0u);
-  int parsed_bytes = 0;
+  int32_t parsed_bytes = 0;
   // Parse mandatory first byte of payload descriptor.
-  bool extension = (*data & 0x80) ? true : false;             // X bit
-  vp8->nonReference = (*data & 0x20) ? true : false;          // N bit
-  vp8->beginningOfPartition = (*data & 0x10) ? true : false;  // S bit
-  vp8->partitionId = (*data & 0x07);                          // PID field
+  bool extension = (*data & 0x80) != 0;             // X bit
+  vp8->nonReference = (*data & 0x20) != 0;          // N bit
+  vp8->beginningOfPartition = (*data & 0x10) != 0;  // S bit
+  vp8->partitionId = (*data & 0x07);                // PID field
 
   data++;
   parsed_bytes++;
   data_length--;
 
-  if (!extension)
+  if (!extension) {
     return parsed_bytes;
+  }
 
-  if (data_length == 0)
+  if (data_length == 0) {
     return kFailedToParse;
+  }
   // Optional X field is present.
-  bool has_picture_id = (*data & 0x80) ? true : false;   // I bit
-  bool has_tl0_pic_idx = (*data & 0x40) ? true : false;  // L bit
-  bool has_tid = (*data & 0x20) ? true : false;          // T bit
-  bool has_key_idx = (*data & 0x10) ? true : false;      // K bit
+  bool has_picture_id = (*data & 0x80) != 0;   // I bit
+  bool has_tl0_pic_idx = (*data & 0x40) != 0;  // L bit
+  bool has_tid = (*data & 0x20) != 0;          // T bit
+  bool has_key_idx = (*data & 0x10) != 0;      // K bit
 
   // Advance data and decrease remaining payload size.
   data++;
@@ -88,15 +90,17 @@ int ParseVP8Descriptor(RTPVideoHeaderVP8* vp8,
   data_length--;
 
   if (has_picture_id) {
-    if (data_length == 0)
+    if (data_length == 0) {
       return kFailedToParse;
+    }
 
     vp8->pictureId = (*data & 0x7F);
     if (*data & 0x80) {
       data++;
       parsed_bytes++;
-      if (--data_length == 0)
+      if (--data_length == 0) {
         return kFailedToParse;
+      }
       // PictureId is 15 bits
       vp8->pictureId = (vp8->pictureId << 8) + *data;
     }
@@ -106,8 +110,9 @@ int ParseVP8Descriptor(RTPVideoHeaderVP8* vp8,
   }
 
   if (has_tl0_pic_idx) {
-    if (data_length == 0)
+    if (data_length == 0) {
       return kFailedToParse;
+    }
 
     vp8->tl0PicIdx = *data;
     data++;
@@ -116,12 +121,13 @@ int ParseVP8Descriptor(RTPVideoHeaderVP8* vp8,
   }
 
   if (has_tid || has_key_idx) {
-    if (data_length == 0)
+    if (data_length == 0) {
       return kFailedToParse;
+    }
 
     if (has_tid) {
       vp8->temporalIdx = ((*data >> 6) & 0x03);
-      vp8->layerSync = (*data & 0x20) ? true : false;  // Y bit
+      vp8->layerSync = (*data & 0x20) != 0;  // Y bit
     }
     if (has_key_idx) {
       vp8->keyIdx = *data & 0x1F;
@@ -139,16 +145,17 @@ std::optional<VideoRtpDepacketizer::ParsedRtpPayload>
 VideoRtpDepacketizerVp8::Parse(base::CopyOnWriteBuffer rtp_payload) {
   std::span<const uint8_t> payload(rtp_payload.cdata(), rtp_payload.size());
   std::optional<ParsedRtpPayload> result(std::in_place);
-  int offset = ParseRtpPayload(payload, &result->video_header);
-  if (offset == kFailedToParse)
+  int32_t offset = ParseRtpPayload(payload, &result->video_header);
+  if (offset == kFailedToParse) {
     return std::nullopt;
+  }
   AVE_DCHECK_LT(static_cast<size_t>(offset), rtp_payload.size());
   result->video_payload =
       rtp_payload.Slice(offset, rtp_payload.size() - offset);
   return result;
 }
 
-int VideoRtpDepacketizerVp8::ParseRtpPayload(
+int32_t VideoRtpDepacketizerVp8::ParseRtpPayload(
     std::span<const uint8_t> rtp_payload,
     RTPVideoHeader* video_header) {
   AVE_DCHECK(video_header);
@@ -163,17 +170,18 @@ int VideoRtpDepacketizerVp8::ParseRtpPayload(
       video_header->video_type_header.emplace<RTPVideoHeaderVP8>();
   vp8_header.InitRTPVideoHeaderVP8();
 
-  const int descriptor_size =
+  const int32_t descriptor_size =
       ParseVP8Descriptor(&vp8_header, rtp_payload.data(), rtp_payload.size());
-  if (descriptor_size == kFailedToParse)
+  if (descriptor_size == kFailedToParse) {
     return kFailedToParse;
+  }
 
   AVE_DCHECK_LT(vp8_header.partitionId, 8);
 
   video_header->is_first_packet_in_frame =
       vp8_header.beginningOfPartition && vp8_header.partitionId == 0;
 
-  int vp8_payload_size = rtp_payload.size() - descriptor_size;
+  int32_t vp8_payload_size = rtp_payload.size() - descriptor_size;
   if (vp8_payload_size == 0) {
     AVE_LOG(LS_WARNING) << "Empty vp8 payload.";
     return kFailedToParse;

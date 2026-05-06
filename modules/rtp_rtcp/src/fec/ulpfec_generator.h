@@ -37,8 +37,8 @@ class UlpfecGenerator : public VideoFecGenerator {
 
  public:
   UlpfecGenerator(base::Clock* clock,
-                  int red_payload_type,
-                  int ulpfec_payload_type);
+                  int32_t red_payload_type,
+                  int32_t ulpfec_payload_type);
   ~UlpfecGenerator();
 
   FecType GetFecType() const override {
@@ -84,7 +84,7 @@ class UlpfecGenerator : public VideoFecGenerator {
   // relative to total number of packets. This definition is inherited from the
   // protection factor produced by video_coding module and how the FEC
   // generation is implemented.
-  int Overhead() const;
+  int32_t Overhead() const;
 
   // Returns true if the excess overhead (actual - target) for the FEC is below
   // the amount `kMaxExcessOverhead`. This effects the lower protection level
@@ -102,15 +102,15 @@ class UlpfecGenerator : public VideoFecGenerator {
   void ResetState();
 
   base::Clock* const clock_;
-  const int red_payload_type_;
-  const int ulpfec_payload_type_;
+  const int32_t red_payload_type_;
+  const int32_t ulpfec_payload_type_;
 
   const std::unique_ptr<ForwardErrorCorrection> fec_;
   ForwardErrorCorrection::PacketList media_packets_;
   std::optional<RtpPacketToSend> last_media_packet_;
   std::list<ForwardErrorCorrection::Packet*> generated_fec_packets_;
-  int num_protected_frames_;
-  int min_num_media_packets_;
+  int32_t num_protected_frames_;
+  int32_t min_num_media_packets_;
   Params current_params_;
   bool media_contains_keyframe_;
 

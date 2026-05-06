@@ -32,7 +32,7 @@ const size_t kNaluShortStartSequenceSize = 3;
 const size_t kNaluTypeSize = 1;
 
 // Maximum reference index for reference pictures.
-constexpr int kMaxReferenceIndex = 31;
+constexpr int32_t kMaxReferenceIndex = 31;
 
 enum NaluType : uint8_t {
   kSlice = 1,

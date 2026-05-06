@@ -19,7 +19,7 @@ namespace rtp_rtcp {
 
 using base::TimeDelta;
 
-TimeDelta ReportBlockData::jitter(int rtp_clock_rate_hz) const {
+TimeDelta ReportBlockData::jitter(int32_t rtp_clock_rate_hz) const {
   AVE_DCHECK_GT(rtp_clock_rate_hz, 0);
   // Conversion to TimeDelta and division are swapped to avoid conversion
   // to/from floating point types.

@@ -25,19 +25,19 @@ namespace rtp_rtcp {
 
 namespace {
 
-constexpr int kMinimumNumberOfSamples = 3;
+constexpr int32_t kMinimumNumberOfSamples = 3;
 constexpr base::TimeDelta kTimingLogInterval = base::TimeDelta::Seconds(10);
-constexpr int kClocksOffsetSmoothingWindow = 7;
+constexpr int32_t kClocksOffsetSmoothingWindow = 7;
 
 // Subtracts two NtpTime values keeping maximum precision.
 int64_t Subtract(NtpTime minuend, NtpTime subtrahend) {
-  uint64_t a = static_cast<uint64_t>(minuend);
-  uint64_t b = static_cast<uint64_t>(subtrahend);
+  auto a = static_cast<uint64_t>(minuend);
+  auto b = static_cast<uint64_t>(subtrahend);
   return a >= b ? static_cast<int64_t>(a - b) : -static_cast<int64_t>(b - a);
 }
 
 NtpTime Add(NtpTime lhs, int64_t rhs) {
-  uint64_t result = static_cast<uint64_t>(lhs);
+  auto result = static_cast<uint64_t>(lhs);
   if (rhs >= 0) {
     result += static_cast<uint64_t>(rhs);
   } else {

@@ -29,8 +29,8 @@ class VideoRtpDepacketizerVp9 : public VideoRtpDepacketizer {
 
   // Parses vp9 rtp payload descriptor.
   // Returns zero on error or vp9 payload header offset on success.
-  static int ParseRtpPayload(std::span<const uint8_t> rtp_payload,
-                             RTPVideoHeader* video_header);
+  static int32_t ParseRtpPayload(std::span<const uint8_t> rtp_payload,
+                                 RTPVideoHeader* video_header);
 
   std::optional<ParsedRtpPayload> Parse(
       base::CopyOnWriteBuffer rtp_payload) override;

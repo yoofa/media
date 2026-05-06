@@ -72,7 +72,7 @@ class RTPVideoFrameSenderInterface {
  public:
   virtual ~RTPVideoFrameSenderInterface() = default;
 
-  virtual bool SendVideo(int payload_type,
+  virtual bool SendVideo(int32_t payload_type,
                          std::optional<VideoCodecType> codec_type,
                          uint32_t rtp_timestamp,
                          Timestamp capture_time,
@@ -107,7 +107,7 @@ class RTPSenderVideo : public RTPVideoFrameSenderInterface {
     std::optional<VideoFecGenerator::FecType> fec_type;
     size_t fec_overhead_bytes = 0;  // Per packet max FEC overhead.
     bool enable_retransmit_all_layers = false;
-    std::optional<int> red_payload_type;
+    std::optional<int32_t> red_payload_type;
   };
 
   explicit RTPSenderVideo(const Config& config);
@@ -119,7 +119,7 @@ class RTPSenderVideo : public RTPVideoFrameSenderInterface {
   // `encoder_output_size` is the size of the video frame as it came out of the
   // video encoder, excluding any additional overhead.
   // Calls to this method are assumed to be externally serialized.
-  bool SendVideo(int payload_type,
+  bool SendVideo(int32_t payload_type,
                  std::optional<VideoCodecType> codec_type,
                  uint32_t rtp_timestamp,
                  Timestamp capture_time,
@@ -227,14 +227,14 @@ class RTPSenderVideo : public RTPVideoFrameSenderInterface {
   // Should never be held when calling out of this class.
   mutable std::mutex mutex_;
 
-  const std::optional<int> red_payload_type_;
+  const std::optional<int32_t> red_payload_type_;
   std::optional<VideoFecGenerator::FecType> fec_type_;
   const size_t fec_overhead_bytes_;  // Per packet max FEC overhead.
 
   mutable std::mutex stats_mutex_;
   BitrateTracker post_encode_overhead_bitrate_;
 
-  std::map<int, TemporalLayerStats> frame_stats_by_temporal_layer_;
+  std::map<int32_t, TemporalLayerStats> frame_stats_by_temporal_layer_;
 
   OneTimeEvent first_frame_sent_;
 

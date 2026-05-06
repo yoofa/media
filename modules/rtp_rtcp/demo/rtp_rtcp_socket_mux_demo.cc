@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <memory>
@@ -68,7 +69,7 @@ using ave::media::rtp_rtcp::RtpRtcpInterface;
 using ave::media::rtp_rtcp::Transport;
 using std::span;
 
-constexpr int kPayloadType = 96;
+constexpr int32_t kPayloadType = 96;
 constexpr uint32_t kTimestampStep = kVideoPayloadTypeFrequency / 30;
 constexpr uint16_t kMuxPortA = 6000;
 constexpr uint16_t kMuxPortB = 6002;
@@ -115,7 +116,7 @@ class UdpMuxTransport final : public Transport {
 
 class DemoEndpoint final : public sigslot::has_slots<> {
  public:
-  DemoEndpoint(const std::string& name,
+  DemoEndpoint(std::string name,
                Clock* clock,
                TaskRunnerBase* worker_queue,
                SocketThread* network_thread,
@@ -123,7 +124,7 @@ class DemoEndpoint final : public sigslot::has_slots<> {
                const SocketAddress& remote_addr,
                uint32_t local_ssrc,
                uint32_t remote_ssrc)
-      : name_(name),
+      : name_(std::move(name)),
         clock_(clock),
         worker_queue_(worker_queue),
         network_thread_(network_thread),
@@ -176,7 +177,7 @@ class DemoEndpoint final : public sigslot::has_slots<> {
       packet->set_capture_time(clock_->CurrentTime());
       uint8_t* payload = packet->AllocatePayload(message.size());
       if (!message.empty()) {
-        memcpy(payload, message.data(), message.size());
+        strcpy(reinterpret_cast<char*>(payload), message.data());
       }
 
       module_->TrySendPacket(std::move(packet), PacedPacketInfo());
@@ -292,7 +293,7 @@ int main() {
   endpoint_a.Initialize();
   endpoint_b.Initialize();
 
-  for (int i = 0; i < 3; ++i) {
+  for (int32_t i = 0; i < 3; ++i) {
     endpoint_a.SendRtpMessage("mux-hello-" + std::to_string(i));
     endpoint_b.SendRtpMessage("mux-world-" + std::to_string(i));
     std::this_thread::sleep_for(std::chrono::milliseconds(100));

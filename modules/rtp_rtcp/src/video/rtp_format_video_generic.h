@@ -61,11 +61,11 @@ class RtpPacketizerGeneric : public RtpPacketizer {
   // Fills header_ and header_size_ members.
   void BuildHeader(const RTPVideoHeader& rtp_video_header);
 
-  uint8_t header_[3];
-  size_t header_size_;
+  uint8_t header_[3]{};
+  size_t header_size_{};
   std::span<const uint8_t> remaining_payload_;
-  std::vector<int> payload_sizes_;
-  std::vector<int>::const_iterator current_packet_;
+  std::vector<int32_t> payload_sizes_;
+  std::vector<int32_t>::const_iterator current_packet_;
 };
 
 }  // namespace rtp_rtcp

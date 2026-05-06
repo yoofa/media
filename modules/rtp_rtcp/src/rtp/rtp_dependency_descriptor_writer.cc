@@ -41,11 +41,12 @@ NextLayerIdc GetNextLayerIdc(const FrameDependencyTemplate& previous,
   if (next.spatial_id == previous.spatial_id &&
       next.temporal_id == previous.temporal_id) {
     return NextLayerIdc::kSameLayer;
-  } else if (next.spatial_id == previous.spatial_id &&
-             next.temporal_id == previous.temporal_id + 1) {
+  }
+  if (next.spatial_id == previous.spatial_id &&
+      next.temporal_id == previous.temporal_id + 1) {
     return NextLayerIdc::kNextTemporal;
-  } else if (next.spatial_id == previous.spatial_id + 1 &&
-             next.temporal_id == 0) {
+  }
+  if (next.spatial_id == previous.spatial_id + 1 && next.temporal_id == 0) {
     return NextLayerIdc::kNewSpatial;
   }
   // Everything else is unsupported.
@@ -97,25 +98,27 @@ bool RtpDependencyDescriptorWriter::Write() {
   return !build_failed_;
 }
 
-int RtpDependencyDescriptorWriter::ValueSizeBits() const {
+int32_t RtpDependencyDescriptorWriter::ValueSizeBits() const {
   if (build_failed_) {
     return 0;
   }
-  static constexpr int kMandatoryFields = 1 + 1 + 6 + 16;
-  int value_size_bits = kMandatoryFields + best_template_.extra_size_bits;
+  static constexpr int32_t kMandatoryFields = 1 + 1 + 6 + 16;
+  int32_t value_size_bits = kMandatoryFields + best_template_.extra_size_bits;
   if (HasExtendedFields()) {
     value_size_bits += 5;
-    if (descriptor_.attached_structure)
+    if (descriptor_.attached_structure) {
       value_size_bits += StructureSizeBits();
-    if (ShouldWriteActiveDecodeTargetsBitmask())
+    }
+    if (ShouldWriteActiveDecodeTargetsBitmask()) {
       value_size_bits += structure_.num_decode_targets;
+    }
   }
   return value_size_bits;
 }
 
-int RtpDependencyDescriptorWriter::StructureSizeBits() const {
+int32_t RtpDependencyDescriptorWriter::StructureSizeBits() const {
   // template_id offset (6 bits) and number of decode targets (5 bits)
-  int bits = 11;
+  int32_t bits = 11;
   // template layers.
   bits += 2 * structure_.templates.size();
   // dtis.
@@ -128,7 +131,7 @@ int RtpDependencyDescriptorWriter::StructureSizeBits() const {
   bits += base::BitBufferWriter::SizeNonSymmetricBits(
       structure_.num_chains, structure_.num_decode_targets + 1);
   if (structure_.num_chains > 0) {
-    for (int protected_by : structure_.decode_target_protected_by_chain) {
+    for (int32_t protected_by : structure_.decode_target_protected_by_chain) {
       bits += base::BitBufferWriter::SizeNonSymmetricBits(
           protected_by, structure_.num_chains);
     }
@@ -150,7 +153,7 @@ RtpDependencyDescriptorWriter::CalculateMatch(
       descriptor_.frame_dependencies.decode_target_indications !=
       frame_template->decode_target_indications;
   result.need_custom_chains = false;
-  for (int i = 0; i < structure_.num_chains; ++i) {
+  for (int32_t i = 0; i < structure_.num_chains; ++i) {
     if (active_chains_[i] && descriptor_.frame_dependencies.chain_diffs[i] !=
                                  frame_template->chain_diffs[i]) {
       result.need_custom_chains = true;
@@ -162,21 +165,23 @@ RtpDependencyDescriptorWriter::CalculateMatch(
   if (result.need_custom_fdiffs) {
     result.extra_size_bits +=
         2 * (1 + descriptor_.frame_dependencies.frame_diffs.size());
-    for (int fdiff : descriptor_.frame_dependencies.frame_diffs) {
-      if (fdiff <= (1 << 4))
+    for (int32_t fdiff : descriptor_.frame_dependencies.frame_diffs) {
+      if (fdiff <= (1 << 4)) {
         result.extra_size_bits += 4;
-      else if (fdiff <= (1 << 8))
+      } else if (fdiff <= (1 << 8)) {
         result.extra_size_bits += 8;
-      else
+      } else {
         result.extra_size_bits += 12;
+      }
     }
   }
   if (result.need_custom_dtis) {
     result.extra_size_bits +=
         2 * descriptor_.frame_dependencies.decode_target_indications.size();
   }
-  if (result.need_custom_chains)
+  if (result.need_custom_chains) {
     result.extra_size_bits += 8 * structure_.num_chains;
+  }
   return result;
 }
 
@@ -189,7 +194,7 @@ void RtpDependencyDescriptorWriter::FindBestTemplate() {
            descriptor_.frame_dependencies.temporal_id ==
                frame_template.temporal_id;
   };
-  auto first = std::find_if(templates.begin(), templates.end(), same_layer);
+  auto first = std::ranges::find_if(templates, same_layer);
   if (first == templates.end()) {
     build_failed_ = true;
     return;
@@ -200,21 +205,22 @@ void RtpDependencyDescriptorWriter::FindBestTemplate() {
   // Search if there any better template than the first one.
   for (auto next = std::next(first); next != last; ++next) {
     TemplateMatch match = CalculateMatch(next);
-    if (match.extra_size_bits < best_template_.extra_size_bits)
+    if (match.extra_size_bits < best_template_.extra_size_bits) {
       best_template_ = match;
+    }
   }
 }
 
 bool RtpDependencyDescriptorWriter::ShouldWriteActiveDecodeTargetsBitmask()
     const {
-  if (!descriptor_.active_decode_targets_bitmask)
+  if (!descriptor_.active_decode_targets_bitmask) {
     return false;
+  }
   const uint64_t all_decode_targets_bitmask =
       (uint64_t{1} << structure_.num_decode_targets) - 1;
-  if (descriptor_.attached_structure &&
-      descriptor_.active_decode_targets_bitmask == all_decode_targets_bitmask)
-    return false;
-  return true;
+  return !(descriptor_.attached_structure &&
+           descriptor_.active_decode_targets_bitmask ==
+               all_decode_targets_bitmask);
 }
 
 bool RtpDependencyDescriptorWriter::HasExtendedFields() const {
@@ -229,14 +235,16 @@ uint64_t RtpDependencyDescriptorWriter::TemplateId() const {
 }
 
 void RtpDependencyDescriptorWriter::WriteBits(uint64_t val, size_t bit_count) {
-  if (!bit_writer_.WriteBits(val, bit_count))
+  if (!bit_writer_.WriteBits(val, bit_count)) {
     build_failed_ = true;
+  }
 }
 
 void RtpDependencyDescriptorWriter::WriteNonSymmetric(uint32_t value,
                                                       uint32_t num_values) {
-  if (!bit_writer_.WriteNonSymmetric(value, num_values))
+  if (!bit_writer_.WriteNonSymmetric(value, num_values)) {
     build_failed_ = true;
+  }
 }
 
 void RtpDependencyDescriptorWriter::WriteTemplateDependencyStructure() {
@@ -254,8 +262,9 @@ void RtpDependencyDescriptorWriter::WriteTemplateDependencyStructure() {
   WriteTemplateChains();
   uint64_t has_resolutions = structure_.resolutions.empty() ? 0 : 1;
   WriteBits(has_resolutions, 1);
-  if (has_resolutions)
+  if (has_resolutions) {
     WriteResolutions();
+  }
 }
 
 void RtpDependencyDescriptorWriter::WriteTemplateLayers() {
@@ -267,7 +276,7 @@ void RtpDependencyDescriptorWriter::WriteTemplateLayers() {
   AVE_DCHECK_EQ(templates[0].temporal_id, 0);
 
   for (size_t i = 1; i < templates.size(); ++i) {
-    uint64_t next_layer_idc =
+    auto next_layer_idc =
         static_cast<uint64_t>(GetNextLayerIdc(templates[i - 1], templates[i]));
     AVE_DCHECK_LE(next_layer_idc, 3u);
     WriteBits(next_layer_idc, 2);
@@ -288,7 +297,7 @@ void RtpDependencyDescriptorWriter::WriteTemplateDtis() {
 
 void RtpDependencyDescriptorWriter::WriteTemplateFdiffs() {
   for (const FrameDependencyTemplate& current_template : structure_.templates) {
-    for (int fdiff : current_template.frame_diffs) {
+    for (int32_t fdiff : current_template.frame_diffs) {
       AVE_DCHECK_GE(fdiff - 1, 0);
       AVE_DCHECK_LT(fdiff - 1, 1 << 4);
       WriteBits((1u << 4) | (fdiff - 1), 1 + 4);
@@ -303,12 +312,13 @@ void RtpDependencyDescriptorWriter::WriteTemplateChains() {
   AVE_DCHECK_LE(structure_.num_chains, structure_.num_decode_targets);
 
   WriteNonSymmetric(structure_.num_chains, structure_.num_decode_targets + 1);
-  if (structure_.num_chains == 0)
+  if (structure_.num_chains == 0) {
     return;
+  }
 
   AVE_DCHECK_EQ(structure_.decode_target_protected_by_chain.size(),
                 static_cast<size_t>(structure_.num_decode_targets));
-  for (int protected_by : structure_.decode_target_protected_by_chain) {
+  for (int32_t protected_by : structure_.decode_target_protected_by_chain) {
     AVE_DCHECK_GE(protected_by, 0);
     AVE_DCHECK_LT(protected_by, structure_.num_chains);
     WriteNonSymmetric(protected_by, structure_.num_chains);
@@ -316,7 +326,7 @@ void RtpDependencyDescriptorWriter::WriteTemplateChains() {
   for (const auto& frame_template : structure_.templates) {
     AVE_DCHECK_EQ(frame_template.chain_diffs.size(),
                   static_cast<size_t>(structure_.num_chains));
-    for (int chain_diff : frame_template.chain_diffs) {
+    for (int32_t chain_diff : frame_template.chain_diffs) {
       AVE_DCHECK_GE(chain_diff, 0);
       AVE_DCHECK_LT(chain_diff, 1 << 4);
       WriteBits(chain_diff, 4);
@@ -325,7 +335,7 @@ void RtpDependencyDescriptorWriter::WriteTemplateChains() {
 }
 
 void RtpDependencyDescriptorWriter::WriteResolutions() {
-  int max_spatial_id = structure_.templates.back().spatial_id;
+  int32_t max_spatial_id = structure_.templates.back().spatial_id;
   AVE_DCHECK_EQ(structure_.resolutions.size(),
                 static_cast<size_t>(max_spatial_id + 1));
   for (const RenderResolution& resolution : structure_.resolutions) {
@@ -356,20 +366,25 @@ void RtpDependencyDescriptorWriter::WriteExtendedFields() {
   WriteBits(best_template_.need_custom_dtis, 1);
   WriteBits(best_template_.need_custom_fdiffs, 1);
   WriteBits(best_template_.need_custom_chains, 1);
-  if (template_dependency_structure_present_flag)
+  if (template_dependency_structure_present_flag) {
     WriteTemplateDependencyStructure();
-  if (active_decode_targets_present_flag)
+  }
+  if (active_decode_targets_present_flag) {
     WriteBits(*descriptor_.active_decode_targets_bitmask,
               structure_.num_decode_targets);
+  }
 }
 
 void RtpDependencyDescriptorWriter::WriteFrameDependencyDefinition() {
-  if (best_template_.need_custom_dtis)
+  if (best_template_.need_custom_dtis) {
     WriteFrameDtis();
-  if (best_template_.need_custom_fdiffs)
+  }
+  if (best_template_.need_custom_fdiffs) {
     WriteFrameFdiffs();
-  if (best_template_.need_custom_chains)
+  }
+  if (best_template_.need_custom_chains) {
     WriteFrameChains();
+  }
 }
 
 void RtpDependencyDescriptorWriter::WriteFrameDtis() {
@@ -382,15 +397,16 @@ void RtpDependencyDescriptorWriter::WriteFrameDtis() {
 }
 
 void RtpDependencyDescriptorWriter::WriteFrameFdiffs() {
-  for (int fdiff : descriptor_.frame_dependencies.frame_diffs) {
+  for (int32_t fdiff : descriptor_.frame_dependencies.frame_diffs) {
     AVE_DCHECK_GT(fdiff, 0);
     AVE_DCHECK_LE(fdiff, 1 << 12);
-    if (fdiff <= (1 << 4))
+    if (fdiff <= (1 << 4)) {
       WriteBits((1u << 4) | (fdiff - 1), 2 + 4);
-    else if (fdiff <= (1 << 8))
+    } else if (fdiff <= (1 << 8)) {
       WriteBits((2u << 8) | (fdiff - 1), 2 + 8);
-    else  // fdiff <= (1 << 12)
+    } else {  // fdiff <= (1 << 12)
       WriteBits((3u << 12) | (fdiff - 1), 2 + 12);
+    }
   }
   // No more diffs.
   WriteBits(/*val=*/0, /*bit_count=*/2);
@@ -399,8 +415,8 @@ void RtpDependencyDescriptorWriter::WriteFrameFdiffs() {
 void RtpDependencyDescriptorWriter::WriteFrameChains() {
   AVE_DCHECK_EQ(descriptor_.frame_dependencies.chain_diffs.size(),
                 static_cast<size_t>(structure_.num_chains));
-  for (int i = 0; i < structure_.num_chains; ++i) {
-    int chain_diff =
+  for (int32_t i = 0; i < structure_.num_chains; ++i) {
+    int32_t chain_diff =
         active_chains_[i] ? descriptor_.frame_dependencies.chain_diffs[i] : 0;
     AVE_DCHECK_GE(chain_diff, 0);
     AVE_DCHECK_LT(chain_diff, 1 << 8);

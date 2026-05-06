@@ -31,21 +31,20 @@ constexpr uint16_t kClientRtcpPort = 8001;
 std::string Trim(const std::string& value) {
   size_t start = 0;
   while (start < value.size() &&
-         std::isspace(static_cast<unsigned char>(value[start]))) {
+         std::isspace(static_cast<uint8_t>(value[start]))) {
     ++start;
   }
   size_t end = value.size();
-  while (end > start &&
-         std::isspace(static_cast<unsigned char>(value[end - 1]))) {
+  while (end > start && std::isspace(static_cast<uint8_t>(value[end - 1]))) {
     --end;
   }
   return value.substr(start, end - start);
 }
 
 std::string ToLower(std::string value) {
-  std::transform(
-      value.begin(), value.end(), value.begin(),
-      [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  std::ranges::transform(value, value.begin(), [](uint8_t ch) {
+    return static_cast<char>(std::tolower(ch));
+  });
   return value;
 }
 
@@ -65,8 +64,8 @@ std::vector<std::string> SplitLines(const std::string& message) {
 }
 
 struct RtspResponse {
-  int status_code = 0;
-  int cseq = 0;
+  int32_t status_code = 0;
+  int32_t cseq = 0;
   std::map<std::string, std::string> headers;
   std::string body;
 };
@@ -266,7 +265,7 @@ class RtspClient final : public sigslot::has_slots<> {
     if (!session_id_.empty()) {
       headers.push_back("Session: " + session_id_);
     }
-    headers.push_back("Range: npt=0.000-");
+    headers.emplace_back("Range: npt=0.000-");
     SendRequest("PLAY", BaseUri(), headers);
   }
 
@@ -283,14 +282,14 @@ class RtspClient final : public sigslot::has_slots<> {
   std::unique_ptr<AsyncTCPSocket> socket_;
   std::string buffer_;
   std::string session_id_;
-  int cseq_ = 0;
+  int32_t cseq_ = 0;
   bool running_ = false;
   State state_ = State::kIdle;
 };
 
 }  // namespace
 
-int main(int argc, char* argv[]) {
+int main(int32_t argc, char* argv[]) {
   std::string host = "127.0.0.1";
   uint16_t port = kDefaultRtspPort;
   if (argc > 1) {

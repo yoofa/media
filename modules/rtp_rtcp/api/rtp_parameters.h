@@ -120,11 +120,11 @@ struct RtpCodec {
   MediaType kind = MediaType::AUDIO;
 
   // If unset, the implementation default is used.
-  std::optional<int> clock_rate;
+  std::optional<int32_t> clock_rate;
 
   // The number of audio channels used. Unset for video codecs. If unset for
   // audio, the implementation default is used.
-  std::optional<int> num_channels;
+  std::optional<int32_t> num_channels;
 
   // Feedback mechanisms to be used for this codec.
   std::vector<RtcpFeedback> rtcp_feedback;
@@ -153,7 +153,7 @@ struct RtpCodecCapability : public RtpCodec {
 
   // Default payload type for this codec. Mainly needed for codecs that have
   // statically assigned payload types.
-  std::optional<int> preferred_payload_type;
+  std::optional<int32_t> preferred_payload_type;
 
   bool operator==(const RtpCodecCapability& o) const {
     return RtpCodec::operator==(o) &&
@@ -170,7 +170,7 @@ struct RtpHeaderExtensionCapability {
   std::string uri;
 
   // Preferred value of ID that goes in the packet.
-  std::optional<int> preferred_id;
+  std::optional<int32_t> preferred_id;
 
   // If true, it's preferred that the value in the header is encrypted.
   bool preferred_encrypt = false;
@@ -181,12 +181,12 @@ struct RtpHeaderExtensionCapability {
   // Constructors for convenience.
   RtpHeaderExtensionCapability();
   explicit RtpHeaderExtensionCapability(std::string_view uri);
-  RtpHeaderExtensionCapability(std::string_view uri, int preferred_id);
+  RtpHeaderExtensionCapability(std::string_view uri, int32_t preferred_id);
   RtpHeaderExtensionCapability(std::string_view uri,
-                               int preferred_id,
+                               int32_t preferred_id,
                                RtpTransceiverDirection direction);
   RtpHeaderExtensionCapability(std::string_view uri,
-                               int preferred_id,
+                               int32_t preferred_id,
                                bool preferred_encrypt,
                                RtpTransceiverDirection direction);
   ~RtpHeaderExtensionCapability();
@@ -215,8 +215,8 @@ struct RtpExtension {
   };
 
   RtpExtension();
-  RtpExtension(std::string_view uri, int id);
-  RtpExtension(std::string_view uri, int id, bool encrypt);
+  RtpExtension(std::string_view uri, int32_t id);
+  RtpExtension(std::string_view uri, int32_t id, bool encrypt);
   ~RtpExtension();
 
   std::string ToString() const;
@@ -242,7 +242,7 @@ struct RtpExtension {
       bool encrypt);
 
   // Returns a list of extensions where any extension URI is unique.
-  static const std::vector<RtpExtension> DeduplicateHeaderExtensions(
+  static std::vector<RtpExtension> DeduplicateHeaderExtensions(
       const std::vector<RtpExtension>& extensions,
       Filter filter);
 
@@ -340,14 +340,14 @@ struct RtpExtension {
 
   // Inclusive min and max IDs for two-byte header extensions and one-byte
   // header extensions, per RFC8285 Section 4.2-4.3.
-  static constexpr int kMinId = 1;
-  static constexpr int kMaxId = 255;
-  static constexpr int kMaxValueSize = 255;
-  static constexpr int kOneByteHeaderExtensionMaxId = 14;
-  static constexpr int kOneByteHeaderExtensionMaxValueSize = 16;
+  static constexpr int32_t kMinId = 1;
+  static constexpr int32_t kMaxId = 255;
+  static constexpr int32_t kMaxValueSize = 255;
+  static constexpr int32_t kOneByteHeaderExtensionMaxId = 14;
+  static constexpr int32_t kOneByteHeaderExtensionMaxValueSize = 16;
 
   std::string uri;
-  int id = 0;
+  int32_t id = 0;
   bool encrypt = false;
 };
 
@@ -400,16 +400,16 @@ struct RtpEncodingParameters {
 
   // If set, this represents the Transport Independent Application Specific
   // maximum bandwidth defined in RFC3890.
-  std::optional<int> max_bitrate_bps;
+  std::optional<int32_t> max_bitrate_bps;
 
   // Specifies the minimum bitrate in bps for video.
-  std::optional<int> min_bitrate_bps;
+  std::optional<int32_t> min_bitrate_bps;
 
   // Specifies the maximum framerate in fps for video.
   std::optional<double> max_framerate;
 
   // Specifies the number of temporal layers for video.
-  std::optional<int> num_temporal_layers;
+  std::optional<int32_t> num_temporal_layers;
 
   // For video, scale the resolution down by this factor.
   std::optional<double> scale_resolution_down_by;
@@ -453,7 +453,7 @@ struct RtpCodecParameters : public RtpCodec {
   virtual ~RtpCodecParameters();
 
   // Payload type used to identify this codec in RTP packets.
-  int payload_type = 0;
+  int32_t payload_type = 0;
 
   bool operator==(const RtpCodecParameters& o) const {
     return RtpCodec::operator==(o) && payload_type == o.payload_type;

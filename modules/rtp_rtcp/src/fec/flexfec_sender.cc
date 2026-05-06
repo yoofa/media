@@ -6,9 +6,10 @@
  */
 
 #include "media/modules/rtp_rtcp/api/flexfec_sender.h"
+#include <memory>
 #include <span>
 
-#include <string.h>
+#include <cstring>
 
 #include <list>
 #include <utility>
@@ -40,7 +41,7 @@ constexpr size_t kFlexfecMaxHeaderSize = 32;
 // the protected media stream.)
 // The constant converts from clock millisecond timestamps to the 90 kHz
 // RTP timestamp.
-const int kMsToRtpTimestamp = kVideoPayloadTypeFrequency / 1000;
+const int32_t kMsToRtpTimestamp = kVideoPayloadTypeFrequency / 1000;
 
 // How often to log the generated FEC packets to the text log.
 constexpr base::TimeDelta kPacketLogInterval = base::TimeDelta::Seconds(10);
@@ -71,10 +72,10 @@ RtpHeaderExtensionMap RegisterSupportedExtensions(
 
 FlexfecSender::FlexfecSender(
     base::Clock* clock,
-    int payload_type,
+    int32_t payload_type,
     uint32_t ssrc,
     uint32_t protected_media_ssrc,
-    const std::string& mid,
+    std::string mid,
     const std::vector<RtpExtension>& rtp_header_extensions,
     std::span<const RtpExtensionSize> extension_sizes,
     const RtpState* rtp_state)
@@ -88,7 +89,7 @@ FlexfecSender::FlexfecSender(
                                   : random_.Rand<uint32_t>()),
       ssrc_(ssrc),
       protected_media_ssrc_(protected_media_ssrc),
-      mid_(mid),
+      mid_(std::move(mid)),
       seq_num_(rtp_state ? rtp_state->sequence_number
                          : random_.Rand(1, kMaxInitRtpSeqNumber)),
       ulpfec_generator_(
@@ -126,8 +127,8 @@ std::vector<std::unique_ptr<RtpPacketToSend>> FlexfecSender::GetFecPackets() {
   fec_packets_to_send.reserve(ulpfec_generator_.generated_fec_packets_.size());
   size_t total_fec_data_bytes = 0;
   for (const auto* fec_packet : ulpfec_generator_.generated_fec_packets_) {
-    std::unique_ptr<RtpPacketToSend> fec_packet_to_send(
-        new RtpPacketToSend(&rtp_header_extension_map_));
+    std::unique_ptr<RtpPacketToSend> fec_packet_to_send =
+        std::make_unique<RtpPacketToSend>(&rtp_header_extension_map_);
     fec_packet_to_send->set_packet_type(
         RtpPacketMediaType::kForwardErrorCorrection);
     fec_packet_to_send->set_allow_retransmission(false);
@@ -176,7 +177,7 @@ std::vector<std::unique_ptr<RtpPacketToSend>> FlexfecSender::GetFecPackets() {
     last_generated_packet_ = now;
   }
 
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   fec_bitrate_.Update(total_fec_data_bytes, now);
 
   return fec_packets_to_send;
@@ -188,7 +189,7 @@ size_t FlexfecSender::MaxPacketOverhead() const {
 }
 
 DataRate FlexfecSender::CurrentFecRate() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   return fec_bitrate_.Rate(clock_->CurrentTime()).value_or(DataRate::Zero());
 }
 

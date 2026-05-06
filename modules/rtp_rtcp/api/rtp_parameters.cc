@@ -75,16 +75,16 @@ RtpHeaderExtensionCapability::RtpHeaderExtensionCapability() = default;
 RtpHeaderExtensionCapability::RtpHeaderExtensionCapability(std::string_view uri)
     : uri(uri) {}
 RtpHeaderExtensionCapability::RtpHeaderExtensionCapability(std::string_view uri,
-                                                           int preferred_id)
+                                                           int32_t preferred_id)
     : uri(uri), preferred_id(preferred_id) {}
 RtpHeaderExtensionCapability::RtpHeaderExtensionCapability(
     std::string_view uri,
-    int preferred_id,
+    int32_t preferred_id,
     RtpTransceiverDirection direction)
     : uri(uri), preferred_id(preferred_id), direction(direction) {}
 RtpHeaderExtensionCapability::RtpHeaderExtensionCapability(
     std::string_view uri,
-    int preferred_id,
+    int32_t preferred_id,
     bool preferred_encrypt,
     RtpTransceiverDirection direction)
     : uri(uri),
@@ -94,8 +94,9 @@ RtpHeaderExtensionCapability::RtpHeaderExtensionCapability(
 RtpHeaderExtensionCapability::~RtpHeaderExtensionCapability() = default;
 
 RtpExtension::RtpExtension() = default;
-RtpExtension::RtpExtension(std::string_view uri, int id) : uri(uri), id(id) {}
-RtpExtension::RtpExtension(std::string_view uri, int id, bool encrypt)
+RtpExtension::RtpExtension(std::string_view uri, int32_t id)
+    : uri(uri), id(id) {}
+RtpExtension::RtpExtension(std::string_view uri, int32_t id, bool encrypt)
     : uri(uri), id(id), encrypt(encrypt) {}
 RtpExtension::~RtpExtension() = default;
 
@@ -165,11 +166,11 @@ constexpr char RtpExtension::kVideoFrameTrackingIdUri[];
 constexpr char RtpExtension::kCsrcAudioLevelsUri[];
 constexpr char RtpExtension::kCorruptionDetectionUri[];
 
-constexpr int RtpExtension::kMinId;
-constexpr int RtpExtension::kMaxId;
-constexpr int RtpExtension::kMaxValueSize;
-constexpr int RtpExtension::kOneByteHeaderExtensionMaxId;
-constexpr int RtpExtension::kOneByteHeaderExtensionMaxValueSize;
+constexpr int32_t RtpExtension::kMinId;
+constexpr int32_t RtpExtension::kMaxId;
+constexpr int32_t RtpExtension::kMaxValueSize;
+constexpr int32_t RtpExtension::kOneByteHeaderExtensionMaxId;
+constexpr int32_t RtpExtension::kOneByteHeaderExtensionMaxValueSize;
 
 bool RtpExtension::IsSupportedForAudio(std::string_view uri) {
   return uri == RtpExtension::kAudioLevelUri ||
@@ -276,7 +277,7 @@ const RtpExtension* RtpExtension::FindHeaderExtensionByUriAndEncryption(
   return nullptr;
 }
 
-const std::vector<RtpExtension> RtpExtension::DeduplicateHeaderExtensions(
+std::vector<RtpExtension> RtpExtension::DeduplicateHeaderExtensions(
     const std::vector<RtpExtension>& extensions,
     Filter filter) {
   std::vector<RtpExtension> filtered;
@@ -308,11 +309,9 @@ const std::vector<RtpExtension> RtpExtension::DeduplicateHeaderExtensions(
 
   // Sort the returned vector to make comparisons of header extensions reliable.
   // In order of priority, we sort by uri first, then encrypt and id last.
-  std::sort(filtered.begin(), filtered.end(),
-            [](const RtpExtension& a, const RtpExtension& b) {
-              return std::tie(a.uri, a.encrypt, a.id) <
-                     std::tie(b.uri, b.encrypt, b.id);
-            });
+  std::ranges::sort(filtered, [](const RtpExtension& a, const RtpExtension& b) {
+    return std::tie(a.uri, a.encrypt, a.id) < std::tie(b.uri, b.encrypt, b.id);
+  });
 
   return filtered;
 }

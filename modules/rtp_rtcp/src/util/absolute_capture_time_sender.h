@@ -75,7 +75,7 @@ class AbsoluteCaptureTimeSender {
   std::optional<AbsoluteCaptureTime> OnSendPacket(
       uint32_t source,
       uint32_t rtp_timestamp,
-      int rtp_clock_frequency_hz,
+      int32_t rtp_clock_frequency_hz,
       base::NtpTime absolute_capture_time,
       std::optional<int64_t> estimated_capture_clock_offset,
       bool force = false);
@@ -94,7 +94,7 @@ class AbsoluteCaptureTimeSender {
       base::Timestamp send_time,
       uint32_t source,
       uint32_t rtp_timestamp,
-      int rtp_clock_frequency_hz,
+      int32_t rtp_clock_frequency_hz,
       base::NtpTime absolute_capture_time,
       std::optional<int64_t> estimated_capture_clock_offset) const;
 
@@ -102,9 +102,9 @@ class AbsoluteCaptureTimeSender {
 
   base::Timestamp last_send_time_ = base::Timestamp::MinusInfinity();
 
-  uint32_t last_source_;
-  uint32_t last_rtp_timestamp_;
-  int last_rtp_clock_frequency_hz_;
+  uint32_t last_source_{};
+  uint32_t last_rtp_timestamp_{};
+  int32_t last_rtp_clock_frequency_hz_{};
   base::NtpTime last_absolute_capture_time_;
   std::optional<int64_t> last_estimated_capture_clock_offset_;
 };

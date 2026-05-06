@@ -27,11 +27,11 @@ struct RTPVideoHeader;
 class RtpPacketizer {
  public:
   struct PayloadSizeLimits {
-    int max_payload_len = 1200;
-    int first_packet_reduction_len = 0;
-    int last_packet_reduction_len = 0;
+    int32_t max_payload_len = 1200;
+    int32_t first_packet_reduction_len = 0;
+    int32_t last_packet_reduction_len = 0;
     // Reduction len for packet that is first & last at the same time.
-    int single_packet_reduction_len = 0;
+    int32_t single_packet_reduction_len = 0;
   };
 
   virtual ~RtpPacketizer() = default;
@@ -46,8 +46,9 @@ class RtpPacketizer {
 
   // Split payload_len into sum of integers with respect to `limits`.
   // Returns empty vector on failure.
-  static std::vector<int> SplitAboutEqually(int payload_len,
-                                            const PayloadSizeLimits& limits);
+  static std::vector<int32_t> SplitAboutEqually(
+      int32_t payload_len,
+      const PayloadSizeLimits& limits);
 
   // Factory method to create codec-specific packetizer.
   // Returns nullptr if codec type is not supported.

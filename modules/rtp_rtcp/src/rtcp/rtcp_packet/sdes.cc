@@ -10,7 +10,7 @@
 
 #include "media/modules/rtp_rtcp/src/rtcp/rtcp_packet/sdes.h"
 
-#include <string.h>
+#include <cstring>
 
 #include <utility>
 
@@ -65,7 +65,7 @@ size_t ChunkSize(const Sdes::Chunk& chunk) {
 
 Sdes::Sdes() : block_length_(RtcpPacket::kHeaderLength) {}
 
-Sdes::~Sdes() {}
+Sdes::~Sdes() = default;
 
 bool Sdes::Parse(const CommonHeader& packet) {
   AVE_DCHECK_EQ(packet.type(), kPacketType);
@@ -96,7 +96,7 @@ bool Sdes::Parse(const CommonHeader& packet) {
     looking_at += sizeof(uint32_t);
     bool cname_found = false;
 
-    uint8_t item_type;
+    uint8_t item_type = 0;
     while ((item_type = *(looking_at++)) != kTerminatorTag) {
       if (looking_at >= payload_end) {
         AVE_LOG(LS_WARNING)
@@ -170,8 +170,9 @@ bool Sdes::Create(uint8_t* packet,
                   size_t max_length,
                   PacketReadyCallback callback) const {
   while (*index + BlockLength() > max_length) {
-    if (!OnBufferFull(packet, index, callback))
+    if (!OnBufferFull(packet, index, callback)) {
       return false;
+    }
   }
   const size_t index_end = *index + BlockLength();
   CreateHeader(chunks_.size(), kPacketType, HeaderLength(), packet, index);
@@ -188,7 +189,7 @@ bool Sdes::Create(uint8_t* packet,
     // octets. The next chunk must start on a 32-bit boundary.
     // CNAME (1 byte) | length (1 byte) | name | padding.
     size_t padding_size = 4 - ((6 + chunk.cname.size()) % 4);
-    const int kPadding = 0;
+    const int32_t kPadding = 0;
     memset(packet + *index, kPadding, padding_size);
     *index += padding_size;
   }

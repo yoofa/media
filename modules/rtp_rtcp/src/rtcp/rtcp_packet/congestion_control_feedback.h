@@ -45,7 +45,7 @@ class CongestionControlFeedback : public Rtpfb {
   // be missing sequence numbers between `Packets`. `Packets` MUST not include
   // duplicate sequence numbers.
   CongestionControlFeedback(std::vector<PacketInfo> packets,
-                            uint32_t report_timestamp_compact_ntp);
+                            uint32_t compact_ntp_timestamp);
   CongestionControlFeedback() = default;
 
   bool Parse(const CommonHeader& packet);
@@ -57,7 +57,7 @@ class CongestionControlFeedback : public Rtpfb {
   }
 
   // Serialize the packet.
-  bool Create(uint8_t* packet,
+  bool Create(uint8_t* buffer,
               size_t* position,
               size_t max_length,
               PacketReadyCallback callback) const override;

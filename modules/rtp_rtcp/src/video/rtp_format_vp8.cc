@@ -11,8 +11,8 @@
 #include "media/modules/rtp_rtcp/src/video/rtp_format_vp8.h"
 #include <span>
 
-#include <stdint.h>
-#include <string.h>  // memcpy
+#include <cstdint>
+#include <cstring>  // memcpy
 
 #include <vector>
 
@@ -26,15 +26,15 @@ namespace media {
 namespace rtp_rtcp {
 namespace {
 
-constexpr int kXBit = 0x80;
-constexpr int kNBit = 0x20;
-constexpr int kSBit = 0x10;
-constexpr int kKeyIdxField = 0x1F;
-constexpr int kIBit = 0x80;
-constexpr int kLBit = 0x40;
-constexpr int kTBit = 0x20;
-constexpr int kKBit = 0x10;
-constexpr int kYBit = 0x20;
+constexpr int32_t kXBit = 0x80;
+constexpr int32_t kNBit = 0x20;
+constexpr int32_t kSBit = 0x10;
+constexpr int32_t kKeyIdxField = 0x1F;
+constexpr int32_t kIBit = 0x80;
+constexpr int32_t kLBit = 0x40;
+constexpr int32_t kTBit = 0x20;
+constexpr int32_t kKBit = 0x10;
+constexpr int32_t kYBit = 0x20;
 
 bool ValidateHeader(const RTPVideoHeaderVP8& hdr_info) {
   if (hdr_info.pictureId != kNoPictureId) {
@@ -110,20 +110,26 @@ RtpPacketizerVp8::RawHeader RtpPacketizerVp8::BuildHeader(
   bool tl0_pid_present = header.tl0PicIdx != kNoTl0PicIdx;
   bool pid_present = header.pictureId != kNoPictureId;
   uint8_t x_field = 0;
-  if (pid_present)
+  if (pid_present) {
     x_field |= kIBit;
-  if (tl0_pid_present)
+  }
+  if (tl0_pid_present) {
     x_field |= kLBit;
-  if (tid_present)
+  }
+  if (tid_present) {
     x_field |= kTBit;
-  if (keyid_present)
+  }
+  if (keyid_present) {
     x_field |= kKBit;
+  }
 
   uint8_t flags = 0;
-  if (x_field != 0)
+  if (x_field != 0) {
     flags |= kXBit;
-  if (header.nonReference)
+  }
+  if (header.nonReference) {
     flags |= kNBit;
+  }
   // Create header as first packet in the frame. NextPacket() will clear it
   // after first use.
   flags |= kSBit;
@@ -133,7 +139,7 @@ RtpPacketizerVp8::RawHeader RtpPacketizerVp8::BuildHeader(
   }
   result.push_back(x_field);
   if (pid_present) {
-    const uint16_t pic_id = static_cast<uint16_t>(header.pictureId);
+    const auto pic_id = static_cast<uint16_t>(header.pictureId);
     result.push_back(0x80 | ((pic_id >> 8) & 0x7F));
     result.push_back(pic_id & 0xFF);
   }
@@ -144,8 +150,9 @@ RtpPacketizerVp8::RawHeader RtpPacketizerVp8::BuildHeader(
     uint8_t data_field = 0;
     if (tid_present) {
       data_field |= header.temporalIdx << 6;
-      if (header.layerSync)
+      if (header.layerSync) {
         data_field |= kYBit;
+      }
     }
     if (keyid_present) {
       data_field |= (header.keyIdx & kKeyIdxField);

@@ -12,11 +12,11 @@
 namespace ave {
 namespace media {
 
-enum : int { kMaxEncoderBuffers = 8 };
-enum : int { kMaxSimulcastStreams = 3 };
-enum : int { kMaxSpatialLayers = 5 };
-enum : int { kMaxTemporalStreams = 4 };
-enum : int { kMaxPreferredPixelFormats = 5 };
+enum : int32_t { kMaxEncoderBuffers = 8 };
+enum : int32_t { kMaxSimulcastStreams = 3 };
+enum : int32_t { kMaxSpatialLayers = 5 };
+enum : int32_t { kMaxTemporalStreams = 4 };
+enum : int32_t { kMaxPreferredPixelFormats = 5 };
 
 }  // namespace media
 }  // namespace ave

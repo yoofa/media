@@ -41,21 +41,22 @@ namespace internal {
 
 class PacketMaskTable {
  public:
-  PacketMaskTable(FecMaskType fec_mask_type, int num_media_packets);
+  PacketMaskTable(FecMaskType fec_mask_type, int32_t num_media_packets);
   ~PacketMaskTable();
 
-  std::span<const uint8_t> LookUp(int num_media_packets, int num_fec_packets);
+  std::span<const uint8_t> LookUp(int32_t num_media_packets,
+                                  int32_t num_fec_packets);
 
  private:
   static const uint8_t* PickTable(FecMaskType fec_mask_type,
-                                  int num_media_packets);
+                                  int32_t num_media_packets);
   const uint8_t* table_;
-  uint8_t fec_packet_mask_[kFECPacketMaskMaxSize];
+  uint8_t fec_packet_mask_[kFECPacketMaskMaxSize]{};
 };
 
 std::span<const uint8_t> LookUpInFecTable(const uint8_t* table,
-                                          int media_packet_index,
-                                          int fec_index);
+                                          int32_t media_packet_index,
+                                          int32_t fec_index);
 
 // Returns an array of packet masks. The mask of a single FEC packet
 // corresponds to a number of mask bytes. The mask indicates which
@@ -78,9 +79,9 @@ std::span<const uint8_t> LookUpInFecTable(const uint8_t* table,
 // \param[out] packet_mask             A pointer to hold the packet mask array,
 //                                     of size: num_fec_packets *
 //                                     "number of mask bytes".
-void GeneratePacketMasks(int num_media_packets,
-                         int num_fec_packets,
-                         int num_imp_packets,
+void GeneratePacketMasks(int32_t num_media_packets,
+                         int32_t num_fec_packets,
+                         int32_t num_imp_packets,
                          bool use_unequal_protection,
                          PacketMaskTable* mask_table,
                          uint8_t* packet_mask);
@@ -93,11 +94,11 @@ size_t PacketMaskSize(size_t num_sequence_numbers);
 // `new_bit_index`. If the current byte of `new_mask` can't fit all zeros, the
 // byte will be filled with zeros from `new_bit_index`, but the next byte will
 // be untouched.
-void InsertZeroColumns(int num_zeros,
+void InsertZeroColumns(int32_t num_zeros,
                        uint8_t* new_mask,
-                       int new_mask_bytes,
-                       int num_fec_packets,
-                       int new_bit_index);
+                       int32_t new_mask_bytes,
+                       int32_t num_fec_packets,
+                       int32_t new_bit_index);
 
 // Copies the left most bit column from the byte pointed to by
 // `old_bit_index` in `old_mask` to the right most column of the byte pointed
@@ -108,12 +109,12 @@ void InsertZeroColumns(int num_zeros,
 // the left in `new_mask`. `new_mask` will contain "xxxx xxn0" after this
 // operation, where x are previously inserted bits and n is the new bit.
 void CopyColumn(uint8_t* new_mask,
-                int new_mask_bytes,
+                int32_t new_mask_bytes,
                 uint8_t* old_mask,
-                int old_mask_bytes,
-                int num_fec_packets,
-                int new_bit_index,
-                int old_bit_index);
+                int32_t old_mask_bytes,
+                int32_t num_fec_packets,
+                int32_t new_bit_index,
+                int32_t old_bit_index);
 
 }  // namespace internal
 }  // namespace rtp_rtcp

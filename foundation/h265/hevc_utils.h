@@ -84,9 +84,9 @@ class HevcParameterSets {
   // Note that this method does not write the start code.
   bool write(size_t index, uint8_t* dest, size_t size);
   status_t makeHvcc(uint8_t* hvcc, size_t* hvccSize, size_t nalSizeLength);
-  void FindHEVCDimensions(const std::shared_ptr<Buffer>& SpsBuffer,
-                          int32_t* width,
-                          int32_t* height);
+  static void FindHEVCDimensions(const std::shared_ptr<Buffer>& SpsBuffer,
+                                 int32_t* width,
+                                 int32_t* height);
 
   Info getInfo() const { return mInfo; }
   static bool IsHevcIDR(const uint8_t* data, size_t size);
@@ -94,7 +94,7 @@ class HevcParameterSets {
  private:
   status_t parseVps(const uint8_t* data, size_t size);
   status_t parseSps(const uint8_t* data, size_t size);
-  status_t parsePps(const uint8_t* data, size_t size);
+  static status_t parsePps(const uint8_t* data, size_t size);
 
   // KeyedVector<uint32_t, uint64_t> mParams;
   std::unordered_map<uint32_t, uint64_t> mParams;
