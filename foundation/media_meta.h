@@ -13,10 +13,10 @@
 
 #include "../audio/channel_layout.h"
 #include "../codec/codec_id.h"
+#include "media_utils.h"
+
 #include "base/units/time_delta.h"
 #include "base/units/timestamp.h"
-#include "media_utils.h"
-#include "message.h"
 
 namespace ave {
 namespace media {
@@ -109,17 +109,8 @@ class MediaMeta {
   MediaMeta& SetQp(int16_t qp);
   int16_t qp() const;
 
-  MediaMeta& SetColorPrimaries(ColorPrimaries color_primaries);
-  ColorPrimaries color_primaries() const;
-
-  MediaMeta& SetColorTransfer(ColorTransfer color_transfer);
-  ColorTransfer color_transfer() const;
-
-  MediaMeta& SetColorSpace(ColorSpace color_space);
+  MediaMeta& SetColorSpace(const ColorSpace& color_space);
   ColorSpace color_space() const;
-
-  MediaMeta& SetColorRange(ColorRange color_range);
-  ColorRange color_range() const;
 
   MediaMeta& SetFieldOrder(FieldOrder field_order);
   FieldOrder field_order() const;

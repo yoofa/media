@@ -514,59 +514,7 @@ int16_t MediaMeta::qp() const {
   return std::get<MediaSampleInfo>(info_).video().qp;
 }
 
-MediaMeta& MediaMeta::SetColorPrimaries(ColorPrimaries color_primaries) {
-  if (stream_type_ != MediaType::VIDEO) {
-    AVE_LOG(LS_WARNING) << "SetColorPrimaries failed, stream type is not video";
-    return *this;
-  }
-
-  if (format_type_ == FormatType::kTrack) {
-    track_info()->video().color_primaries = color_primaries;
-  } else {
-    sample_info()->video().color_primaries = color_primaries;
-  }
-  return *this;
-}
-
-ColorPrimaries MediaMeta::color_primaries() const {
-  if (stream_type_ != MediaType::VIDEO) {
-    AVE_LOG(LS_WARNING) << "color_primaries failed, stream type is not video";
-    return ColorPrimaries::kUNSPECIFIED;
-  }
-
-  if (format_type_ == FormatType::kTrack) {
-    return std::get<MediaTrackInfo>(info_).video().color_primaries;
-  }
-  return std::get<MediaSampleInfo>(info_).video().color_primaries;
-}
-
-MediaMeta& MediaMeta::SetColorTransfer(ColorTransfer color_transfer) {
-  if (stream_type_ != MediaType::VIDEO) {
-    AVE_LOG(LS_WARNING) << "SetColorTransfer failed, stream type is not video";
-    return *this;
-  }
-
-  if (format_type_ == FormatType::kTrack) {
-    track_info()->video().color_transfer = color_transfer;
-  } else {
-    sample_info()->video().color_transfer = color_transfer;
-  }
-  return *this;
-}
-
-ColorTransfer MediaMeta::color_transfer() const {
-  if (stream_type_ != MediaType::VIDEO) {
-    AVE_LOG(LS_WARNING) << "color_transfer failed, stream type is not video";
-    return ColorTransfer::kUNSPECIFIED;
-  }
-
-  if (format_type_ == FormatType::kTrack) {
-    return std::get<MediaTrackInfo>(info_).video().color_transfer;
-  }
-  return std::get<MediaSampleInfo>(info_).video().color_transfer;
-}
-
-MediaMeta& MediaMeta::SetColorSpace(ColorSpace color_space) {
+MediaMeta& MediaMeta::SetColorSpace(const ColorSpace& color_space) {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "SetColorSpace failed, stream type is not video";
     return *this;
@@ -583,39 +531,13 @@ MediaMeta& MediaMeta::SetColorSpace(ColorSpace color_space) {
 ColorSpace MediaMeta::color_space() const {
   if (stream_type_ != MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "color_space failed, stream type is not video";
-    return ColorSpace::kUNSPECIFIED;
+    return ColorSpace();
   }
 
   if (format_type_ == FormatType::kTrack) {
     return std::get<MediaTrackInfo>(info_).video().color_space;
   }
   return std::get<MediaSampleInfo>(info_).video().color_space;
-}
-
-MediaMeta& MediaMeta::SetColorRange(ColorRange color_range) {
-  if (stream_type_ != MediaType::VIDEO) {
-    AVE_LOG(LS_WARNING) << "SetColorRange failed, stream type is not video";
-    return *this;
-  }
-
-  if (format_type_ == FormatType::kTrack) {
-    track_info()->video().color_range = color_range;
-  } else {
-    sample_info()->video().color_range = color_range;
-  }
-  return *this;
-}
-
-ColorRange MediaMeta::color_range() const {
-  if (stream_type_ != MediaType::VIDEO) {
-    AVE_LOG(LS_WARNING) << "color_range failed, stream type is not video";
-    return ColorRange::kUNSPECIFIED;
-  }
-
-  if (format_type_ == FormatType::kTrack) {
-    return std::get<MediaTrackInfo>(info_).video().color_range;
-  }
-  return std::get<MediaSampleInfo>(info_).video().color_range;
 }
 
 MediaMeta& MediaMeta::SetFieldOrder(FieldOrder field_order) {

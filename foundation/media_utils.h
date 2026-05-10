@@ -18,6 +18,7 @@
 
 #include "../audio/channel_layout.h"
 #include "../codec/codec_id.h"
+#include "color_space.h"
 #include "pixel_format.h"
 
 namespace ave {
@@ -45,48 +46,6 @@ enum class PictureType {
   SP,
   BI,
   D,
-};
-
-enum class ColorPrimaries {
-  kUNSPECIFIED = -1,
-  kBT470M,
-  kBT470BG,
-  kBT601_6_525,
-  kBT601_6_625,
-  kBT709,
-  kSMPTE170M,
-  kSMPTE24M,
-  kBT2020,
-};
-
-enum class ColorTransfer {
-  kUNSPECIFIED = -1,
-  kBT709,
-  kBT470M,
-  kBT601_6_525,
-  kBT601_6_625,
-  kSMPTE170M,
-  kSMPTE240M,
-  kBT2020_10BIT,
-  kBT2020_12BIT,
-};
-
-enum class ColorSpace {
-  kUNSPECIFIED = -1,
-  kBT709,
-  kBT470M,
-  kBT601_6_525,
-  kBT601_6_625,
-  kSMPTE170M,
-  kSMPTE240M,
-  kBT2020_NCL,  ///< Non-constant luminance
-  kBT2020_CL,   ///< Constant luminance
-};
-
-enum class ColorRange {
-  kUNSPECIFIED = -1,
-  kFULL,     ///< Full range
-  kLIMITED,  ///< Limited range
 };
 
 enum class FieldOrder {
@@ -135,10 +94,7 @@ struct VideoSampleInfo {
 
   // raw
   PixelFormat pixel_format = PixelFormat::AVE_PIX_FMT_NONE;
-  ColorPrimaries color_primaries = ColorPrimaries::kUNSPECIFIED;
-  ColorTransfer color_transfer = ColorTransfer::kUNSPECIFIED;
-  ColorSpace color_space = ColorSpace::kUNSPECIFIED;
-  ColorRange color_range = ColorRange::kUNSPECIFIED;
+  ColorSpace color_space;
   FieldOrder field_order = FieldOrder::kUNSPECIFIED;
 
   std::pair<int32_t, int32_t> sample_aspect_ratio = {1, 1};
@@ -201,10 +157,7 @@ struct VideoTrackInfo {
   int16_t rotation = -1;
 
   PixelFormat pixel_format = PixelFormat::AVE_PIX_FMT_NONE;
-  ColorPrimaries color_primaries = ColorPrimaries::kUNSPECIFIED;
-  ColorTransfer color_transfer = ColorTransfer::kUNSPECIFIED;
-  ColorSpace color_space = ColorSpace::kUNSPECIFIED;
-  ColorRange color_range = ColorRange::kUNSPECIFIED;
+  ColorSpace color_space;
   FieldOrder field_order = FieldOrder::kUNSPECIFIED;
 
   int32_t fps = -1;
