@@ -58,11 +58,14 @@ public interface AudioSink {
      * @param data Audio data buffer.
      * @param size Number of bytes to write.
      * @param frameCount PCM-equivalent frames represented by this write for compressed audio. Pass
-     *     0 to use the sink's default per-access-unit accounting.
+     *     0 to use the sink's default per-access-unit accounting. Ignored for PCM (byte count
+     *     determines frames written).
+     * @param block If true, block until all bytes are consumed (or an error occurs). If false,
+     *     write what fits immediately and return.
      * @return Number of bytes actually written, or negative on error.
      */
     @CalledByNative
-    int write(ByteBuffer data, int size, int frameCount);
+    int write(ByteBuffer data, int size, int frameCount, boolean block);
 
     /** Start playback. */
     @CalledByNative

@@ -226,7 +226,8 @@ ssize_t JavaAudioTrack::Write(const void* buffer,
   while (total_written < size) {
     jint written = Java_AudioSink_write(
         env, j_audio_sink_, jni_zero::JavaParamRef<jobject>(env, j_buffer),
-        static_cast<int>(size - total_written), static_cast<int>(frame_count));
+        static_cast<int>(size - total_written), static_cast<int>(frame_count),
+        static_cast<jboolean>(blocking));
     if (written == 0 && blocking && base::TimeMillis() < blocking_deadline_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(2));
       continue;

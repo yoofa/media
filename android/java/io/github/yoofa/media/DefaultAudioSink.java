@@ -182,14 +182,13 @@ public class DefaultAudioSink implements AudioSink {
     }
 
     @Override
-    public int write(ByteBuffer data, int size, int frameCount) {
+    public int write(ByteBuffer data, int size, int frameCount, boolean block) {
         if (audioTrack == null) {
             return -1;
         }
+        int writeMode = block ? AudioTrack.WRITE_BLOCKING : AudioTrack.WRITE_NON_BLOCKING;
         if (isCompressed) {
-            int startPosition = data.position();
-            int written = audioTrack.write(data, size, AudioTrack.WRITE_NON_BLOCKING);
-            data.position(startPosition);
+            int written = audioTrack.write(data, size, writeMode);
             if (written == size) {
                 // Count the full PCM-equivalent duration represented by this compressed
                 // write only after AudioTrack has accepted the whole buffer.
@@ -202,6 +201,17 @@ public class DefaultAudioSink implements AudioSink {
                                 + " written="
                                 + written
                                 + " compressed=true");
+            }
+            return written;
+        }
+        // PCM: write loop is driven by the actual byte count (size), not frameCount.
+        // frameCount is unused for PCM — framesWritten is derived from bytes / frameSize.
+        if (!block) {
+            // Non-blocking: single write attempt; return immediately with however many
+            // bytes AudioTrack accepted.
+            int written = audioTrack.write(data, size, AudioTrack.WRITE_NON_BLOCKING);
+            if (written > 0) {
+                framesWritten += written / frameSize;
             }
             return written;
         }
@@ -227,7 +237,6 @@ public class DefaultAudioSink implements AudioSink {
             }
             totalWritten += written;
         }
-        data.position(0);
         framesWritten += totalWritten / frameSize;
         return totalWritten;
     }
