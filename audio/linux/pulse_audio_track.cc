@@ -406,26 +406,6 @@ status_t PulseAudioTrack::GetPosition(uint32_t* position) const {
   return 0;
 }
 
-int64_t PulseAudioTrack::GetPlayedOutDurationUs(
-    int64_t nowUs AVE_MAYBE_UNUSED) const {
-  if (!ready_) {
-    return 0;
-  }
-
-  // TODO: Implement based on written frames and latency
-  return 0;
-}
-
-status_t PulseAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
-  if (!ready_ || !frameswritten) {
-    return -EINVAL;
-  }
-
-  // TODO: Track written frames
-  *frameswritten = 0;
-  return 0;
-}
-
 int64_t PulseAudioTrack::GetBufferDurationInUs() const {
   return static_cast<int64_t>((buffer_size_ / frameSize()) * 1000000LL /
                               config_.sample_rate);

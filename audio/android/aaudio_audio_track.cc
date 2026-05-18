@@ -118,23 +118,6 @@ status_t AAudioAudioTrack::GetPosition(uint32_t* position) const {
   return 0;
 }
 
-int64_t AAudioAudioTrack::GetPlayedOutDurationUs(int64_t nowUs) const {
-  (void)nowUs;
-  return 0;
-}
-
-status_t AAudioAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
-  if (!stream_ || !frameswritten) {
-    return -EINVAL;
-  }
-  int64_t frames = AAudioStream_getFramesWritten(stream_);
-  if (frames < 0) {
-    return -EINVAL;
-  }
-  *frameswritten = static_cast<uint32_t>(frames);
-  return 0;
-}
-
 int64_t AAudioAudioTrack::GetBufferDurationInUs() const {
   if (!stream_ || config_.sample_rate == 0) {
     return 0;

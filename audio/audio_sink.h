@@ -42,8 +42,6 @@ class AudioSink {
 
   virtual status_t GetPosition(uint32_t* position) const = 0;
   // virtual status_t getTimestamp(AudioTimestamp& ts) const = 0;
-  virtual int64_t GetPlayedOutDurationUs(int64_t nowUs) const = 0;
-  virtual status_t GetFramesWritten(uint32_t* frameswritten) const = 0;
   // virtual audio_session_t getSessionId() const = 0;
   // virtual audio_stream_type_t getAudioStreamType() const = 0;
   virtual uint32_t GetSampleRate() const = 0;

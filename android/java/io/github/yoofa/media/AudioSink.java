@@ -121,12 +121,6 @@ public interface AudioSink {
     long getBufferDurationUs();
 
     /**
-     * @return The number of frames written to the track since open.
-     */
-    @CalledByNative
-    long getFramesWritten();
-
-    /**
      * @return Playback head position in frames since open.
      */
     @CalledByNative

@@ -91,14 +91,6 @@ status_t OpenSLESAudioTrack::GetPosition(uint32_t* position) const {
   return 0;
 }
 
-int64_t OpenSLESAudioTrack::GetPlayedOutDurationUs(int64_t nowUs) const {
-  return 0;
-}
-
-status_t OpenSLESAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
-  return 0;
-}
-
 int64_t OpenSLESAudioTrack::GetBufferDurationInUs() const {
   return 0;
 }

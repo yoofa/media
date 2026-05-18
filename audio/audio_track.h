@@ -44,8 +44,6 @@ class AudioTrack {
 
   virtual status_t GetPosition(uint32_t* position) const = 0;
   // virtual status_t getTimestamp(AudioTimestamp& ts) const = 0;
-  virtual int64_t GetPlayedOutDurationUs(int64_t nowUs) const = 0;
-  virtual status_t GetFramesWritten(uint32_t* frameswritten) const = 0;
   virtual int64_t GetBufferDurationInUs() const = 0;
 
   // if cb is nullptr, use write() to fill the buffer

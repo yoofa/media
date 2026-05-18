@@ -43,8 +43,6 @@ class AlsaAudioTrack : public AudioTrack {
   float msecsPerFrame() const override;
 
   status_t GetPosition(uint32_t* position) const override;
-  status_t GetFramesWritten(uint32_t* frameswritten) const override;
-  int64_t GetPlayedOutDurationUs(int64_t nowUs) const override;
   int64_t GetBufferDurationInUs() const override;
 
   status_t Open(audio_config_t config, AudioCallback cb, void* cookie) override;
@@ -72,7 +70,6 @@ class AlsaAudioTrack : public AudioTrack {
 
   snd_pcm_uframes_t period_size_;
   snd_pcm_uframes_t buffer_size_;
-  uint64_t frames_written_;
 
   // Callback mode support
   std::unique_ptr<uint8_t[]> callback_buffer_;

@@ -32,8 +32,6 @@ class AAudioAudioTrack : public AudioTrack {
   float msecsPerFrame() const override;
 
   status_t GetPosition(uint32_t* position) const override;
-  int64_t GetPlayedOutDurationUs(int64_t nowUs) const override;
-  status_t GetFramesWritten(uint32_t* frameswritten) const override;
   int64_t GetBufferDurationInUs() const override;
 
   status_t Open(audio_config_t config, AudioCallback cb, void* cookie) override;

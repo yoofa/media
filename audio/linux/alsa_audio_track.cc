@@ -38,7 +38,6 @@ AlsaAudioTrack::AlsaAudioTrack(AlsaSymbolTable* symbol_table)
       playing_(false),
       period_size_(0),
       buffer_size_(0),
-      frames_written_(0),
       callback_buffer_(nullptr),
       callback_running_(false) {}
 
@@ -119,33 +118,15 @@ status_t AlsaAudioTrack::GetPosition(uint32_t* position) const {
   return 0;
 }
 
-status_t AlsaAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
-  *frameswritten = frames_written_;
-  return 0;
-}
-
-int64_t AlsaAudioTrack::GetPlayedOutDurationUs(int64_t nowUs) const {
-  if (!ready_) {
-    return -EINVAL;
-  }
-
-  snd_pcm_sframes_t delay_frames{};
-  if (LATE(snd_pcm_delay)(handle_, &delay_frames) < 0) {
-    return -EINVAL;
-  }
-
-  snd_pcm_sframes_t played_frames = frames_written_ - delay_frames;
-  if (played_frames < 0) {
-    played_frames = 0;
-  }
-
-  long long played_us = (played_frames * 1000000LL) / config_.sample_rate;
-
-  return played_us;
-}
-
 int64_t AlsaAudioTrack::GetBufferDurationInUs() const {
-  return 0;
+  if (!ready_) {
+    return 0;
+  }
+  snd_pcm_sframes_t delay_frames{};
+  if (LATE(snd_pcm_delay)(handle_, &delay_frames) < 0 || delay_frames <= 0) {
+    return 0;
+  }
+  return delay_frames * 1000000LL / config_.sample_rate;
 }
 
 status_t AlsaAudioTrack::Open(audio_config_t config,
@@ -371,7 +352,6 @@ ssize_t AlsaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
       remaining -= ret;
       data += ret * channels;
       written += ret;
-      frames_written_ += ret;
     }
     // Return bytes written in float32 input terms
     return written * channels * static_cast<ssize_t>(sizeof(float));
@@ -404,7 +384,6 @@ ssize_t AlsaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
     frames -= ret;
     data += ret * frameSize();
     written += ret;
-    frames_written_ += ret;
   }
 
   return written * frameSize();
@@ -537,7 +516,6 @@ uint64_t AlsaAudioTrack::CallbackThreadFunc() {
 
       frames_to_write -= ret;
       data += ret * frameSize();
-      frames_written_ += ret;
     }
 
     // Check PCM state and start if needed

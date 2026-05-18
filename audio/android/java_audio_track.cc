@@ -27,7 +27,6 @@ using media::jni::Java_AudioSink_flush;
 using media::jni::Java_AudioSink_getBufferDurationUs;
 using media::jni::Java_AudioSink_getBufferSize;
 using media::jni::Java_AudioSink_getChannelCount;
-using media::jni::Java_AudioSink_getFramesWritten;
 using media::jni::Java_AudioSink_getLatency;
 using media::jni::Java_AudioSink_getPosition;
 using media::jni::Java_AudioSink_getSampleRate;
@@ -129,21 +128,6 @@ status_t JavaAudioTrack::GetPosition(uint32_t* position) const {
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   *position =
       static_cast<uint32_t>(Java_AudioSink_getPosition(env, j_audio_sink_));
-  return 0;
-}
-
-int64_t JavaAudioTrack::GetPlayedOutDurationUs(int64_t nowUs) const {
-  (void)nowUs;
-  return GetBufferDurationInUs();
-}
-
-status_t JavaAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
-  if (!j_audio_sink_.obj() || !frameswritten) {
-    return -EINVAL;
-  }
-  JNIEnv* env = AttachCurrentThreadIfNeeded();
-  *frameswritten = static_cast<uint32_t>(
-      Java_AudioSink_getFramesWritten(env, j_audio_sink_));
   return 0;
 }
 

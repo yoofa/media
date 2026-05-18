@@ -312,11 +312,6 @@ public class DefaultAudioSink implements AudioSink {
     }
 
     @Override
-    public long getFramesWritten() {
-        return framesWritten;
-    }
-
-    @Override
     public int getPosition() {
         if (audioTrack == null) {
             return 0;
