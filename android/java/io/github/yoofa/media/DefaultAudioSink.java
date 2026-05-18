@@ -187,52 +187,11 @@ public class DefaultAudioSink implements AudioSink {
             return -1;
         }
         int writeMode = block ? AudioTrack.WRITE_BLOCKING : AudioTrack.WRITE_NON_BLOCKING;
-        if (isCompressed) {
-            int written = audioTrack.write(data, size, writeMode);
-            if (written > 0 && written < size) {
-                Log.w(
-                        TAG,
-                        "write incomplete: requested="
-                                + size
-                                + " written="
-                                + written
-                                + " compressed=true");
-            }
-            return written;
+        int written = audioTrack.write(data, size, writeMode);
+        if (written > 0 && !isCompressed) {
+            framesWritten += written / frameSize;
         }
-        if (!block) {
-            // Non-blocking: single write attempt; return immediately with however many
-            // bytes AudioTrack accepted.
-            int written = audioTrack.write(data, size, AudioTrack.WRITE_NON_BLOCKING);
-            if (written > 0) {
-                framesWritten += written / frameSize;
-            }
-            return written;
-        }
-        int totalWritten = 0;
-        while (totalWritten < size) {
-            data.position(totalWritten);
-            int written = audioTrack.write(data, size - totalWritten, AudioTrack.WRITE_BLOCKING);
-            if (written <= 0) {
-                if (totalWritten > 0) {
-                    Log.w(
-                            TAG,
-                            "write incomplete: requested="
-                                    + size
-                                    + " written="
-                                    + totalWritten
-                                    + " lastResult="
-                                    + written
-                                    + " compressed="
-                                    + isCompressed);
-                    return totalWritten;
-                }
-                return written;
-            }
-            totalWritten += written;
-        }
-        framesWritten += totalWritten / frameSize;
-        return totalWritten;
+        return written;
     }
 
     @Override
