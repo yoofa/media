@@ -10,6 +10,7 @@
 
 #include <functional>
 
+#include "audio.h"
 #include "base/types.h"
 
 namespace ave {
@@ -40,7 +41,7 @@ class AudioSink {
   virtual uint32_t latency() const = 0;
   virtual float msecsPerFrame() const = 0;
 
-  virtual status_t GetPosition(uint32_t* position) const = 0;
+  virtual status_t GetTimestamp(AudioTimestamp* ts) const = 0;
   // virtual status_t getTimestamp(AudioTimestamp& ts) const = 0;
   // virtual audio_session_t getSessionId() const = 0;
   // virtual audio_stream_type_t getAudioStreamType() const = 0;

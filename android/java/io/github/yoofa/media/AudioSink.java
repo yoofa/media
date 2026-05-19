@@ -121,8 +121,13 @@ public interface AudioSink {
     long getBufferDurationUs();
 
     /**
-     * @return Playback head position in frames since open.
+     * Retrieves the playback timestamp: the frame position and the system clock nanosecond time
+     * at which that position was observed.
+     *
+     * @param framePosition long[1] output: frame position played since open.
+     * @param nanoTime      long[1] output: CLOCK_MONOTONIC nanoseconds for that position.
+     * @return true if a valid timestamp was obtained, false otherwise.
      */
     @CalledByNative
-    int getPosition();
+    boolean getTimestamp(long[] framePosition, long[] nanoTime);
 }

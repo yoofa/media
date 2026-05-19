@@ -28,7 +28,7 @@ using media::jni::Java_AudioSink_getBufferDurationUs;
 using media::jni::Java_AudioSink_getBufferSize;
 using media::jni::Java_AudioSink_getChannelCount;
 using media::jni::Java_AudioSink_getLatency;
-using media::jni::Java_AudioSink_getPosition;
+using media::jni::Java_AudioSink_getTimestamp;
 using media::jni::Java_AudioSink_getSampleRate;
 using media::jni::Java_AudioSink_isReady;
 using media::jni::Java_AudioSink_open;
@@ -121,14 +121,39 @@ float JavaAudioTrack::msecsPerFrame() const {
   return config_.sample_rate > 0 ? 1000.0f / config_.sample_rate : 0.0f;
 }
 
-status_t JavaAudioTrack::GetPosition(uint32_t* position) const {
-  if (!j_audio_sink_.obj() || !position) {
+status_t JavaAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
+  if (!j_audio_sink_.obj() || !ts) {
     return -EINVAL;
   }
   JNIEnv* env = AttachCurrentThreadIfNeeded();
-  *position =
-      static_cast<uint32_t>(Java_AudioSink_getPosition(env, j_audio_sink_));
-  return 0;
+
+  jlongArray j_frame_pos = env->NewLongArray(1);
+  jlongArray j_nano_time = env->NewLongArray(1);
+  if (!j_frame_pos || !j_nano_time) {
+    if (j_frame_pos)
+      env->DeleteLocalRef(j_frame_pos);
+    if (j_nano_time)
+      env->DeleteLocalRef(j_nano_time);
+    return -ENOMEM;
+  }
+
+  jboolean ok = Java_AudioSink_getTimestamp(
+      env, j_audio_sink_,
+      jni_zero::JavaRef<jlongArray>(env, j_frame_pos),
+      jni_zero::JavaRef<jlongArray>(env, j_nano_time));
+
+  if (ok) {
+    jlong frame_pos = 0;
+    jlong nano_time = 0;
+    env->GetLongArrayRegion(j_frame_pos, 0, 1, &frame_pos);
+    env->GetLongArrayRegion(j_nano_time, 0, 1, &nano_time);
+    ts->position = static_cast<uint32_t>(frame_pos);
+    ts->nanos = static_cast<int64_t>(nano_time);
+  }
+
+  env->DeleteLocalRef(j_frame_pos);
+  env->DeleteLocalRef(j_nano_time);
+  return ok ? OK : INVALID_OPERATION;
 }
 
 int64_t JavaAudioTrack::GetBufferDurationInUs() const {

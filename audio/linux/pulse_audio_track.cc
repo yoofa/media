@@ -395,15 +395,14 @@ float PulseAudioTrack::msecsPerFrame() const {
   return 1000.0f / static_cast<float>(config_.sample_rate);
 }
 
-status_t PulseAudioTrack::GetPosition(uint32_t* position) const {
-  if (!ready_ || !position) {
+status_t PulseAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
+  if (!ready_ || !ts) {
     return -EINVAL;
   }
-
-  // PulseAudio doesn't provide direct position information
-  // We could calculate it based on written frames and latency
-  *position = 0;
-  return 0;
+  // PulseAudio does not provide a reliable hardware-correlated timestamp.
+  ts->position = 0;
+  ts->nanos = 0;
+  return INVALID_OPERATION;
 }
 
 int64_t PulseAudioTrack::GetBufferDurationInUs() const {

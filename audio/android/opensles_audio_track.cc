@@ -87,8 +87,14 @@ float OpenSLESAudioTrack::msecsPerFrame() const {
   return 0;
 }
 
-status_t OpenSLESAudioTrack::GetPosition(uint32_t* position) const {
-  return 0;
+status_t OpenSLESAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
+  if (!ts) {
+    return -EINVAL;
+  }
+  // OpenSLES does not provide a hardware-correlated timestamp; return zeros.
+  ts->position = 0;
+  ts->nanos = 0;
+  return INVALID_OPERATION;
 }
 
 int64_t OpenSLESAudioTrack::GetBufferDurationInUs() const {

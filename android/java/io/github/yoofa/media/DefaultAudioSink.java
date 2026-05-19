@@ -312,11 +312,24 @@ public class DefaultAudioSink implements AudioSink {
     }
 
     @Override
-    public int getPosition() {
+    public boolean getTimestamp(long[] framePosition, long[] nanoTime) {
         if (audioTrack == null) {
-            return 0;
+            return false;
         }
-        return (int) getPlayedFrameCount();
+        AudioTimestamp ts = new AudioTimestamp();
+        try {
+            if (audioTrack.getTimestamp(ts)) {
+                framePosition[0] = ts.framePosition;
+                nanoTime[0] = ts.nanoTime;
+                return true;
+            }
+        } catch (Exception e) {
+            // fall through to estimate
+        }
+        // Fallback: derive position from playback head + current clock
+        framePosition[0] = audioTrack.getPlaybackHeadPosition() & 0xFFFFFFFFL;
+        nanoTime[0] = System.nanoTime();
+        return true;
     }
 
     // --- Private helpers ---

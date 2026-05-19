@@ -98,24 +98,28 @@ float AlsaAudioTrack::msecsPerFrame() const {
   return 1000.0f / static_cast<float>(config_.sample_rate);
 }
 
-status_t AlsaAudioTrack::GetPosition(uint32_t* position) const {
-  if (!ready_ || !position) {
+status_t AlsaAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
+  if (!ready_ || !ts) {
     return -EINVAL;
   }
 
   snd_pcm_sframes_t delay{};
   snd_pcm_sframes_t avail{};
-
-  if (LATE(snd_pcm_delay)(handle_, &delay) < 0) {
+  if (LATE(snd_pcm_delay)(handle_, &delay) < 0 ||
+      LATE(snd_pcm_avail_update)(handle_) < 0) {
     return -EINVAL;
   }
+  avail = LATE(snd_pcm_avail_update)(handle_);
 
-  if (LATE(snd_pcm_avail_update)(handle_) < 0) {
-    return -EINVAL;
-  }
+  // frames_written_ was removed; derive played position from buffer occupancy.
+  // position = (buffer_size - delay - avail) wrapping in buffer_size units.
+  ts->position = static_cast<uint32_t>(
+      (buffer_size_ - (delay + avail)) % buffer_size_);
 
-  *position = (buffer_size_ - (delay + avail)) % buffer_size_;
-  return 0;
+  struct timespec tp {};
+  clock_gettime(CLOCK_MONOTONIC, &tp);
+  ts->nanos = static_cast<int64_t>(tp.tv_sec) * 1000000000LL + tp.tv_nsec;
+  return OK;
 }
 
 int64_t AlsaAudioTrack::GetBufferDurationInUs() const {

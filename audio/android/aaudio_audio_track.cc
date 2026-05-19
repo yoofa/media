@@ -106,16 +106,20 @@ float AAudioAudioTrack::msecsPerFrame() const {
   return 1000.0f / static_cast<float>(config_.sample_rate);
 }
 
-status_t AAudioAudioTrack::GetPosition(uint32_t* position) const {
-  if (!stream_ || !position) {
+status_t AAudioAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
+  if (!stream_ || !ts) {
     return -EINVAL;
   }
-  int64_t frames = AAudioStream_getFramesWritten(stream_);
-  if (frames < 0) {
+  int64_t hardware_frames = 0;
+  int64_t hardware_time_ns = 0;
+  aaudio_result_t result = AAudioStream_getTimestamp(
+      stream_, CLOCK_MONOTONIC, &hardware_frames, &hardware_time_ns);
+  if (result != AAUDIO_OK) {
     return -EINVAL;
   }
-  *position = static_cast<uint32_t>(frames);
-  return 0;
+  ts->position = static_cast<uint32_t>(hardware_frames);
+  ts->nanos = hardware_time_ns;
+  return OK;
 }
 
 int64_t AAudioAudioTrack::GetBufferDurationInUs() const {

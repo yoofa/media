@@ -40,6 +40,13 @@ using audio_config_t = struct AudioConfig {
   uint32_t frame_size = 0;            // size of a single frame in bytes
 } __attribute__((aligned(8)));
 
+// Playback timestamp: frame position and the CLOCK_MONOTONIC nanosecond time
+// at which that position was observed. Mirrors android.media.AudioTimestamp.
+struct AudioTimestamp {
+  uint32_t position = 0;  // frames played since track open
+  int64_t nanos = 0;      // CLOCK_MONOTONIC ns corresponding to |position|; 0 = unknown
+};
+
 static const audio_config_t DefaultAudioConfig{
     .sample_rate = 44100,
     .channel_layout = CHANNEL_LAYOUT_STEREO,

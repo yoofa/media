@@ -42,7 +42,7 @@ class AudioTrack {
   virtual uint32_t latency() const = 0;
   virtual float msecsPerFrame() const = 0;
 
-  virtual status_t GetPosition(uint32_t* position) const = 0;
+  virtual status_t GetTimestamp(AudioTimestamp* ts) const = 0;
   // virtual status_t getTimestamp(AudioTimestamp& ts) const = 0;
   virtual int64_t GetBufferDurationInUs() const = 0;
 
