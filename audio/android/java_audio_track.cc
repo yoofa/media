@@ -139,8 +139,8 @@ status_t JavaAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
 
   jboolean ok = Java_AudioSink_getTimestamp(
       env, j_audio_sink_,
-      jni_zero::JavaRef<jlongArray>(env, j_frame_pos),
-      jni_zero::JavaRef<jlongArray>(env, j_nano_time));
+      jni_zero::JavaParamRef<jlongArray>(env, j_frame_pos),
+      jni_zero::JavaParamRef<jlongArray>(env, j_nano_time));
 
   if (ok) {
     jlong frame_pos = 0;
