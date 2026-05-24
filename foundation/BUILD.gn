@@ -59,8 +59,8 @@ ave_library("handler") {
 
 ave_library("avc_util") {
   sources = [
-    "avc_utils.cc",
-    "avc_utils.h",
+    "h264/avc_utils.cc",
+    "h264/avc_utils.h",
   ]
   deps = [
     ":bit_reader",
@@ -70,8 +70,8 @@ ave_library("avc_util") {
 
 ave_library("aac_util") {
   sources = [
-    "aac_utils.cc",
-    "aac_utils.h",
+    "aac/aac_utils.cc",
+    "aac/aac_utils.h",
   ]
 }
 
@@ -89,8 +89,8 @@ ave_library("framing_queue") {
 
 ave_library("hevc_util") {
   sources = [
-    "hevc_utils.cc",
-    "hevc_utils.h",
+    "h265/hevc_utils.cc",
+    "h265/hevc_utils.h",
   ]
 }
 

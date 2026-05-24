@@ -10,21 +10,24 @@
 #include "base/checks.h"
 #include "base/logging.h"
 
-#include "avc_utils.h"
-#include "bit_reader.h"
-#include "buffer.h"
-#include "media_errors.h"
+#include "../bit_reader.h"
+#include "../buffer.h"
+#include "../h264/avc_utils.h"
+#include "../media_errors.h"
 
 #define UNUSED_PARAM __attribute__((unused))
 
 namespace ave {
+namespace media {
 
+// NOLINTBEGIN(modernize-avoid-c-arrays)
 static const uint8_t kHevcNalUnitTypes[8] = {
     kHevcNalUnitTypeCodedSliceIdr, kHevcNalUnitTypeCodedSliceIdrNoLP,
     kHevcNalUnitTypeCodedSliceCra, kHevcNalUnitTypeVps,
     kHevcNalUnitTypeSps,           kHevcNalUnitTypePps,
     kHevcNalUnitTypePrefixSei,     kHevcNalUnitTypeSuffixSei,
 };
+// NOLINTEND(modernize-avoid-c-arrays)
 
 HevcParameterSets::HevcParameterSets() : mInfo(kInfoNone) {}
 
@@ -163,8 +166,9 @@ status_t HevcParameterSets::parseVps(const uint8_t* data, size_t size) {
     mParams.emplace(kGeneralTierFlag, reader.getBits(1));
     mParams.emplace(kGeneralProfileIdc, reader.getBits(5));
     mParams.emplace(kGeneralProfileCompatibilityFlags, reader.getBits(32));
-    mParams.emplace(kGeneralConstraintIndicatorFlags,
-                    ((uint64_t)reader.getBits(16) << 32) | reader.getBits(32));
+    mParams.emplace(
+        kGeneralConstraintIndicatorFlags,
+        (static_cast<uint64_t>(reader.getBits(16)) << 32) | reader.getBits(32));
     mParams.emplace(kGeneralLevelIdc, reader.getBits(8));
     // 96 bits total for general profile.
   } else {
@@ -185,8 +189,10 @@ status_t HevcParameterSets::parseSps(const uint8_t* data, size_t size) {
   // Skip general profile
   reader.skipBits(96);
   if (maxSubLayersMinus1 > 0) {
-    bool subLayerProfilePresentFlag[8];
-    bool subLayerLevelPresentFlag[8];
+    // NOLINTBEGIN(modernize-avoid-c-arrays)
+    bool subLayerProfilePresentFlag[8]{};
+    bool subLayerLevelPresentFlag[8]{};
+    // NOLINTEND(modernize-avoid-c-arrays)
     for (int i = 0; i < maxSubLayersMinus1; ++i) {
       subLayerProfilePresentFlag[i] = reader.getBitsWithFallback(1, 0);
       subLayerLevelPresentFlag[i] = reader.getBitsWithFallback(1, 0);
@@ -230,7 +236,7 @@ status_t HevcParameterSets::parseSps(const uint8_t* data, size_t size) {
   mParams.emplace(kBitDepthChromaMinus8, parseUEWithFallback(&reader, 0));
 
   // log2_max_pic_order_cnt_lsb_minus4
-  size_t log2MaxPicOrderCntLsb = parseUEWithFallback(&reader, 0) + (size_t)4;
+  size_t log2MaxPicOrderCntLsb = parseUEWithFallback(&reader, 0) + 4;
   bool spsSubLayerOrderingInfoPresentFlag = reader.getBitsWithFallback(1, 0);
   for (uint32_t i = spsSubLayerOrderingInfoPresentFlag ? 0 : maxSubLayersMinus1;
        i <= maxSubLayersMinus1; ++i) {
@@ -339,14 +345,14 @@ status_t HevcParameterSets::parseSps(const uint8_t* data, size_t size) {
     }
     if (reader.getBitsWithFallback(1, 0)) {  // video_signal_type_present_flag
       reader.skipBits(3);                    // video_format
-      uint32_t videoFullRangeFlag;
+      uint32_t videoFullRangeFlag{};
       if (reader.getBitsGraceful(1, &videoFullRangeFlag)) {
         mParams.emplace(kVideoFullRangeFlag, videoFullRangeFlag);
       }
       if (reader.getBitsWithFallback(1,
                                      0)) {  // colour_description_present_flag
-        mInfo = (Info)(mInfo | kInfoHasColorDescription);
-        uint32_t colourPrimaries, transferCharacteristics, matrixCoeffs;
+        mInfo = static_cast<Info>(mInfo | kInfoHasColorDescription);
+        uint32_t colourPrimaries{}, transferCharacteristics{}, matrixCoeffs{};
         if (reader.getBitsGraceful(8, &colourPrimaries)) {
           mParams.emplace(kColourPrimaries, colourPrimaries);
         }
@@ -354,7 +360,7 @@ status_t HevcParameterSets::parseSps(const uint8_t* data, size_t size) {
           mParams.emplace(kTransferCharacteristics, transferCharacteristics);
           if (transferCharacteristics == 16 /* ST 2084 */
               || transferCharacteristics == 18 /* ARIB STD-B67 HLG */) {
-            mInfo = (Info)(mInfo | kInfoIsHdr);
+            mInfo = static_cast<Info>(mInfo | kInfoIsHdr);
           }
         }
         if (reader.getBitsGraceful(8, &matrixCoeffs)) {
@@ -383,8 +389,10 @@ void HevcParameterSets::FindHEVCDimensions(
   // Skip general profile
   reader.skipBits(96);
   if (maxSubLayersMinus1 > 0) {
-    bool subLayerProfilePresentFlag[8];
-    bool subLayerLevelPresentFlag[8];
+    // NOLINTBEGIN(modernize-avoid-c-arrays)
+    bool subLayerProfilePresentFlag[8]{};
+    bool subLayerLevelPresentFlag[8]{};
+    // NOLINTEND(modernize-avoid-c-arrays)
     for (int i = 0; i < maxSubLayersMinus1; ++i) {
       subLayerProfilePresentFlag[i] = reader.getBitsWithFallback(1, 0);
       subLayerLevelPresentFlag[i] = reader.getBitsWithFallback(1, 0);
@@ -413,9 +421,9 @@ void HevcParameterSets::FindHEVCDimensions(
   skipUE(&reader);
 
   // pic_width_in_luma_samples
-  *width = parseUEWithFallback(&reader, 0);
+  *width = static_cast<int32_t>(parseUEWithFallback(&reader, 0));
   // pic_height_in_luma_samples
-  *height = parseUEWithFallback(&reader, 0);
+  *height = static_cast<int32_t>(parseUEWithFallback(&reader, 0));
 }
 
 status_t HevcParameterSets::parsePps(const uint8_t* data UNUSED_PARAM,
@@ -428,7 +436,7 @@ status_t HevcParameterSets::parsePps(const uint8_t* data UNUSED_PARAM,
 status_t HevcParameterSets::makeHvcc(uint8_t* hvcc,
                                      size_t* hvccSize,
                                      size_t nalSizeLength) {
-  if (hvcc == NULL || hvccSize == NULL ||
+  if (hvcc == nullptr || hvccSize == nullptr ||
       (nalSizeLength != 4 && nalSizeLength != 2)) {
     return BAD_VALUE;
   }
@@ -436,8 +444,7 @@ status_t HevcParameterSets::makeHvcc(uint8_t* hvcc,
   size_t size = 23;  // 23 bytes in the header
   size_t numOfArrays = 0;
   const size_t numNalUnits = getNumNalUnits();
-  for (size_t i = 0; i < ARRAY_SIZE(kHevcNalUnitTypes); ++i) {
-    uint8_t type = kHevcNalUnitTypes[i];
+  for (const auto& type : kHevcNalUnitTypes) {
     size_t numNalus = getNumNalUnitsOfType(type);
     if (numNalus == 0) {
       continue;
@@ -451,23 +458,23 @@ status_t HevcParameterSets::makeHvcc(uint8_t* hvcc,
       size += 2 + getSize(j);
     }
   }
-  uint8_t generalProfileSpace, generalTierFlag, generalProfileIdc;
+  uint8_t generalProfileSpace{}, generalTierFlag{}, generalProfileIdc{};
   if (!findParam8(kGeneralProfileSpace, &generalProfileSpace) ||
       !findParam8(kGeneralTierFlag, &generalTierFlag) ||
       !findParam8(kGeneralProfileIdc, &generalProfileIdc)) {
     return ERROR_MALFORMED;
   }
-  uint32_t compatibilityFlags;
-  uint64_t constraintIdcFlags;
+  uint32_t compatibilityFlags{};
+  uint64_t constraintIdcFlags{};
   if (!findParam32(kGeneralProfileCompatibilityFlags, &compatibilityFlags) ||
       !findParam64(kGeneralConstraintIndicatorFlags, &constraintIdcFlags)) {
     return ERROR_MALFORMED;
   }
-  uint8_t generalLevelIdc;
+  uint8_t generalLevelIdc{};
   if (!findParam8(kGeneralLevelIdc, &generalLevelIdc)) {
     return ERROR_MALFORMED;
   }
-  uint8_t chromaFormatIdc, bitDepthLumaMinus8, bitDepthChromaMinus8;
+  uint8_t chromaFormatIdc{}, bitDepthLumaMinus8{}, bitDepthChromaMinus8{};
   if (!findParam8(kChromaFormatIdc, &chromaFormatIdc) ||
       !findParam8(kBitDepthLumaMinus8, &bitDepthLumaMinus8) ||
       !findParam8(kBitDepthChromaMinus8, &bitDepthChromaMinus8)) {
@@ -508,8 +515,7 @@ status_t HevcParameterSets::makeHvcc(uint8_t* hvcc,
   header[21] = nalSizeLength - 1;
   header[22] = numOfArrays;
   header += 23;
-  for (size_t i = 0; i < ARRAY_SIZE(kHevcNalUnitTypes); ++i) {
-    uint8_t type = kHevcNalUnitTypes[i];
+  for (const auto& type : kHevcNalUnitTypes) {
     size_t numNalus = getNumNalUnitsOfType(type);
     if (numNalus == 0) {
       continue;
@@ -525,7 +531,7 @@ status_t HevcParameterSets::makeHvcc(uint8_t* hvcc,
       }
       header[0] = (getSize(j) >> 8) & 0xff;
       header[1] = getSize(j) & 0xff;
-      if (!write(j, header + 2, size - (header - (uint8_t*)hvcc))) {
+      if (!write(j, header + 2, size - (header - hvcc))) {
         return NO_MEMORY;
       }
       header += (2 + getSize(j));
@@ -538,8 +544,8 @@ status_t HevcParameterSets::makeHvcc(uint8_t* hvcc,
 
 bool HevcParameterSets::IsHevcIDR(const uint8_t* data, size_t size) {
   bool foundIDR = false;
-  const uint8_t* nalStart;
-  size_t nalSize;
+  const uint8_t* nalStart{};
+  size_t nalSize{};
   while (!foundIDR &&
          getNextNALUnit(&data, &size, &nalStart, &nalSize, true) == OK) {
     if (nalSize == 0) {
@@ -559,4 +565,5 @@ bool HevcParameterSets::IsHevcIDR(const uint8_t* data, size_t size) {
 
   return foundIDR;
 }
-} /* namespace ave */
+}  // namespace media
+}  // namespace ave

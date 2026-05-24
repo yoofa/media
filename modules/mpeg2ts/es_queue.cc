@@ -15,9 +15,9 @@
 
 #include "audio/channel_layout.h"
 #include "base/logging.h"
-#include "foundation/aac_utils.h"
-#include "foundation/avc_utils.h"
+#include "foundation/aac/aac_utils.h"
 #include "foundation/bit_reader.h"
+#include "foundation/h264/avc_utils.h"
 #include "foundation/media_defs.h"
 #include "foundation/media_frame.h"
 #include "foundation/media_meta.h"

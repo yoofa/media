@@ -8,7 +8,7 @@
 #ifndef AVC_UTILS_H
 #define AVC_UTILS_H
 
-#include "buffer.h"
+#include "../buffer.h"
 
 namespace ave {
 namespace media {
@@ -40,34 +40,34 @@ void FindAVCDimensions(const std::shared_ptr<Buffer>& seqParamSet,
                        int32_t* sarWidth = nullptr,
                        int32_t* sarHeight = nullptr);
 
-// Gets and returns an unsigned exp-golomb (ue) value from a bit reader |br|.
+// Gets and returns an uint32_t exp-golomb (ue) value from a bit reader |br|.
 // Aborts if the value is more than 64 bits long (>=0xFFFF (!)) or the bit
 // reader overflows.
-unsigned parseUE(BitReader* br);
+uint32_t parseUE(BitReader* br);
 
-// Gets and returns a signed exp-golomb (se) value from a bit reader |br|.
+// Gets and returns a int32_t exp-golomb (se) value from a bit reader |br|.
 // Aborts if the value is more than 64 bits long (>0x7FFF || <-0x7FFF (!)) or
 // the bit reader overflows.
-signed parseSE(BitReader* br);
+int32_t parseSE(BitReader* br);
 
-// Gets an unsigned exp-golomb (ue) value from a bit reader |br|, and returns it
+// Gets an uint32_t exp-golomb (ue) value from a bit reader |br|, and returns it
 // if it was successful. Returns |fallback| if it was unsuccessful. Note: if the
 // value was longer that 64 bits, it reads past the value and still returns
 // |fallback|.
-unsigned parseUEWithFallback(BitReader* br, unsigned fallback);
+uint32_t parseUEWithFallback(BitReader* br, uint32_t fallback);
 
-// Gets a signed exp-golomb (se) value from a bit reader |br|, and returns it if
-// it was successful. Returns |fallback| if it was unsuccessful. Note: if the
+// Gets a int32_t exp-golomb (se) value from a bit reader |br|, and returns it
+// if it was successful. Returns |fallback| if it was unsuccessful. Note: if the
 // value was longer that 64 bits, it reads past the value and still returns
 // |fallback|.
-signed parseSEWithFallback(BitReader* br, signed fallback);
+int32_t parseSEWithFallback(BitReader* br, int32_t fallback);
 
-// Skips an unsigned exp-golomb (ue) value from bit reader |br|.
+// Skips an uint32_t exp-golomb (ue) value from bit reader |br|.
 inline void skipUE(BitReader* br) {
   (void)parseUEWithFallback(br, 0U);
 }
 
-// Skips a signed exp-golomb (se) value from bit reader |br|.
+// Skips a int32_t exp-golomb (se) value from bit reader |br|.
 inline void skipSE(BitReader* br) {
   (void)parseSEWithFallback(br, 0);
 }

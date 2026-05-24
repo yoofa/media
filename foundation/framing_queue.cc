@@ -6,9 +6,9 @@
  */
 
 #include "framing_queue.h"
-#include "aac_utils.h"
-#include "avc_utils.h"
+#include "aac/aac_utils.h"
 #include "base/logging.h"
+#include "h264/avc_utils.h"
 
 namespace ave {
 namespace media {

@@ -21,7 +21,7 @@
 #include "media/codec/codec_id.h"
 #include "media/codec/default_codec_factory.h"
 #include "media/codec/simple_passthrough_codec.h"
-#include "media/foundation/aac_utils.h"
+#include "media/foundation/aac/aac_utils.h"
 #include "media/foundation/framing_queue.h"
 #include "media/foundation/media_meta.h"
 

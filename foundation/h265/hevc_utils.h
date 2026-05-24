@@ -13,11 +13,11 @@
 #include <vector>
 
 #include "base/constructor_magic.h"
-#include "base/types.h"
 
-#include "buffer.h"
+#include "../buffer.h"
 
 namespace ave {
+namespace media {
 
 enum {
   kHevcNalUnitTypeCodedSliceIdr = 19,
@@ -103,6 +103,7 @@ class HevcParameterSets {
 
   AVE_DISALLOW_COPY_AND_ASSIGN(HevcParameterSets);
 };
-} /* namespace ave */
+}  // namespace media
+}  // namespace ave
 
 #endif /* !HEVC_UTILS_H */

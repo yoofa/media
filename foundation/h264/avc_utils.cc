@@ -13,24 +13,24 @@
 #include "base/errors.h"
 #include "base/logging.h"
 
-#include "bit_reader.h"
+#include "../bit_reader.h"
 
 namespace ave {
 namespace media {
 
-unsigned parseUE(BitReader* br) {
-  unsigned numZeroes = 0;
+uint32_t parseUE(BitReader* br) {
+  uint32_t numZeroes = 0;
   while (br->getBits(1) == 0) {
     ++numZeroes;
   }
 
-  unsigned x = br->getBits(numZeroes);
+  uint32_t x = br->getBits(numZeroes);
 
   return x + (1u << numZeroes) - 1;
 }
 
-unsigned parseUEWithFallback(BitReader* br, unsigned fallback) {
-  unsigned numZeroes = 0;
+uint32_t parseUEWithFallback(BitReader* br, uint32_t fallback) {
+  uint32_t numZeroes = 0;
   while (br->getBitsWithFallback(1, static_cast<uint32_t>(1)) == 0) {
     ++numZeroes;
   }
@@ -46,20 +46,22 @@ unsigned parseUEWithFallback(BitReader* br, unsigned fallback) {
   return fallback;
 }
 
-signed parseSE(BitReader* br) {
-  unsigned codeNum = parseUE(br);
+int32_t parseSE(BitReader* br) {
+  uint32_t codeNum = parseUE(br);
 
-  return (codeNum & 1) ? (codeNum + 1) / 2 : -signed(codeNum / 2);
+  auto val = static_cast<int32_t>((codeNum + 1) >> 1);
+  return (codeNum & 1) ? val : -val;
 }
 
-signed parseSEWithFallback(BitReader* br, signed fallback) {
+int32_t parseSEWithFallback(BitReader* br, int32_t fallback) {
   // NOTE: parseUE cannot normally return ~0 as the max supported value is
   // 0xFFFE
-  unsigned codeNum = parseUEWithFallback(br, ~0U);
+  uint32_t codeNum = parseUEWithFallback(br, ~0U);
   if (codeNum == ~0U) {
     return fallback;
   }
-  return (codeNum & 1) ? (codeNum + 1) / 2 : -signed(codeNum / 2);
+  auto val = static_cast<int32_t>((codeNum + 1) >> 1);
+  return (codeNum & 1) ? val : -val;
 }
 
 static void skipScalingList(BitReader* br, size_t sizeOfScalingList) {
@@ -67,7 +69,7 @@ static void skipScalingList(BitReader* br, size_t sizeOfScalingList) {
   size_t nextScale = 8;
   for (size_t j = 0; j < sizeOfScalingList; ++j) {
     if (nextScale != 0) {
-      signed delta_scale = parseSE(br);
+      int32_t delta_scale = parseSE(br);
       // ISO_IEC_14496-10_201402-ITU, 7.4.2.1.1.1, The value of delta_scale
       // shall be in the range of −128 to +127, inclusive.
       if (delta_scale < -128) {
@@ -94,11 +96,11 @@ void FindAVCDimensions(const std::shared_ptr<Buffer>& seqParamSet,
                        int32_t* sarHeight) {
   BitReader br(seqParamSet->data() + 1, seqParamSet->size() - 1);
 
-  unsigned profile_idc = br.getBits(8);
+  uint32_t profile_idc = br.getBits(8);
   br.skipBits(16);
   parseUE(&br);  // seq_parameter_set_id
 
-  unsigned chroma_format_idc = 1;  // 4:2:0 chroma format
+  uint32_t chroma_format_idc = 1;  // 4:2:0 chroma format
 
   if (profile_idc == 100 || profile_idc == 110 || profile_idc == 122 ||
       profile_idc == 244 || profile_idc == 44 || profile_idc == 83 ||
@@ -131,7 +133,7 @@ void FindAVCDimensions(const std::shared_ptr<Buffer>& seqParamSet,
   }
 
   parseUE(&br);  // log2_max_frame_num_minus4
-  unsigned pic_order_cnt_type = parseUE(&br);
+  uint32_t pic_order_cnt_type = parseUE(&br);
 
   if (pic_order_cnt_type == 0) {
     parseUE(&br);  // log2_max_pic_order_cnt_lsb_minus4
@@ -144,8 +146,8 @@ void FindAVCDimensions(const std::shared_ptr<Buffer>& seqParamSet,
     parseUE(&br);   // offset_for_non_ref_pic
     parseUE(&br);   // offset_for_top_to_bottom_field
 
-    unsigned num_ref_frames_in_pic_order_cnt_cycle = parseUE(&br);
-    for (unsigned i = 0; i < num_ref_frames_in_pic_order_cnt_cycle; ++i) {
+    uint32_t num_ref_frames_in_pic_order_cnt_cycle = parseUE(&br);
+    for (uint32_t i = 0; i < num_ref_frames_in_pic_order_cnt_cycle; ++i) {
       parseUE(&br);  // offset_for_ref_frame
     }
   }
@@ -153,9 +155,9 @@ void FindAVCDimensions(const std::shared_ptr<Buffer>& seqParamSet,
   parseUE(&br);   // num_ref_frames
   br.getBits(1);  // gaps_in_frame_num_value_allowed_flag
 
-  unsigned pic_width_in_mbs_minus1 = parseUE(&br);
-  unsigned pic_height_in_map_units_minus1 = parseUE(&br);
-  unsigned frame_mbs_only_flag = br.getBits(1);
+  uint32_t pic_width_in_mbs_minus1 = parseUE(&br);
+  uint32_t pic_height_in_map_units_minus1 = parseUE(&br);
+  uint32_t frame_mbs_only_flag = br.getBits(1);
 
   //    *width = pic_width_in_mbs_minus1 * 16 + 16;
   if (__builtin_mul_overflow(pic_width_in_mbs_minus1, 16,
@@ -182,18 +184,18 @@ void FindAVCDimensions(const std::shared_ptr<Buffer>& seqParamSet,
   br.getBits(1);  // direct_8x8_inference_flag
 
   if (br.getBits(1)) {  // frame_cropping_flag
-    unsigned frame_crop_left_offset = parseUE(&br);
-    unsigned frame_crop_right_offset = parseUE(&br);
-    unsigned frame_crop_top_offset = parseUE(&br);
-    unsigned frame_crop_bottom_offset = parseUE(&br);
+    uint32_t frame_crop_left_offset = parseUE(&br);
+    uint32_t frame_crop_right_offset = parseUE(&br);
+    uint32_t frame_crop_top_offset = parseUE(&br);
+    uint32_t frame_crop_bottom_offset = parseUE(&br);
 
-    unsigned cropUnitX = 0, cropUnitY = 0;
+    uint32_t cropUnitX = 0, cropUnitY = 0;
     if (chroma_format_idc == 0 /* monochrome */) {
       cropUnitX = 1;
       cropUnitY = 2 - frame_mbs_only_flag;
     } else {
-      unsigned subWidthC = (chroma_format_idc == 3) ? 1 : 2;
-      unsigned subHeightC = (chroma_format_idc == 1) ? 2 : 1;
+      uint32_t subWidthC = (chroma_format_idc == 3) ? 1 : 2;
+      uint32_t subHeightC = (chroma_format_idc == 1) ? 2 : 1;
 
       cropUnitX = subWidthC;
       cropUnitY = subHeightC * (2 - frame_mbs_only_flag);
@@ -238,24 +240,26 @@ void FindAVCDimensions(const std::shared_ptr<Buffer>& seqParamSet,
   }
 
   if (br.getBits(1)) {  // vui_parameters_present_flag
-    unsigned sar_width = 0, sar_height = 0;
+    uint32_t sar_width = 0, sar_height = 0;
 
     if (br.getBits(1)) {  // aspect_ratio_info_present_flag
-      unsigned aspect_ratio_idc = br.getBits(8);
+      uint32_t aspect_ratio_idc = br.getBits(8);
 
       if (aspect_ratio_idc == 255 /* extendedSAR */) {
         sar_width = br.getBits(16);
         sar_height = br.getBits(16);
       } else {
         // NOLINTBEGIN(modernize-avoid-c-arrays)
+        // NOLINTBEGIN(modernize-use-designated-initializers)
         static const struct {
-          unsigned width, height;
+          uint32_t width, height;
         } kFixedSARs[] = {
             {0, 0},  // Invalid
             {1, 1},    {12, 11}, {10, 11}, {16, 11}, {40, 33}, {24, 11},
             {20, 11},  {32, 11}, {80, 33}, {18, 11}, {15, 11}, {64, 33},
             {160, 99}, {4, 3},   {3, 2},   {2, 1},
         };
+        // NOLINTEND(modernize-use-designated-initializers)
         // NOLINTEND(modernize-avoid-c-arrays)
 
         if (aspect_ratio_idc > 0 && aspect_ratio_idc < NELEM(kFixedSARs)) {
@@ -353,7 +357,7 @@ status_t getNextNALUnit(const uint8_t** _data,
 
 static std::shared_ptr<Buffer> FindNAL(const uint8_t* data,
                                        size_t size,
-                                       unsigned nalType) {
+                                       uint32_t nalType) {
   const uint8_t* nalStart = nullptr;
   size_t nalSize = 0;
   while (getNextNALUnit(&data, &size, &nalStart, &nalSize, true) == OK) {
@@ -475,7 +479,7 @@ bool IsIDR(const uint8_t* data, size_t size) {
       continue;
     }
 
-    unsigned nalType = nalStart[0] & 0x1f;
+    uint32_t nalType = nalStart[0] & 0x1f;
 
     if (nalType == 5) {
       foundIDR = true;
@@ -504,12 +508,12 @@ bool IsAVCReferenceFrame(const std::shared_ptr<Buffer>& accessUnit) {
       return false;
     }
 
-    unsigned nalType = nalStart[0] & 0x1f;
+    uint32_t nalType = nalStart[0] & 0x1f;
 
     if (nalType == 5) {
       return true;
     }
-    unsigned nal_ref_idc = (nalStart[0] >> 5) & 3;
+    uint32_t nal_ref_idc = (nalStart[0] >> 5) & 3;
     return nal_ref_idc != 0;
   }
 
@@ -519,8 +523,8 @@ bool IsAVCReferenceFrame(const std::shared_ptr<Buffer>& accessUnit) {
 uint32_t FindAVCLayerId(const uint8_t* data, size_t size) {
   AVE_CHECK(data != nullptr);
 
-  const unsigned kSvcNalType = 0xE;
-  const unsigned kSvcNalSearchRange = 32;
+  const uint32_t kSvcNalType = 0xE;
+  const uint32_t kSvcNalSearchRange = 32;
   // SVC NAL
   // |---0 1110|1--- ----|---- ----|iii- ---|
   //       ^                        ^
@@ -544,7 +548,7 @@ bool ExtractDimensionsFromVOLHeader(const uint8_t* data,
                                     int32_t* height) {
   BitReader br(&data[4], size - 4);
   br.skipBits(1);  // random_accessible_vol
-  unsigned video_object_type_indication = br.getBits(8);
+  uint32_t video_object_type_indication = br.getBits(8);
 
   AVE_CHECK_NE(video_object_type_indication,
                0x21u /* Fine Granularity Scalable */);
@@ -553,7 +557,7 @@ bool ExtractDimensionsFromVOLHeader(const uint8_t* data,
     br.skipBits(4);  // video_object_layer_verid
     br.skipBits(3);  // video_object_layer_priority
   }
-  unsigned aspect_ratio_info = br.getBits(4);
+  uint32_t aspect_ratio_info = br.getBits(4);
   if (aspect_ratio_info == 0x0f /* extended PAR */) {
     br.skipBits(8);  // par_width
     br.skipBits(8);  // par_height
@@ -575,11 +579,11 @@ bool ExtractDimensionsFromVOLHeader(const uint8_t* data,
       AVE_CHECK(br.getBits(1));  // marker_bit
     }
   }
-  unsigned video_object_layer_shape = br.getBits(2);
+  uint32_t video_object_layer_shape = br.getBits(2);
   AVE_CHECK_EQ(video_object_layer_shape, 0x00u /* rectangular */);
 
   AVE_CHECK(br.getBits(1));  // marker_bit
-  unsigned vop_time_increment_resolution = br.getBits(16);
+  uint32_t vop_time_increment_resolution = br.getBits(16);
   AVE_CHECK(br.getBits(1));  // marker_bit
 
   if (br.getBits(1)) {  // fixed_vop_rate
@@ -595,7 +599,7 @@ bool ExtractDimensionsFromVOLHeader(const uint8_t* data,
     AVE_CHECK_GT(vop_time_increment_resolution, 0u);
     --vop_time_increment_resolution;
 
-    unsigned numBits = 0;
+    uint32_t numBits = 0;
     while (vop_time_increment_resolution > 0) {
       ++numBits;
       vop_time_increment_resolution >>= 1;
@@ -605,15 +609,15 @@ bool ExtractDimensionsFromVOLHeader(const uint8_t* data,
   }
 
   AVE_CHECK(br.getBits(1));  // marker_bit
-  unsigned video_object_layer_width = br.getBits(13);
+  uint32_t video_object_layer_width = br.getBits(13);
   AVE_CHECK(br.getBits(1));  // marker_bit
-  unsigned video_object_layer_height = br.getBits(13);
+  uint32_t video_object_layer_height = br.getBits(13);
   AVE_CHECK(br.getBits(1));  // marker_bit
 
   br.skipBits(1);  // interlaced
 
-  *width = static_cast<uint32_t>(video_object_layer_width);
-  *height = static_cast<uint32_t>(video_object_layer_height);
+  *width = static_cast<int32_t>(video_object_layer_width);
+  *height = static_cast<int32_t>(video_object_layer_height);
 
   return true;
 }
@@ -646,13 +650,13 @@ bool GetMPEGAudioFrameSize(uint32_t header,
     return false;
   }
 
-  unsigned version = (header >> 19) & 3;
+  uint32_t version = (header >> 19) & 3;
 
   if (version == 0x01) {
     return false;
   }
 
-  unsigned layer = (header >> 17) & 3;
+  uint32_t layer = (header >> 17) & 3;
 
   if (layer == 0x00) {
     return false;
@@ -660,14 +664,14 @@ bool GetMPEGAudioFrameSize(uint32_t header,
 
   // we can get protection value from (header >> 16) & 1
 
-  unsigned bitrate_index = (header >> 12) & 0x0f;
+  uint32_t bitrate_index = (header >> 12) & 0x0f;
 
   if (bitrate_index == 0 || bitrate_index == 0x0f) {
     // Disallow "free" bitrate.
     return false;
   }
 
-  unsigned sampling_rate_index = (header >> 10) & 3;
+  uint32_t sampling_rate_index = (header >> 10) & 3;
 
   if (sampling_rate_index == 3) {
     return false;
@@ -683,7 +687,7 @@ bool GetMPEGAudioFrameSize(uint32_t header,
     sampling_rate /= 4;
   }
 
-  unsigned padding = (header >> 9) & 1;
+  uint32_t padding = (header >> 9) & 1;
 
   if (layer == 3) {
     // layer I
@@ -754,7 +758,7 @@ bool GetMPEGAudioFrameSize(uint32_t header,
   }
 
   if (out_channels) {
-    int channel_mode = (header >> 6) & 3;
+    int channel_mode = static_cast<int>(header >> 6) & 3;
     *out_channels = (channel_mode == 3) ? 1 : 2;
   }
 
