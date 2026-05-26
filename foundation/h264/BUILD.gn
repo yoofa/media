@@ -1,0 +1,24 @@
+import("//base/build/ave.gni")
+
+ave_library("h264_common") {
+  sources = [
+    "h264_common.cc",
+    "h264_common.h",
+  ]
+  deps = [
+    "//base",
+    "//base:buffers",
+  ]
+}
+
+ave_library("h264_globals") {
+  sources = [ "h264_globals.h" ]
+  deps = [ "//base:checks" ]
+}
+
+group("h264") {
+  deps = [
+    ":h264_common",
+    ":h264_globals",
+  ]
+}
