@@ -1,0 +1,70 @@
+import("//base/build/ave.gni")
+
+ave_library("h265_common") {
+  sources = [
+    "h265_common.cc",
+    "h265_common.h",
+  ]
+  deps = [
+    "//base",
+    "//base:buffers",
+    "//media/foundation/h264:h264_common",
+  ]
+}
+
+ave_library("h265_vps_parser") {
+  sources = [
+    "h265_vps_parser.cc",
+    "h265_vps_parser.h",
+  ]
+  deps = [
+    ":h265_common",
+    "//base",
+    "//base:buffers",
+    "//base:logging",
+  ]
+}
+
+ave_library("h265_sps_parser") {
+  sources = [
+    "h265_sps_parser.cc",
+    "h265_sps_parser.h",
+  ]
+  deps = [
+    ":h265_common",
+    "//base",
+    "//base:buffers",
+    "//base:logging",
+  ]
+}
+
+ave_library("h265_pps_parser") {
+  sources = [
+    "h265_pps_parser.cc",
+    "h265_pps_parser.h",
+  ]
+  deps = [
+    ":h265_common",
+    ":h265_sps_parser",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+  ]
+}
+
+ave_library("h265_bitstream_parser") {
+  sources = [
+    "h265_bitstream_parser.cc",
+    "h265_bitstream_parser.h",
+  ]
+  deps = [
+    ":h265_common",
+    ":h265_pps_parser",
+    ":h265_sps_parser",
+    ":h265_vps_parser",
+    "//base",
+    "//base:buffers",
+    "//base:logging",
+  ]
+}
