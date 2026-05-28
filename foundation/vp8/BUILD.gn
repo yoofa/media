@@ -1,0 +1,6 @@
+import("//base/build/ave.gni")
+
+ave_library("vp8_globals") {
+  sources = [ "vp8_globals.h" ]
+  deps = [ "//media/foundation:common_constants" ]
+}

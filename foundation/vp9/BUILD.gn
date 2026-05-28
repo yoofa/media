@@ -1,0 +1,9 @@
+import("//base/build/ave.gni")
+
+ave_library("vp9_globals") {
+  sources = [ "vp9_globals.h" ]
+  deps = [
+    "//base:checks",
+    "//media/foundation:common_constants",
+  ]
+}

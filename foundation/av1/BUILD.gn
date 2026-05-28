@@ -1,0 +1,4 @@
+source_set("av1") {
+  sources = [ "av1_globals.h" ]
+  public_deps = [ "//base" ]
+}
