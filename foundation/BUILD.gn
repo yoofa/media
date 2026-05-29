@@ -11,6 +11,10 @@ ave_library("foundation") {
   ]
 }
 
+ave_library("common_constants") {
+  sources = [ "common_constants.h" ]
+}
+
 ave_library("message_object") {
   sources = [ "message_object.h" ]
   public_configs = [ "//build/config/compiler:rtti" ]
@@ -182,4 +186,49 @@ executable("media_foundation_unittests") {
     "//test:test_main",
     "//test:test_support",
   ]
+}
+
+ave_library("video_codec_constants") {
+  sources = [ "video_codec_constants.h" ]
+}
+
+ave_library("video_bitrate_allocation") {
+  sources = [
+    "video_bitrate_allocation.cc",
+    "video_bitrate_allocation.h",
+  ]
+  deps = [
+    ":video_codec_constants",
+    "//base:checks",
+  ]
+}
+
+ave_library("video_codec_type") {
+  sources = [ "video_codec_type.h" ]
+}
+
+ave_library("video_frame_type") {
+  sources = [ "video_frame_type.h" ]
+}
+
+ave_library("video_rotation") {
+  sources = [ "video_rotation.h" ]
+}
+
+ave_library("video_content_type") {
+  sources = [ "video_content_type.h" ]
+}
+
+ave_library("hdr_metadata") {
+  sources = [ "hdr_metadata.h" ]
+}
+
+ave_library("color_space") {
+  sources = [ "color_space.h" ]
+  deps = [ ":hdr_metadata" ]
+}
+
+ave_library("video_layers_allocation") {
+  sources = [ "video_layers_allocation.h" ]
+  deps = [ "//base/units:data_rate" ]
 }
