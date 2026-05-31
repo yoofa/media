@@ -1,0 +1,1598 @@
+import("//base/build/ave.gni")
+
+ave_library("leb128") {
+  sources = [
+    "src/util/leb128.cc",
+    "src/util/leb128.h",
+  ]
+}
+
+ave_library("priority") {
+  sources = [ "api/priority.h" ]
+  deps = [ "//base:checks" ]
+}
+
+ave_library("rtp_transceiver_direction") {
+  sources = [ "api/rtp_transceiver_direction.h" ]
+}
+
+ave_library("rtp_headers") {
+  sources = [
+    "api/rtp_headers.cc",
+    "api/rtp_headers.h",
+  ]
+  deps = [
+    "//base:checks",
+    "//base/units:timestamp",
+    "//media/foundation:video_content_type",
+    "//media/foundation:video_rotation",
+  ]
+}
+
+ave_library("rtp_packet_info") {
+  sources = [
+    "api/rtp_packet_info.cc",
+    "api/rtp_packet_info.h",
+    "api/rtp_packet_infos.h",
+  ]
+  deps = [
+    ":rtp_headers",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_packet_sender") {
+  sources = [ "api/rtp_packet_sender.h" ]
+}
+
+ave_library("rtp_parameters") {
+  sources = [
+    "api/rtp_parameters.cc",
+    "api/rtp_parameters.h",
+  ]
+  deps = [
+    ":priority",
+    ":rtp_transceiver_direction",
+    "//base:checks",
+    "//media/foundation:media_utils",
+  ]
+}
+
+ave_library("rtp_rtcp_defines") {
+  sources = [
+    "api/rtp_rtcp_defines.cc",
+    "api/rtp_rtcp_defines.h",
+  ]
+  deps = [
+    ":rtp_parameters",
+    "//base",
+    "//base/units:data_rate",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_packet_send_info") {
+  sources = [ "src/util/rtp_packet_send_info.cc" ]
+  deps = [
+    ":network_types",
+    ":rtp_header_extensions",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    "//base:checks",
+  ]
+}
+
+ave_library("rtp_packet_counter") {
+  sources = [ "src/util/rtp_packet_counter.cc" ]
+  deps = [
+    ":rtp_packet",
+    ":rtp_packet_received",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    "//base/units:time_delta",
+  ]
+}
+
+ave_library("rtcp_statistics") {
+  sources = [ "api/rtcp_statistics.h" ]
+}
+
+ave_library("rtp_cvo") {
+  sources = [ "api/rtp_cvo.h" ]
+  deps = [ "//base:checks" ]
+}
+
+ave_library("report_block_data") {
+  sources = [
+    "api/report_block_data.cc",
+    "api/report_block_data.h",
+  ]
+  deps = [
+    ":rtp_rtcp_format",
+    "//base:checks",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("active_decode_targets_helper") {
+  sources = [
+    "src/util/active_decode_targets_helper.cc",
+    "src/util/active_decode_targets_helper.h",
+  ]
+  deps = [
+    "//base",
+    "//base:checks",
+    "//base:logging",
+  ]
+}
+
+ave_library("rtp_header_extension_size") {
+  sources = [
+    "src/rtp/rtp_header_extension_size.cc",
+    "src/rtp/rtp_header_extension_size.h",
+  ]
+  deps = [
+    ":rtp_header_extension_map",
+    ":rtp_parameters",
+    ":rtp_rtcp_defines",
+    "//base",
+  ]
+}
+
+ave_library("capture_clock_offset_updater") {
+  sources = [
+    "src/util/capture_clock_offset_updater.cc",
+    "src/util/capture_clock_offset_updater.h",
+  ]
+  deps = [
+    ":rtp_rtcp_format",
+    "//base/units:time_delta",
+  ]
+}
+
+ave_library("rtp_sequence_number_map") {
+  sources = [
+    "src/rtp/rtp_sequence_number_map.cc",
+    "src/rtp/rtp_sequence_number_map.h",
+  ]
+  deps = [
+    "//base:checks",
+    "//base:logging",
+    "//base/numerics",
+  ]
+}
+
+ave_library("rtp_header_extension_map") {
+  sources = [
+    "api/rtp_header_extension_map.cc",
+    "api/rtp_header_extension_map.h",
+  ]
+  deps = [
+    ":rtp_rtcp_defines",
+    "//base",
+    "//base:checks",
+    "//base:logging",
+  ]
+}
+
+ave_library("rtp_header_extensions") {
+  sources = [
+    "src/rtp/rtp_header_extensions.cc",
+    "src/rtp/rtp_header_extensions.h",
+  ]
+  deps = [
+    ":rtp_headers",
+    ":rtp_rtcp_defines",
+    "//base",
+    "//base:checks",
+    "//base/units:timestamp",
+    "//media/foundation:color_space",
+  ]
+}
+
+ave_library("ntp_time_util") {
+  sources = [
+    "src/util/ntp_time_util.cc",
+    "src/util/ntp_time_util.h",
+  ]
+  deps = [
+    ":rtp_rtcp_format",
+    "//base/numerics",
+    "//base/numerics",
+    "//base/units:time_delta",
+  ]
+}
+
+ave_library("rtp_generic_frame_descriptor") {
+  sources = [
+    "src/rtp/rtp_generic_frame_descriptor.cc",
+    "src/rtp/rtp_generic_frame_descriptor.h",
+    "src/rtp/rtp_generic_frame_descriptor_extension.cc",
+    "src/rtp/rtp_generic_frame_descriptor_extension.h",
+  ]
+  deps = [
+    ":rtp_rtcp_defines",
+    "//base",
+    "//base:checks",
+  ]
+}
+
+ave_library("rtp_rtcp_format") {
+  sources = [
+    # Headers
+    "src/rtcp/rtcp_nack_stats.h",
+    "src/rtcp/rtcp_packet.h",
+    "src/rtcp/rtcp_packet/app.h",
+    "src/rtcp/rtcp_packet/bye.h",
+    "src/rtcp/rtcp_packet/common_header.h",
+    "src/rtcp/rtcp_packet/compound_packet.h",
+    "src/rtcp/rtcp_packet/congestion_control_feedback.h",
+    "src/rtcp/rtcp_packet/dlrr.h",
+    "src/rtcp/rtcp_packet/extended_reports.h",
+    "src/rtcp/rtcp_packet/fir.h",
+    "src/rtcp/rtcp_packet/loss_notification.h",
+    "src/rtcp/rtcp_packet/nack.h",
+    "src/rtcp/rtcp_packet/pli.h",
+    "src/rtcp/rtcp_packet/psfb.h",
+    "src/rtcp/rtcp_packet/rapid_resync_request.h",
+    "src/rtcp/rtcp_packet/receiver_report.h",
+    "src/rtcp/rtcp_packet/remb.h",
+    "src/rtcp/rtcp_packet/report_block.h",
+    "src/rtcp/rtcp_packet/rrtr.h",
+    "src/rtcp/rtcp_packet/rtpfb.h",
+    "src/rtcp/rtcp_packet/sdes.h",
+    "src/rtcp/rtcp_packet/sender_report.h",
+    "src/rtcp/rtcp_packet/target_bitrate.h",
+    "src/rtcp/rtcp_packet/tmmb_item.h",
+    "src/rtcp/rtcp_packet/tmmbn.h",
+    "src/rtcp/rtcp_packet/tmmbr.h",
+    "src/rtcp/rtcp_packet/transport_feedback.h",
+    "src/util/byte_io.h",
+    "src/util/ntp_time.h",
+    "src/util/packet_loss_stats.h",
+    "src/util/rtp_rtcp_config.h",
+    "src/util/rtp_util.h",
+    "src/util/tmmbr_help.h",
+
+    # Source files
+    "src/rtcp/rtcp_nack_stats.cc",
+    "src/rtcp/rtcp_packet.cc",
+    "src/rtcp/rtcp_packet/app.cc",
+    "src/rtcp/rtcp_packet/bye.cc",
+    "src/rtcp/rtcp_packet/common_header.cc",
+    "src/rtcp/rtcp_packet/compound_packet.cc",
+    "src/rtcp/rtcp_packet/congestion_control_feedback.cc",
+    "src/rtcp/rtcp_packet/dlrr.cc",
+    "src/rtcp/rtcp_packet/extended_reports.cc",
+    "src/rtcp/rtcp_packet/fir.cc",
+    "src/rtcp/rtcp_packet/loss_notification.cc",
+    "src/rtcp/rtcp_packet/nack.cc",
+    "src/rtcp/rtcp_packet/pli.cc",
+    "src/rtcp/rtcp_packet/psfb.cc",
+    "src/rtcp/rtcp_packet/rapid_resync_request.cc",
+    "src/rtcp/rtcp_packet/receiver_report.cc",
+    "src/rtcp/rtcp_packet/remb.cc",
+    "src/rtcp/rtcp_packet/report_block.cc",
+    "src/rtcp/rtcp_packet/rrtr.cc",
+    "src/rtcp/rtcp_packet/rtpfb.cc",
+    "src/rtcp/rtcp_packet/sdes.cc",
+    "src/rtcp/rtcp_packet/sender_report.cc",
+    "src/rtcp/rtcp_packet/target_bitrate.cc",
+    "src/rtcp/rtcp_packet/tmmb_item.cc",
+    "src/rtcp/rtcp_packet/tmmbn.cc",
+    "src/rtcp/rtcp_packet/tmmbr.cc",
+    "src/rtcp/rtcp_packet/transport_feedback.cc",
+    "src/util/packet_loss_stats.cc",
+    "src/util/rtp_util.cc",
+    "src/util/tmmbr_help.cc",
+  ]
+  deps = [
+    ":leb128",
+    ":rtcp_statistics",
+    ":rtp_rtcp_defines",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//base/net:ecn_marking",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_packet") {
+  sources = [
+    "src/rtp/rtp_packet.cc",
+    "src/rtp/rtp_packet.h",
+  ]
+  deps = [
+    ":rtp_header_extension_map",
+    ":rtp_header_extensions",
+    ":rtp_rtcp_defines",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//base/numerics",
+  ]
+}
+
+ave_library("absolute_capture_time_interpolator") {
+  sources = [
+    "src/util/absolute_capture_time_interpolator.cc",
+    "src/util/absolute_capture_time_interpolator.h",
+  ]
+  deps = [
+    ":rtp_headers",
+    ":rtp_rtcp_format",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base:macromagic",
+  ]
+}
+
+ave_library("absolute_capture_time_sender") {
+  sources = [
+    "src/util/absolute_capture_time_sender.cc",
+    "src/util/absolute_capture_time_sender.h",
+  ]
+  deps = [
+    ":absolute_capture_time_interpolator",
+    ":rtp_headers",
+    ":rtp_rtcp_format",
+    "//base",
+    "//base:clock",
+  ]
+}
+
+ave_library("rtp_source") {
+  sources = [ "src/util/rtp_source.h" ]
+  deps = [
+    ":rtp_headers",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("source_tracker") {
+  sources = [
+    "src/util/source_tracker.cc",
+    "src/util/source_tracker.h",
+  ]
+  deps = [
+    ":rtp_headers",
+    ":rtp_packet_info",
+    ":rtp_source",
+    "//base:checks",
+    "//base:clock",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("dtmf_queue") {
+  sources = [
+    "src/util/dtmf_queue.cc",
+    "src/util/dtmf_queue.h",
+  ]
+  deps = [
+    "//base:checks",
+    "//base:macromagic",
+  ]
+}
+
+ave_library("rtp_packet_received") {
+  sources = [
+    "src/rtp/rtp_packet_received.cc",
+    "src/rtp/rtp_packet_received.h",
+  ]
+  deps = [
+    ":rtp_header_extensions",
+    ":rtp_headers",
+    ":rtp_packet",
+    "//base",
+    "//base",
+    "//base/net:ecn_marking",
+    "//base/numerics",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_packet_sink_interface") {
+  sources = [ "api/rtp_packet_sink_interface.h" ]
+}
+
+ave_library("receive_statistics") {
+  sources = [ "api/receive_statistics.h" ]
+  deps = [
+    ":rtcp_statistics",
+    ":rtp_packet_sink_interface",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    "//base:clock",
+  ]
+}
+
+ave_library("receive_statistics_impl") {
+  sources = [
+    "src/util/receive_statistics_impl.cc",
+    "src/util/receive_statistics_impl.h",
+  ]
+  deps = [
+    ":receive_statistics",
+    ":rtp_packet_counter",
+    ":rtp_packet_received",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    "//base:bitrate_tracker",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base/numerics",
+    "//base/units:data_rate",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("recovered_packet_receiver") {
+  sources = [ "api/recovered_packet_receiver.h" ]
+  deps = [ ":rtp_packet_received" ]
+}
+
+ave_library("rtp_format") {
+  sources = [
+    "src/video/rtp_format.cc",
+    "src/video/rtp_format.h",
+  ]
+  deps = [
+    "//base",
+    "//base:checks",
+    "//media/foundation:video_codec_type",
+  ]
+}
+
+ave_library("rtp_packetizer_factory") {
+  sources = [ "src/video/rtp_packetizer_factory.cc" ]
+  deps = [
+    ":rtp_format",
+    ":rtp_format_h264",
+    ":rtp_format_video_generic",
+    ":rtp_format_vp8",
+    ":rtp_format_vp9",
+    ":rtp_packetizer_av1",
+    ":rtp_packetizer_h265",
+    ":rtp_video_header",
+    "//base",
+    "//media/foundation:video_codec_type",
+    "//media/foundation:video_frame_type",
+    "//media/foundation/h264:h264_globals",
+    "//media/foundation/vp8:vp8_globals",
+    "//media/foundation/vp9:vp9_globals",
+  ]
+}
+
+ave_library("rtp_packet_to_send") {
+  sources = [
+    "src/rtp/rtp_packet_to_send.cc",
+    "src/rtp/rtp_packet_to_send.h",
+  ]
+  deps = [
+    ":rtp_header_extensions",
+    ":rtp_packet",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    "//base",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_format_h264") {
+  sources = [
+    "src/video/rtp_format_h264.cc",
+    "src/video/rtp_format_h264.h",
+  ]
+  deps = [
+    ":rtp_format",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_format",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//media/foundation/h264:h264_common",
+    "//media/foundation/h264:h264_globals",
+  ]
+}
+
+ave_library("rtp_format_vp8") {
+  sources = [
+    "src/video/rtp_format_vp8.cc",
+    "src/video/rtp_format_vp8.h",
+  ]
+  public_configs = [ "//third_party/abseil-cpp:absl_include_config" ]
+  deps = [
+    ":rtp_format",
+    ":rtp_packet_to_send",
+    "//base",
+    "//base:checks",
+    "//base:logging",
+    "//media/foundation:common_constants",
+    "//media/foundation/vp8:vp8_globals",
+    "//third_party/abseil-cpp:absl",
+  ]
+}
+
+ave_library("rtp_format_video_generic") {
+  sources = [
+    "src/video/rtp_format_video_generic.cc",
+    "src/video/rtp_format_video_generic.h",
+  ]
+  deps = [
+    ":rtp_format",
+    ":rtp_packet_to_send",
+    ":video_rtp_depacketizer",
+    "//base",
+    "//base:checks",
+    "//base:logging",
+  ]
+}
+
+ave_library("rtp_video_header") {
+  sources = [
+    "src/rtp/rtp_video_header.cc",
+    "src/rtp/rtp_video_header.h",
+  ]
+  public_configs = [ "//third_party/abseil-cpp:absl_include_config" ]
+  deps = [
+    ":dependency_descriptor",
+    ":rtp_headers",
+    "//media/foundation:color_space",
+    "//media/foundation:video_codec_type",
+    "//media/foundation:video_content_type",
+    "//media/foundation:video_frame_type",
+    "//media/foundation:video_rotation",
+    "//media/foundation/h264:h264_globals",
+    "//media/foundation/vp8:vp8_globals",
+    "//media/foundation/vp9:vp9_globals",
+    "//third_party/abseil-cpp:absl",
+  ]
+}
+
+ave_library("encoded_image_buffer") {
+  sources = [
+    "api/encoded_image_buffer.cc",
+    "api/encoded_image_buffer.h",
+  ]
+  deps = [
+    "//base",
+    "//base:buffers",
+  ]
+}
+
+ave_library("video_rtp_depacketizer") {
+  sources = [
+    "src/video/video_rtp_depacketizer.cc",
+    "src/video/video_rtp_depacketizer.h",
+  ]
+  public_configs = [ "//third_party/abseil-cpp:absl_include_config" ]
+  deps = [
+    ":encoded_image_buffer",
+    ":rtp_video_header",
+    "//base",
+    "//base:buffers",
+    "//third_party/abseil-cpp:absl",
+  ]
+}
+
+ave_library("video_rtp_depacketizer_h264") {
+  sources = [
+    "src/video/video_rtp_depacketizer_h264.cc",
+    "src/video/video_rtp_depacketizer_h264.h",
+  ]
+  deps = [
+    ":rtp_format_h264",
+    ":rtp_rtcp_format",
+    ":video_rtp_depacketizer",
+    "//base:buffers",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//media/foundation/h264:h264_common",
+    "//media/foundation/h264:h264_globals",
+  ]
+}
+
+ave_library("video_rtp_depacketizer_vp8") {
+  sources = [
+    "src/video/video_rtp_depacketizer_vp8.cc",
+    "src/video/video_rtp_depacketizer_vp8.h",
+  ]
+  deps = [
+    ":rtp_video_header",
+    ":video_rtp_depacketizer",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//media/foundation/vp8:vp8_globals",
+  ]
+}
+
+ave_library("rtp_format_vp9") {
+  sources = [
+    "src/video/rtp_format_vp9.cc",
+    "src/video/rtp_format_vp9.h",
+  ]
+  deps = [
+    ":rtp_format",
+    ":rtp_packet_to_send",
+    ":video_rtp_depacketizer_vp9",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//media/foundation:common_constants",
+    "//media/foundation/vp9:vp9_globals",
+  ]
+}
+
+ave_library("video_rtp_depacketizer_vp9") {
+  sources = [
+    "src/video/video_rtp_depacketizer_vp9.cc",
+    "src/video/video_rtp_depacketizer_vp9.h",
+  ]
+  deps = [
+    ":rtp_packet_to_send",
+    ":rtp_video_header",
+    ":video_rtp_depacketizer",
+    "//base",
+    "//base:buffers",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//media/foundation:common_constants",
+    "//media/foundation/vp9:vp9_globals",
+  ]
+}
+
+ave_library("video_rtp_depacketizer_generic") {
+  sources = [
+    "src/video/video_rtp_depacketizer_generic.cc",
+    "src/video/video_rtp_depacketizer_generic.h",
+  ]
+  deps = [
+    ":video_rtp_depacketizer",
+    "//base:buffers",
+    "//base:logging",
+  ]
+}
+
+ave_library("video_rtp_depacketizer_raw") {
+  sources = [
+    "src/video/video_rtp_depacketizer_raw.cc",
+    "src/video/video_rtp_depacketizer_raw.h",
+  ]
+  deps = [
+    ":video_rtp_depacketizer",
+    "//base:buffers",
+  ]
+}
+
+ave_library("rtp_packetizer_h265") {
+  sources = [
+    "src/video/rtp_packet_h265_common.h",
+    "src/video/rtp_packetizer_h265.cc",
+    "src/video/rtp_packetizer_h265.h",
+  ]
+  deps = [
+    ":rtp_format",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_format",
+    "//base",
+    "//base:checks",
+    "//base:logging",
+    "//media/foundation/h264:h264_common",
+    "//media/foundation/h265:h265_common",
+  ]
+}
+
+ave_library("video_rtp_depacketizer_h265") {
+  sources = [
+    "src/video/video_rtp_depacketizer_h265.cc",
+    "src/video/video_rtp_depacketizer_h265.h",
+  ]
+  deps = [
+    ":rtp_packetizer_h265",
+    ":rtp_rtcp_format",
+    ":video_rtp_depacketizer",
+    "//base",
+    "//base:buffers",
+    "//base:logging",
+    "//media/foundation:common_constants",
+    "//media/foundation/h265:h265_bitstream_parser",
+    "//media/foundation/h265:h265_common",
+    "//media/foundation/h265:h265_sps_parser",
+  ]
+}
+
+ave_library("dependency_descriptor") {
+  sources = [
+    "src/util/dependency_descriptor.cc",
+    "src/util/dependency_descriptor.h",
+  ]
+  public_configs = [ "//third_party/abseil-cpp:absl_include_config" ]
+  deps = [
+    "//base:checks",
+    "//third_party/abseil-cpp:absl",
+  ]
+}
+
+ave_library("rtp_dependency_descriptor_reader") {
+  sources = [
+    "src/rtp/rtp_dependency_descriptor_reader.cc",
+    "src/rtp/rtp_dependency_descriptor_reader.h",
+  ]
+  deps = [
+    ":dependency_descriptor",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+  ]
+}
+
+ave_library("rtp_dependency_descriptor_writer") {
+  sources = [
+    "src/rtp/rtp_dependency_descriptor_writer.cc",
+    "src/rtp/rtp_dependency_descriptor_writer.h",
+  ]
+  deps = [
+    ":dependency_descriptor",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base/numerics",
+  ]
+}
+
+ave_library("rtp_dependency_descriptor_extension") {
+  sources = [
+    "src/rtp/rtp_dependency_descriptor_extension.cc",
+    "src/rtp/rtp_dependency_descriptor_extension.h",
+  ]
+  deps = [
+    ":dependency_descriptor",
+    ":rtp_dependency_descriptor_reader",
+    ":rtp_dependency_descriptor_writer",
+    ":rtp_rtcp_defines",
+    "//base",
+    "//base/numerics",
+  ]
+}
+
+ave_library("packet_sequencer") {
+  sources = [
+    "src/rtp/packet_sequencer.cc",
+    "src/rtp/packet_sequencer.h",
+  ]
+  deps = [
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_to_ntp_estimator") {
+  sources = [
+    "src/util/rtp_to_ntp_estimator.cc",
+    "src/util/rtp_to_ntp_estimator.h",
+  ]
+  deps = [
+    ":rtp_rtcp_format",
+    "//base:checks",
+    "//base:logging",
+    "//base/numerics",
+  ]
+}
+
+ave_library("remote_ntp_time_estimator") {
+  sources = [
+    "api/remote_ntp_time_estimator.h",
+    "src/util/remote_ntp_time_estimator.cc",
+  ]
+  deps = [
+    ":ntp_time_util",
+    ":rtp_rtcp_format",
+    ":rtp_to_ntp_estimator",
+    "//base:clock",
+    "//base:logging",
+    "//base/numerics",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("video_layers_allocation") {
+  sources = [ "//media/foundation/video_layers_allocation.h" ]
+  deps = [ "//base/units:data_rate" ]
+}
+
+ave_library("rtp_video_layers_allocation_extension") {
+  sources = [
+    "src/rtp/rtp_video_layers_allocation_extension.cc",
+    "src/rtp/rtp_video_layers_allocation_extension.h",
+  ]
+  deps = [
+    ":leb128",
+    ":rtp_parameters",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    ":video_layers_allocation",
+    "//base",
+    "//base:checks",
+    "//base/units:data_rate",
+  ]
+}
+
+ave_library("rtp_packet_history") {
+  sources = [
+    "src/rtp/rtp_packet_history.cc",
+    "src/rtp/rtp_packet_history.h",
+  ]
+  deps = [
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    "//base",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base/numerics",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_packetizer_av1") {
+  sources = [
+    "src/video/rtp_packetizer_av1.cc",
+    "src/video/rtp_packetizer_av1.h",
+  ]
+  public_configs = [ "//third_party/abseil-cpp:absl_include_config" ]
+  deps = [
+    ":leb128",
+    ":rtp_format",
+    ":rtp_packet_to_send",
+    ":rtp_video_header",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//third_party/abseil-cpp:absl",
+  ]
+}
+
+ave_library("video_rtp_depacketizer_av1") {
+  sources = [
+    "src/video/video_rtp_depacketizer_av1.cc",
+    "src/video/video_rtp_depacketizer_av1.h",
+  ]
+  deps = [
+    ":encoded_image_buffer",
+    ":leb128",
+    ":rtp_video_header",
+    ":video_rtp_depacketizer",
+    "//base",
+    "//base:buffers",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//base/numerics",
+  ]
+}
+
+ave_library("rtp_descriptor_authentication") {
+  sources = [
+    "src/rtp/rtp_descriptor_authentication.cc",
+    "src/rtp/rtp_descriptor_authentication.h",
+  ]
+  deps = [
+    ":rtp_generic_frame_descriptor",
+    ":rtp_video_header",
+  ]
+}
+
+ave_library("create_video_rtp_depacketizer") {
+  sources = [
+    "src/video/create_video_rtp_depacketizer.cc",
+    "src/video/create_video_rtp_depacketizer.h",
+  ]
+  deps = [
+    ":video_rtp_depacketizer",
+    ":video_rtp_depacketizer_av1",
+    ":video_rtp_depacketizer_generic",
+    ":video_rtp_depacketizer_h264",
+    ":video_rtp_depacketizer_h265",
+    ":video_rtp_depacketizer_vp8",
+    ":video_rtp_depacketizer_vp9",
+    "//base:checks",
+  ]
+}
+
+ave_library("rtp_rtcp") {
+  # This is the main consolidated rtp_rtcp library that includes all sub-components
+  # Using a null source since all code is in the dependencies
+  sources = [ "//base/null.cc" ]
+
+  deps = [
+    ":absolute_capture_time_interpolator",
+    ":absolute_capture_time_sender",
+    ":active_decode_targets_helper",
+    ":capture_clock_offset_updater",
+    ":corruption_detection_extension",
+    ":create_video_rtp_depacketizer",
+    ":dependency_descriptor",
+    ":dtmf_queue",
+    ":encoded_image_buffer",
+    ":fec_private_tables",
+    ":flexfec_03_header_reader_writer",
+    ":flexfec_header_reader_writer",
+    ":flexfec_receiver",
+    ":flexfec_sender",
+    ":forward_error_correction",
+    ":forward_error_correction_internal",
+    ":frame_object",
+    ":leb128",
+    ":module_fec_types",
+    ":network_types",
+    ":ntp_time_util",
+    ":packet_sequencer",
+    ":priority",
+    ":receive_statistics",
+    ":receive_statistics_impl",
+    ":recovered_packet_receiver",
+    ":remote_ntp_time_estimator",
+    ":report_block_data",
+    ":rtcp_receiver",
+    ":rtcp_sender",
+    ":rtcp_statistics",
+    ":rtcp_transceiver",
+    ":rtcp_transceiver_config",
+    ":rtcp_transceiver_impl",
+    ":rtp_cvo",
+    ":rtp_dependency_descriptor_extension",
+    ":rtp_dependency_descriptor_reader",
+    ":rtp_dependency_descriptor_writer",
+    ":rtp_descriptor_authentication",
+    ":rtp_format",
+    ":rtp_format_h264",
+    ":rtp_format_video_generic",
+    ":rtp_format_vp8",
+    ":rtp_format_vp9",
+    ":rtp_generic_frame_descriptor",
+    ":rtp_header_extension_map",
+    ":rtp_header_extension_size",
+    ":rtp_header_extensions",
+    ":rtp_headers",
+    ":rtp_packet",
+    ":rtp_packet_counter",
+    ":rtp_packet_history",
+    ":rtp_packet_info",
+    ":rtp_packet_received",
+    ":rtp_packet_sender",
+    ":rtp_packet_sink_interface",
+    ":rtp_packet_to_send",
+    ":rtp_packetizer_av1",
+    ":rtp_packetizer_factory",
+    ":rtp_packetizer_h265",
+    ":rtp_parameters",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    ":rtp_rtcp_impl2",
+    ":rtp_sender",
+    ":rtp_sender_audio",
+    ":rtp_sender_egress",
+    ":rtp_sender_video",
+    ":rtp_sequence_number_map",
+    ":rtp_source",
+    ":rtp_to_ntp_estimator",
+    ":rtp_transceiver_direction",
+    ":rtp_video_header",
+    ":rtp_video_layers_allocation_extension",
+    ":source_tracker",
+    ":transport",
+    ":ulpfec_generator",
+    ":ulpfec_header_reader_writer",
+    ":ulpfec_receiver",
+    ":video_fec_generator",
+    ":video_layers_allocation",
+    ":video_rtp_depacketizer",
+    ":video_rtp_depacketizer_av1",
+    ":video_rtp_depacketizer_generic",
+    ":video_rtp_depacketizer_h264",
+    ":video_rtp_depacketizer_h265",
+    ":video_rtp_depacketizer_raw",
+    ":video_rtp_depacketizer_vp8",
+    ":video_rtp_depacketizer_vp9",
+  ]
+}
+
+ave_library("module_fec_types") {
+  sources = [ "//media/modules/include/module_fec_types.h" ]
+}
+
+ave_library("network_types") {
+  sources = [ "src/transport/network_types.h" ]
+  deps = [
+    "//base/net:ecn_marking",
+    "//base/units:data_rate",
+    "//base/units:data_size",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("transport") {
+  sources = [ "src/transport/transport.h" ]
+  deps = [ "//base" ]
+}
+
+ave_library("video_fec_generator") {
+  sources = [ "src/fec/video_fec_generator.h" ]
+  deps = [
+    ":module_fec_types",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    "//base/units:data_rate",
+  ]
+}
+
+ave_library("remote_estimate") {
+  sources = [
+    "src/rtcp/rtcp_packet/remote_estimate.cc",
+    "src/rtcp/rtcp_packet/remote_estimate.h",
+  ]
+  deps = [
+    ":network_types",
+    ":rtp_rtcp_format",
+    "//base:buffers",
+    "//base:logging",
+  ]
+}
+
+ave_library("rtp_rtcp_interface") {
+  sources = [ "api/rtp_rtcp_interface.h" ]
+  deps = [
+    ":module_fec_types",
+    ":receive_statistics",
+    ":report_block_data",
+    ":rtcp_statistics",
+    ":rtp_headers",
+    ":rtp_packet_sender",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    ":rtp_sequence_number_map",
+    ":video_fec_generator",
+    "//base",
+    "//base",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+    "//media/foundation:video_bitrate_allocation",
+  ]
+}
+
+ave_library("rtcp_receiver") {
+  sources = [
+    "src/rtcp/rtcp_receiver.cc",
+    "src/rtcp/rtcp_receiver.h",
+  ]
+  deps = [
+    ":ntp_time_util",
+    ":remote_estimate",
+    ":report_block_data",
+    ":rtcp_statistics",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    ":rtp_rtcp_interface",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base:thread",
+    "//base/units:data_rate",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+    "//media/foundation:video_bitrate_allocation",
+    "//media/foundation:video_codec_constants",
+  ]
+}
+
+ave_library("rtcp_sender") {
+  sources = [
+    "src/rtcp/rtcp_sender.cc",
+    "src/rtcp/rtcp_sender.h",
+  ]
+  deps = [
+    ":ntp_time_util",
+    ":receive_statistics",
+    ":rtcp_receiver",
+    ":rtcp_statistics",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    ":rtp_rtcp_interface",
+    ":transport",
+    "//base",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base/numerics",
+    "//base/units:data_rate",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+    "//media/foundation:video_bitrate_allocation",
+    "//media/foundation:video_codec_constants",
+  ]
+}
+
+ave_library("rtcp_transceiver_config") {
+  sources = [
+    "src/rtcp/rtcp_transceiver_config.cc",
+    "src/rtcp/rtcp_transceiver_config.h",
+  ]
+  deps = [
+    ":report_block_data",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    "//base",
+    "//base:clock",
+    "//base:logging",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+    "//media/foundation:video_bitrate_allocation",
+  ]
+}
+
+ave_library("rtp_sender") {
+  sources = [
+    "src/rtp/rtp_sender.cc",
+    "src/rtp/rtp_sender.h",
+  ]
+  deps = [
+    ":rtp_generic_frame_descriptor",
+    ":rtp_header_extension_map",
+    ":rtp_header_extension_size",
+    ":rtp_header_extensions",
+    ":rtp_headers",
+    ":rtp_packet_history",
+    ":rtp_packet_sender",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    ":rtp_rtcp_interface",
+    ":video_fec_generator",
+    "//base",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base:macromagic",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_sender_audio") {
+  sources = [
+    "src/rtp/rtp_sender_audio.cc",
+    "src/rtp/rtp_sender_audio.h",
+  ]
+  deps = [
+    ":absolute_capture_time_sender",
+    ":dtmf_queue",
+    ":ntp_time_util",
+    ":rtp_header_extensions",
+    ":rtp_packet",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    ":rtp_sender",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("fec_private_tables") {
+  sources = [
+    "src/fec/fec_private_tables_bursty.cc",
+    "src/fec/fec_private_tables_bursty.h",
+    "src/fec/fec_private_tables_random.cc",
+    "src/fec/fec_private_tables_random.h",
+  ]
+}
+
+ave_library("forward_error_correction_internal") {
+  sources = [
+    "src/fec/forward_error_correction_internal.cc",
+    "src/fec/forward_error_correction_internal.h",
+  ]
+  deps = [
+    ":fec_private_tables",
+    ":module_fec_types",
+    "//base",
+    "//base:checks",
+  ]
+}
+
+ave_library("forward_error_correction") {
+  sources = [
+    "src/fec/forward_error_correction.cc",
+    "src/fec/forward_error_correction.h",
+    "src/fec/ulpfec_header_reader_writer.cc",
+    "src/fec/ulpfec_header_reader_writer.h",
+  ]
+  deps = [
+    ":forward_error_correction_internal",
+    ":module_fec_types",
+    ":rtp_header_extension_map",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    "//base",
+    "//base",
+    "//base:buffers",
+    "//base:checks",
+    "//base:logging",
+    "//base/numerics",
+  ]
+}
+
+ave_library("ulpfec_header_reader_writer") {
+  sources = [
+    "src/fec/ulpfec_header_reader_writer.cc",
+    "src/fec/ulpfec_header_reader_writer.h",
+  ]
+  deps = [ ":forward_error_correction" ]
+}
+
+ave_library("ulpfec_generator") {
+  sources = [
+    "src/fec/ulpfec_generator.cc",
+    "src/fec/ulpfec_generator.h",
+  ]
+  deps = [
+    ":forward_error_correction",
+    ":forward_error_correction_internal",
+    ":module_fec_types",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    ":video_fec_generator",
+    "//base:bitrate_tracker",
+    "//base:checks",
+    "//base:clock",
+    "//base/units:data_rate",
+    "//base/units:time_delta",
+  ]
+}
+
+ave_library("ulpfec_receiver") {
+  sources = [
+    "src/fec/ulpfec_receiver.cc",
+    "src/fec/ulpfec_receiver.h",
+  ]
+  deps = [
+    ":forward_error_correction",
+    ":recovered_packet_receiver",
+    ":rtp_header_extension_map",
+    ":rtp_packet_received",
+    ":rtp_rtcp_defines",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_sender_video") {
+  sources = [
+    "src/rtp/rtp_sender_video.cc",
+    "src/rtp/rtp_sender_video.h",
+  ]
+  public_configs = [ "//third_party/abseil-cpp:absl_include_config" ]
+  deps = [
+    ":absolute_capture_time_sender",
+    ":active_decode_targets_helper",
+    ":dependency_descriptor",
+    ":rtp_dependency_descriptor_extension",
+    ":rtp_descriptor_authentication",
+    ":rtp_format",
+    ":rtp_generic_frame_descriptor",
+    ":rtp_header_extensions",
+    ":rtp_packet_to_send",
+    ":rtp_packetizer_factory",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    ":rtp_sender",
+    ":rtp_video_header",
+    ":rtp_video_layers_allocation_extension",
+    ":video_fec_generator",
+    "//base",
+    "//base",
+    "//base:bitrate_tracker",
+    "//base:checks",
+    "//base:clock",
+    "//base:frequency_tracker",
+    "//base:logging",
+    "//base/units:data_rate",
+    "//base/units:frequency",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+    "//media/foundation:video_codec_type",
+    "//media/foundation:video_content_type",
+    "//media/foundation:video_frame_type",
+    "//media/foundation:video_layers_allocation",
+    "//media/foundation:video_rotation",
+    "//media/foundation/h264:h264_globals",
+    "//media/foundation/vp8:vp8_globals",
+    "//media/foundation/vp9:vp9_globals",
+    "//third_party/abseil-cpp:absl",
+  ]
+}
+
+ave_library("flexfec_header_reader_writer") {
+  sources = [
+    "src/fec/flexfec_header_reader_writer.cc",
+    "src/fec/flexfec_header_reader_writer.h",
+  ]
+  deps = [
+    ":forward_error_correction",
+    ":forward_error_correction_internal",
+    "//base",
+    "//base:logging",
+  ]
+}
+
+ave_library("flexfec_03_header_reader_writer") {
+  sources = [
+    "src/fec/flexfec_03_header_reader_writer.cc",
+    "src/fec/flexfec_03_header_reader_writer.h",
+  ]
+  deps = [
+    ":forward_error_correction",
+    ":forward_error_correction_internal",
+    "//base",
+    "//base:logging",
+  ]
+}
+
+ave_library("flexfec_receiver") {
+  sources = [
+    "api/flexfec_receiver.h",
+    "src/fec/flexfec_receiver.cc",
+  ]
+  deps = [
+    ":forward_error_correction",
+    ":recovered_packet_receiver",
+    ":rtp_packet_received",
+    ":rtp_rtcp_defines",
+    ":ulpfec_receiver",
+    "//base",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("flexfec_sender") {
+  sources = [
+    "api/flexfec_sender.h",
+    "src/fec/flexfec_sender.cc",
+  ]
+  deps = [
+    ":forward_error_correction",
+    ":rtp_header_extension_map",
+    ":rtp_header_extension_size",
+    ":rtp_header_extensions",
+    ":rtp_packet_to_send",
+    ":rtp_parameters",
+    ":rtp_rtcp_defines",
+    ":ulpfec_generator",
+    ":video_fec_generator",
+    "//base",
+    "//base",
+    "//base:bitrate_tracker",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base/units:data_rate",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_sender_egress") {
+  sources = [
+    "src/rtp/rtp_sender_egress.cc",
+    "src/rtp/rtp_sender_egress.h",
+  ]
+  deps = [
+    ":module_fec_types",
+    ":network_types",
+    ":packet_sequencer",
+    ":rtp_header_extensions",
+    ":rtp_packet_history",
+    ":rtp_packet_sender",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_interface",
+    ":rtp_sequence_number_map",
+    ":transport",
+    ":video_fec_generator",
+    "//base",
+    "//base:bitrate_tracker",
+    "//base:buffers",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base:task_util",
+    "//base/units:data_rate",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("corruption_detection_extension") {
+  sources = [
+    "src/util/corruption_detection_extension.cc",
+    "src/util/corruption_detection_extension.h",
+    "src/util/corruption_detection_message.h",
+  ]
+  deps = [ ":rtp_rtcp_defines" ]
+}
+
+ave_library("rtp_rtcp_impl2") {
+  sources = [
+    "src/util/rtp_rtcp_impl2.cc",
+    "src/util/rtp_rtcp_impl2.h",
+  ]
+  deps = [
+    ":module_fec_types",
+    ":ntp_time_util",
+    ":packet_sequencer",
+    ":report_block_data",
+    ":rtcp_receiver",
+    ":rtcp_sender",
+    ":rtp_packet_history",
+    ":rtp_packet_to_send",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    ":rtp_rtcp_interface",
+    ":rtp_sender",
+    ":rtp_sender_egress",
+    ":rtp_sequence_number_map",
+    "//base",
+    "//base:checks",
+    "//base:clock",
+    "//base:logging",
+    "//base:task_util",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+    "//media/foundation:video_bitrate_allocation",
+  ]
+}
+
+ave_library("rtcp_transceiver_impl") {
+  sources = [
+    "src/rtcp/rtcp_transceiver_impl.cc",
+    "src/rtcp/rtcp_transceiver_impl.h",
+  ]
+  deps = [
+    ":ntp_time_util",
+    ":receive_statistics",
+    ":report_block_data",
+    ":rtcp_transceiver_config",
+    ":rtp_rtcp_defines",
+    ":rtp_rtcp_format",
+    "//base",
+    "//base:checks",
+    "//base:logging",
+    "//base:task_util",
+    "//base/numerics",
+    "//base/units:time_delta",
+    "//base/units:timestamp",
+    "//media/foundation:video_bitrate_allocation",
+    "//media/foundation:video_codec_constants",
+  ]
+}
+
+ave_library("rtcp_transceiver") {
+  sources = [
+    "src/rtcp/rtcp_transceiver.cc",
+    "src/rtcp/rtcp_transceiver.h",
+  ]
+  deps = [
+    ":rtcp_transceiver_config",
+    ":rtcp_transceiver_impl",
+    ":rtp_rtcp_defines",
+    "//base:buffers",
+    "//base:checks",
+    "//base:task_util",
+  ]
+}
+
+ave_library("frame_object") {
+  sources = [
+    "src/util/frame_object.cc",
+    "src/util/frame_object.h",
+  ]
+  deps = [
+    ":encoded_image_buffer",
+    ":rtp_headers",
+    ":rtp_packet_info",
+    ":rtp_video_header",
+    "//base",
+    "//media/foundation:color_space",
+    "//media/foundation:video_codec_type",
+    "//media/foundation:video_content_type",
+    "//media/foundation:video_frame_type",
+    "//media/foundation:video_rotation",
+  ]
+}
+
+ave_executable("rtp_rtcp_socket_demo") {
+  testonly = true
+  sources = [ "demo/rtp_rtcp_socket_demo.cc" ]
+  deps = [
+    ":rtp_rtcp",
+    "//base",
+    "//base",
+    "//base:clock",
+    "//base:task_util",
+    "//base/net:async_socket",
+  ]
+}
+
+ave_executable("rtp_rtcp_socket_mux_demo") {
+  testonly = true
+  sources = [ "demo/rtp_rtcp_socket_mux_demo.cc" ]
+  deps = [
+    ":rtp_rtcp",
+    "//base",
+    "//base",
+    "//base:clock",
+    "//base:task_util",
+    "//base/net:async_socket",
+  ]
+}
+
+ave_executable("rtsp_server_demo") {
+  testonly = true
+  sources = [ "demo/rtsp_server_demo.cc" ]
+  deps = [
+    ":rtp_rtcp_defines",
+    "//base/net:async_socket",
+  ]
+}
+
+ave_executable("rtsp_client_demo") {
+  testonly = true
+  sources = [ "demo/rtsp_client_demo.cc" ]
+  deps = [
+    ":rtp_rtcp_defines",
+    "//base/net:async_socket",
+  ]
+}

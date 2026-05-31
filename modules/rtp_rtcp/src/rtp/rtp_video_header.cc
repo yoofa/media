@@ -1,0 +1,28 @@
+/*
+ *  Copyright (c) 2018 The WebRTC project authors. All Rights Reserved.
+ *
+ *  Use of this source code is governed by a BSD-style license
+ *  that can be found in the LICENSE file in the root of the source
+ *  tree. An additional intellectual property rights grant can be found
+ *  in the file PATENTS.  All contributing project authors may
+ *  be found in the AUTHORS file in the root of the source tree.
+ */
+
+#include "media/modules/rtp_rtcp/src/rtp/rtp_video_header.h"
+
+namespace ave {
+namespace media {
+namespace rtp_rtcp {
+
+RTPVideoHeader::GenericDescriptorInfo::GenericDescriptorInfo() = default;
+RTPVideoHeader::GenericDescriptorInfo::GenericDescriptorInfo(
+    const GenericDescriptorInfo& other) = default;
+RTPVideoHeader::GenericDescriptorInfo::~GenericDescriptorInfo() = default;
+
+RTPVideoHeader::RTPVideoHeader() : video_timing() {}
+RTPVideoHeader::RTPVideoHeader(const RTPVideoHeader& other) = default;
+RTPVideoHeader::~RTPVideoHeader() = default;
+
+}  // namespace rtp_rtcp
+}  // namespace media
+}  // namespace ave

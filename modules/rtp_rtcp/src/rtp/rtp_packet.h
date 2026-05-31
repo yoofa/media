@@ -1,0 +1,269 @@
+/*
+ *  Copyright (c) 2016 The WebRTC project authors. All Rights Reserved.
+ *
+ *  Use of this source code is governed by a BSD-style license
+ *  that can be found in the LICENSE file in the root of the source
+ *  tree. An additional intellectual property rights grant can be found
+ *  in the file PATENTS.  All contributing project authors may
+ *  be found in the AUTHORS file in the root of the source tree.
+ */
+#ifndef AVE_MODULES_RTP_RTCP_SOURCE_RTP_PACKET_H_
+#define AVE_MODULES_RTP_RTCP_SOURCE_RTP_PACKET_H_
+
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <span>
+#include "base/copy_on_write_buffer.h"
+#include "media/modules/rtp_rtcp/api/rtp_header_extension_map.h"
+#include "media/modules/rtp_rtcp/api/rtp_rtcp_defines.h"
+
+namespace ave {
+namespace media {
+namespace rtp_rtcp {
+
+class RtpPacket {
+ public:
+  using ExtensionType = RTPExtensionType;
+  using ExtensionManager = RtpHeaderExtensionMap;
+
+  // `extensions` required for SetExtension/ReserveExtension functions during
+  // packet creating and used if available in Parse function.
+  // Adding and getting extensions will fail until `extensions` is
+  // provided via constructor or IdentifyExtensions function.
+  RtpPacket();
+  explicit RtpPacket(const ExtensionManager* extensions);
+  RtpPacket(const ExtensionManager* extensions, size_t capacity);
+
+  RtpPacket(const RtpPacket&);
+  RtpPacket(RtpPacket&&);
+  RtpPacket& operator=(const RtpPacket&);
+  RtpPacket& operator=(RtpPacket&&);
+
+  ~RtpPacket();
+
+  // Parse and copy given buffer into Packet.
+  bool Parse(const uint8_t* buffer, size_t size);
+  bool Parse(std::span<const uint8_t> packet);
+
+  // Parse and move given buffer into Packet.
+  bool Parse(base::CopyOnWriteBuffer packet);
+
+  // Maps extensions id to their types.
+  void IdentifyExtensions(ExtensionManager extensions);
+
+  // Returns the extension map used for identifying extensions in this packet.
+  const ExtensionManager& extension_manager() const { return extensions_; }
+
+  // Header.
+  bool Marker() const { return marker_; }
+  uint8_t PayloadType() const { return payload_type_; }
+  uint16_t SequenceNumber() const { return sequence_number_; }
+  uint32_t Timestamp() const { return timestamp_; }
+  uint32_t Ssrc() const { return ssrc_; }
+  std::vector<uint32_t> Csrcs() const;
+
+  size_t headers_size() const { return payload_offset_; }
+
+  // Payload.
+  size_t payload_size() const { return payload_size_; }
+  bool has_padding() const { return buffer_[0] & 0x20; }
+  size_t padding_size() const { return padding_size_; }
+  std::span<const uint8_t> payload() const {
+    return std::span(data() + payload_offset_, payload_size_);
+  }
+  base::CopyOnWriteBuffer PayloadBuffer() const {
+    return buffer_.Slice(payload_offset_, payload_size_);
+  }
+
+  // Buffer.
+  base::CopyOnWriteBuffer Buffer() const { return buffer_; }
+  size_t capacity() const { return buffer_.capacity(); }
+  size_t size() const {
+    return payload_offset_ + payload_size_ + padding_size_;
+  }
+  const uint8_t* data() const { return buffer_.cdata(); }
+  size_t FreeCapacity() const { return capacity() - size(); }
+  size_t MaxPayloadSize() const { return capacity() - headers_size(); }
+
+  // Reset fields and buffer.
+  void Clear();
+
+  // Header setters.
+  void CopyHeaderFrom(const RtpPacket& packet);
+  void SetMarker(bool marker_bit);
+  void SetPayloadType(uint8_t payload_type);
+  void SetSequenceNumber(uint16_t seq_no);
+  void SetTimestamp(uint32_t timestamp);
+  void SetSsrc(uint32_t ssrc);
+
+  // Fills with zeroes mutable extensions.
+  void ZeroMutableExtensions();
+
+  // Removes extension of given `type`.
+  bool RemoveExtension(ExtensionType type);
+
+  // Updates extension data at a specific offset. Used by subclasses to
+  // modify extension data after the packet is created.
+  bool UpdateExtensionData(ExtensionType type,
+                           size_t offset,
+                           std::span<const uint8_t> data);
+
+  // Writes csrc list.
+  void SetCsrcs(std::span<const uint32_t> csrcs);
+
+  // Header extensions.
+  template <typename Extension>
+  bool HasExtension() const;
+  bool HasExtension(ExtensionType type) const;
+
+  template <typename Extension>
+  bool IsRegistered() const;
+
+  template <typename Extension, typename FirstValue, typename... Values>
+  bool GetExtension(FirstValue&&, Values&&...) const;
+
+  template <typename Extension>
+  std::optional<typename Extension::value_type> GetExtension() const;
+
+  template <typename Extension>
+  std::span<const uint8_t> GetRawExtension() const;
+
+  template <typename Extension, typename... Values>
+  bool SetExtension(const Values&...);
+
+  template <typename Extension>
+  bool SetRawExtension(std::span<const uint8_t> data);
+
+  template <typename Extension>
+  bool ReserveExtension();
+
+  // Find or allocate an extension `type`.
+  std::span<uint8_t> AllocateExtension(ExtensionType type, size_t length);
+
+  // Find an extension `type`.
+  std::span<const uint8_t> FindExtension(ExtensionType type) const;
+
+  // Returns pointer to the payload of size at least `size_bytes`.
+  uint8_t* SetPayloadSize(size_t size_bytes);
+
+  // Same as SetPayloadSize but doesn't guarantee to keep current payload.
+  uint8_t* AllocatePayload(size_t size_bytes);
+
+  bool SetPadding(size_t padding_size);
+
+  // Returns debug string of RTP packet.
+  std::string ToString() const;
+
+ private:
+  struct ExtensionInfo {
+    explicit ExtensionInfo(uint8_t id) : ExtensionInfo(id, 0, 0) {}
+    ExtensionInfo(uint8_t id, uint8_t length, uint16_t offset)
+        : id(id), length(length), offset(offset) {}
+    uint8_t id;
+    uint8_t length;
+    uint16_t offset;
+  };
+
+  bool ParseBuffer(const uint8_t* buffer, size_t size);
+
+  const ExtensionInfo* FindExtensionInfo(int id) const;
+
+  ExtensionInfo& FindOrCreateExtensionInfo(int id);
+
+  std::span<uint8_t> AllocateRawExtension(int id, size_t length);
+
+  void PromoteToTwoByteHeaderExtension();
+
+  uint16_t SetExtensionLengthMaybeAddZeroPadding(size_t extensions_offset);
+
+  uint8_t* WriteAt(size_t offset) { return buffer_.MutableData() + offset; }
+  void WriteAt(size_t offset, uint8_t byte) {
+    buffer_.MutableData()[offset] = byte;
+  }
+  const uint8_t* ReadAt(size_t offset) const { return buffer_.data() + offset; }
+
+  // Header.
+  bool marker_;
+  uint8_t payload_type_;
+  uint8_t padding_size_;
+  uint16_t sequence_number_;
+  uint32_t timestamp_;
+  uint32_t ssrc_;
+  size_t payload_offset_;
+  size_t payload_size_;
+
+  ExtensionManager extensions_;
+  std::vector<ExtensionInfo> extension_entries_;
+  size_t extensions_size_ = 0;
+  base::CopyOnWriteBuffer buffer_;
+};
+
+template <typename Extension>
+bool RtpPacket::HasExtension() const {
+  return HasExtension(Extension::kId);
+}
+
+template <typename Extension>
+bool RtpPacket::IsRegistered() const {
+  return extensions_.IsRegistered(Extension::kId);
+}
+
+template <typename Extension, typename FirstValue, typename... Values>
+bool RtpPacket::GetExtension(FirstValue&& first, Values&&... values) const {
+  auto raw = FindExtension(Extension::kId);
+  if (raw.empty())
+    return false;
+  return Extension::Parse(raw, std::forward<FirstValue>(first),
+                          std::forward<Values>(values)...);
+}
+
+template <typename Extension>
+std::optional<typename Extension::value_type> RtpPacket::GetExtension() const {
+  std::optional<typename Extension::value_type> result;
+  auto raw = FindExtension(Extension::kId);
+  if (raw.empty() || !Extension::Parse(raw, &result.emplace()))
+    result = std::nullopt;
+  return result;
+}
+
+template <typename Extension>
+std::span<const uint8_t> RtpPacket::GetRawExtension() const {
+  return FindExtension(Extension::kId);
+}
+
+template <typename Extension, typename... Values>
+bool RtpPacket::SetExtension(const Values&... values) {
+  const size_t value_size = Extension::ValueSize(values...);
+  auto buffer = AllocateExtension(Extension::kId, value_size);
+  if (buffer.empty())
+    return false;
+  return Extension::Write(buffer, values...);
+}
+
+template <typename Extension>
+bool RtpPacket::SetRawExtension(std::span<const uint8_t> data) {
+  std::span<uint8_t> buffer = AllocateExtension(Extension::kId, data.size());
+  if (buffer.empty()) {
+    return false;
+  }
+  std::memcpy(buffer.data(), data.data(), data.size());
+  return true;
+}
+
+template <typename Extension>
+bool RtpPacket::ReserveExtension() {
+  auto buffer = AllocateExtension(Extension::kId, Extension::kValueSizeBytes);
+  if (buffer.empty())
+    return false;
+  memset(buffer.data(), 0, Extension::kValueSizeBytes);
+  return true;
+}
+
+}  // namespace rtp_rtcp
+}  // namespace media
+}  // namespace ave
+
+#endif  // AVE_MODULES_RTP_RTCP_SOURCE_RTP_PACKET_H_

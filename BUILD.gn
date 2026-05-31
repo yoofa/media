@@ -6,6 +6,7 @@ group("media") {
     "codec",
     "foundation",
     "modules/mpeg2ts",
+    "modules/rtp_rtcp",
   ]
   if (is_android) {
     deps += [ "android" ]

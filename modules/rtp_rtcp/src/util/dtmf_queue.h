@@ -1,0 +1,50 @@
+/*
+ *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
+ *
+ *  Use of this source code is governed by a BSD-style license
+ *  that can be found in the LICENSE file in the root of the source
+ *  tree. An additional intellectual property rights grant can be found
+ *  in the file PATENTS.  All contributing project authors may
+ *  be found in the AUTHORS file in the root of the source tree.
+ */
+
+#ifndef AVE_MODULES_RTP_RTCP_SOURCE_DTMF_QUEUE_H_
+#define AVE_MODULES_RTP_RTCP_SOURCE_DTMF_QUEUE_H_
+
+#include <cstdint>
+#include <list>
+
+#include "base/mutex.h"
+
+namespace ave {
+namespace media {
+namespace rtp_rtcp {
+
+using ::ave::base::Mutex;
+
+class DtmfQueue {
+ public:
+  struct Event {
+    uint16_t duration_ms = 0;
+    uint8_t payload_type = 0;
+    uint8_t key = 0;
+    uint8_t level = 0;
+  };
+
+  DtmfQueue();
+  ~DtmfQueue();
+
+  bool AddDtmf(const Event& event);
+  bool NextDtmf(Event* event);
+  bool PendingDtmf() const;
+
+ private:
+  mutable Mutex dtmf_mutex_;
+  std::list<Event> queue_;
+};
+
+}  // namespace rtp_rtcp
+}  // namespace media
+}  // namespace ave
+
+#endif  // AVE_MODULES_RTP_RTCP_SOURCE_DTMF_QUEUE_H_

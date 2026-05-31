@@ -1,0 +1,152 @@
+/*
+ * remote_estimate.cc - Remote estimate RTCP packet implementation
+ *
+ * Copyright (c) 2019 The WebRTC project authors. All Rights Reserved.
+ * Ported to aspect-oriented framework.
+ */
+
+#include "media/modules/rtp_rtcp/src/rtcp/rtcp_packet/remote_estimate.h"
+#include <span>
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "base/logging.h"
+#include "media/modules/rtp_rtcp/src/rtcp/rtcp_packet/common_header.h"
+#include "media/modules/rtp_rtcp/src/util/byte_io.h"
+
+namespace ave {
+namespace media {
+namespace rtp_rtcp {
+namespace rtcp {
+namespace {
+
+static constexpr int kFieldValueSize = 3;
+static constexpr int kFieldSize = 1 + kFieldValueSize;
+static constexpr DataRate kDataRateResolution = DataRate::KilobitsPerSec(1);
+constexpr int64_t kMaxEncoded = (1 << (kFieldValueSize * 8)) - 1;
+
+class DataRateSerializer {
+ public:
+  DataRateSerializer(
+      uint8_t id,
+      std::function<DataRate*(NetworkStateEstimate*)> field_getter)
+      : id_(id), field_getter_(field_getter) {}
+
+  uint8_t id() const { return id_; }
+
+  void Read(const uint8_t* src, NetworkStateEstimate* target) const {
+    int64_t scaled = ByteReader<uint32_t, kFieldValueSize>::ReadBigEndian(src);
+    if (scaled == kMaxEncoded) {
+      *field_getter_(target) = DataRate::PlusInfinity();
+    } else {
+      *field_getter_(target) = kDataRateResolution * scaled;
+    }
+  }
+
+  bool Write(const NetworkStateEstimate& src, uint8_t* target) const {
+    auto value = *field_getter_(const_cast<NetworkStateEstimate*>(&src));
+    if (value.IsMinusInfinity()) {
+      AVE_LOG(LS_WARNING) << "Trying to serialize MinusInfinity";
+      return false;
+    }
+    ByteWriter<uint8_t>::WriteBigEndian(target++, id_);
+    int64_t scaled;
+    if (value.IsPlusInfinity()) {
+      scaled = kMaxEncoded;
+    } else {
+      scaled = value / kDataRateResolution;
+      if (scaled >= kMaxEncoded) {
+        scaled = kMaxEncoded;
+        AVE_LOG(LS_WARNING) << ToString(value) << " is larger than max ("
+                            << ToString(kMaxEncoded * kDataRateResolution)
+                            << "), encoded as PlusInfinity.";
+      }
+    }
+    ByteWriter<uint32_t, kFieldValueSize>::WriteBigEndian(target, scaled);
+    return true;
+  }
+
+ private:
+  const uint8_t id_;
+  const std::function<DataRate*(NetworkStateEstimate*)> field_getter_;
+};
+
+class RemoteEstimateSerializerImpl : public RemoteEstimateSerializer {
+ public:
+  explicit RemoteEstimateSerializerImpl(std::vector<DataRateSerializer> fields)
+      : fields_(fields) {}
+
+  base::Buffer Serialize(const NetworkStateEstimate& src) const override {
+    size_t max_size = fields_.size() * kFieldSize;
+    size_t size = 0;
+    base::Buffer buf(max_size);
+    for (const auto& field : fields_) {
+      if (field.Write(src, buf.data() + size)) {
+        size += kFieldSize;
+      }
+    }
+    buf.SetSize(size);
+    return buf;
+  }
+
+  bool Parse(std::span<const uint8_t> src,
+             NetworkStateEstimate* target) const override {
+    if (src.size() % kFieldSize != 0)
+      return false;
+    AVE_DCHECK_EQ(src.size() % kFieldSize, 0u);
+    for (const uint8_t* data_ptr = src.data();
+         data_ptr < src.data() + src.size(); data_ptr += kFieldSize) {
+      uint8_t field_id = ByteReader<uint8_t>::ReadBigEndian(data_ptr);
+      for (const auto& field : fields_) {
+        if (field.id() == field_id) {
+          field.Read(data_ptr + 1, target);
+          break;
+        }
+      }
+    }
+    return true;
+  }
+
+ private:
+  const std::vector<DataRateSerializer> fields_;
+};
+
+}  // namespace
+
+const RemoteEstimateSerializer* GetRemoteEstimateSerializer() {
+  using E = NetworkStateEstimate;
+  static auto* serializer = new RemoteEstimateSerializerImpl({
+      {1, [](E* e) { return &e->link_capacity_lower; }},
+      {2, [](E* e) { return &e->link_capacity_upper; }},
+  });
+  return serializer;
+}
+
+RemoteEstimate::RemoteEstimate() : serializer_(GetRemoteEstimateSerializer()) {
+  SetSubType(kSubType);
+  SetName(kName);
+  SetSenderSsrc(0);
+}
+
+RemoteEstimate::RemoteEstimate(App&& app)
+    : App(std::move(app)), serializer_(GetRemoteEstimateSerializer()) {}
+
+bool RemoteEstimate::ParseData() {
+  return serializer_->Parse({data(), data_size()}, &estimate_);
+}
+
+void RemoteEstimate::SetEstimate(NetworkStateEstimate estimate) {
+  estimate_ = estimate;
+  auto buf = serializer_->Serialize(estimate);
+  SetData(buf.data(), buf.size());
+}
+
+}  // namespace rtcp
+}  // namespace rtp_rtcp
+}  // namespace media
+}  // namespace ave
