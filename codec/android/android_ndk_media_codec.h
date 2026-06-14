@@ -53,6 +53,8 @@ class AndroidNdkMediaCodec : public Codec {
   ssize_t DequeueOutputBuffer(int64_t timeout_us) override;
   status_t ReleaseOutputBuffer(size_t index, bool render) override;
 
+  bool IsValid() const override;
+
   void NotifyInputBufferAvailable(size_t index);
   void NotifyOutputBufferAvailable(size_t index,
                                    int32_t offset,

@@ -122,6 +122,8 @@ class Codec {
    * render: true - render the buffer, false - only release the buffer
    */
   virtual status_t ReleaseOutputBuffer(size_t index, bool render) = 0;
+
+  virtual bool IsValid() const { return true; }
 };
 
 }  // namespace media

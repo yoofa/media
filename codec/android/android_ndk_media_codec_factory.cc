@@ -56,6 +56,23 @@ std::shared_ptr<Codec> AndroidNdkMediaCodecFactory::CreateCodecByMime(
     bool encoder) {
   AVE_LOG(LS_INFO) << "AndroidNdkMediaCodecFactory: CreateCodecByMime: " << mime
                    << ", encoder=" << encoder;
+  if (!encoder && mime == "video/dolby-vision") {
+    // Try creating Dolby Vision decoder first
+    auto codec = std::make_shared<AndroidNdkMediaCodec>(
+        "video/dolby-vision", AndroidNdkMediaCodec::CreatedBy::kCreatedByMime,
+        false);
+    if (codec->IsValid()) {
+      return codec;
+    }
+    // Fallback to standard HEVC decoder
+    AVE_LOG(LS_WARNING)
+        << "AndroidNdkMediaCodecFactory: video/dolby-vision decoder creation "
+           "failed, falling back to video/hevc";
+    auto fallback_codec = std::make_shared<AndroidNdkMediaCodec>(
+        "video/hevc", AndroidNdkMediaCodec::CreatedBy::kCreatedByMime, false);
+    return fallback_codec;
+  }
+
   auto codec = std::make_shared<AndroidNdkMediaCodec>(
       mime.c_str(), AndroidNdkMediaCodec::CreatedBy::kCreatedByMime, encoder);
   return codec;

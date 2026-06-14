@@ -352,6 +352,9 @@ AndroidNdkMediaCodec::AndroidNdkMediaCodec(const char* mime_or_name,
                                            CreatedBy type,
                                            bool encoder)
     : is_encoder_(encoder) {
+  if (type == kCreatedByMime) {
+    mime_ = mime_or_name;
+  }
   AVE_LOG(LS_INFO) << "AndroidNdkMediaCodec: creating codec, mime_or_name="
                    << mime_or_name << ", type="
                    << (type == kCreatedByName ? "byName" : "byMime")
@@ -381,6 +384,10 @@ AndroidNdkMediaCodec::~AndroidNdkMediaCodec() {
   }
 }
 
+bool AndroidNdkMediaCodec::IsValid() const {
+  return android_media_codec_ != nullptr;
+}
+
 AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
     const std::shared_ptr<MediaMeta>& format) {
   AMediaFormat* ndk_format = AMediaFormat_new();
@@ -389,7 +396,7 @@ AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
     return nullptr;
   }
 
-  const std::string& mime = format->mime();
+  std::string mime = mime_.empty() ? format->mime() : mime_;
   AMediaFormat_setString(ndk_format, AMEDIAFORMAT_KEY_MIME, mime.c_str());
   AVE_LOG(LS_VERBOSE) << "MediaMetaToAMediaFormat: mime=" << mime;
 
@@ -428,6 +435,51 @@ AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
       if (level > 0) {
         if (__builtin_available(android 28, *)) {
           AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_LEVEL, level);
+        }
+      }
+    } else if (mime == "video/dolby-vision") {
+      int32_t dv_profile = format->codec_profile();
+      int32_t dv_level = format->codec_level();
+
+      int32_t android_profile = -1;
+      int32_t android_level = -1;
+
+      switch (dv_profile) {
+        case 4:
+          android_profile = 8;  // DolbyVisionProfileDvheDer
+          break;
+        case 5:
+          android_profile = 16;  // DolbyVisionProfileDvheDtr
+          break;
+        case 8:
+          android_profile = 128;  // DolbyVisionProfileDvheDtb (8.1)
+          break;
+        case 9:
+          android_profile = 2;  // DolbyVisionProfileDvavPer (9.0)
+          break;
+        default:
+          break;
+      }
+
+      if (dv_level >= 1 && dv_level <= 13) {
+        android_level = 1 << (dv_level - 1);
+      }
+
+      if (android_profile != -1) {
+        if (__builtin_available(android 28, *)) {
+          AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_PROFILE,
+                                android_profile);
+          AVE_LOG(LS_INFO) << "MediaMetaToAMediaFormat: Dolby Vision profile="
+                           << dv_profile
+                           << " -> android_profile=" << android_profile;
+        }
+      }
+      if (android_level != -1) {
+        if (__builtin_available(android 28, *)) {
+          AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_LEVEL,
+                                android_level);
+          AVE_LOG(LS_INFO) << "MediaMetaToAMediaFormat: Dolby Vision level="
+                           << dv_level << " -> android_level=" << android_level;
         }
       }
     }
@@ -475,7 +527,14 @@ AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
     const auto* csd_data = static_cast<const uint8_t*>(csd->data());
     size_t csd_size = csd->size();
 
-    if (mime == "video/avc" && IsAvccFormat(csd_data, csd_size)) {
+    bool is_hevc = (mime == "video/hevc") ||
+                   (mime == "video/dolby-vision" &&
+                    format->codec() == CodecId::AVE_CODEC_ID_HEVC);
+    bool is_avc = (mime == "video/avc") ||
+                  (mime == "video/dolby-vision" &&
+                   format->codec() == CodecId::AVE_CODEC_ID_H264);
+
+    if (is_avc && IsAvccFormat(csd_data, csd_size)) {
       // H.264: Convert AVCC → Annex B csd-0 (SPS) + csd-1 (PPS)
       // Also extract NAL length size for access unit conversion.
       nal_length_size_ = (csd_data[4] & 0x03) + 1;
@@ -497,7 +556,7 @@ AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
         AMediaFormat_setBuffer(ndk_format, "csd-0", csd->data(), csd->size());
         nal_length_size_ = 0;  // disable access unit conversion
       }
-    } else if (mime == "video/hevc" && IsHvccFormat(csd_data, csd_size)) {
+    } else if (is_hevc && IsHvccFormat(csd_data, csd_size)) {
       // HEVC: Convert HVCC → Annex B csd-0 (VPS+SPS+PPS)
       nal_length_size_ = (csd_data[21] & 0x03) + 1;
       AVE_LOG(LS_INFO) << "MediaMetaToAMediaFormat: HVCC nal_length_size="
@@ -540,7 +599,9 @@ status_t AndroidNdkMediaCodec::Configure(
     return BAD_VALUE;
   }
 
-  mime_ = config->info.mime;
+  if (mime_.empty()) {
+    mime_ = config->info.mime;
+  }
   media_type_ = config->info.media_type;
   AVE_LOG(LS_INFO) << "Configure: mime=" << mime_
                    << ", media_type=" << static_cast<int>(media_type_)
@@ -610,7 +671,58 @@ status_t AndroidNdkMediaCodec::Configure(
   if (status != AMEDIA_OK) {
     AVE_LOG(LS_ERROR) << "Configure: AMediaCodec_configure failed, status="
                       << status;
-    return MapMediaStatus(status);
+    if (!is_encoder_ && mime_ == "video/dolby-vision") {
+      AVE_LOG(LS_WARNING) << "Configure: Dolby Vision configure failed, "
+                             "falling back to video/hevc";
+      AMediaCodec_delete(android_media_codec_);
+      android_media_codec_ = AMediaCodec_createDecoderByType("video/hevc");
+      if (!android_media_codec_) {
+        if (surface_) {
+          ANativeWindow_release(surface_);
+          surface_ = nullptr;
+        }
+        return MapMediaStatus(status);
+      }
+      mime_ = "video/hevc";
+
+      if (__builtin_available(android 28, *)) {
+        AMediaCodecOnAsyncNotifyCallback async_cb{};
+        async_cb.onAsyncInputAvailable = OnAsyncInputAvailable;
+        async_cb.onAsyncOutputAvailable = OnAsyncOutputAvailable;
+        async_cb.onAsyncFormatChanged = OnAsyncFormatChanged;
+        async_cb.onAsyncError = OnAsyncError;
+        AMediaCodec_setAsyncNotifyCallback(android_media_codec_, async_cb,
+                                           this);
+      }
+
+      AMediaFormat* hevc_format = MediaMetaToAMediaFormat(config->format);
+      if (!hevc_format) {
+        if (surface_) {
+          ANativeWindow_release(surface_);
+          surface_ = nullptr;
+        }
+        return UNKNOWN_ERROR;
+      }
+      status = AMediaCodec_configure(android_media_codec_, hevc_format, surface,
+                                     nullptr, 0);
+      AMediaFormat_delete(hevc_format);
+      if (status != AMEDIA_OK) {
+        AVE_LOG(LS_ERROR)
+            << "Configure: HEVC fallback configure failed, status=" << status;
+        if (surface_) {
+          ANativeWindow_release(surface_);
+          surface_ = nullptr;
+        }
+        return MapMediaStatus(status);
+      }
+      AVE_LOG(LS_INFO) << "Configure: HEVC fallback configure succeeded!";
+    } else {
+      if (surface_) {
+        ANativeWindow_release(surface_);
+        surface_ = nullptr;
+      }
+      return MapMediaStatus(status);
+    }
   }
 
   // Initialize output format from input config as fallback
