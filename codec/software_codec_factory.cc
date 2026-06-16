@@ -14,15 +14,21 @@ namespace ave {
 namespace media {
 
 SoftwareCodecFactory::SoftwareCodecFactory() {
+#ifdef AVE_FFMPEG_CODEC
   ffmpeg_factory_ = std::make_shared<FFmpegCodecFactory>();
+#endif
 }
 
 SoftwareCodecFactory::~SoftwareCodecFactory() {}
 
 std::vector<CodecInfo> SoftwareCodecFactory::GetSupportedCodecs() {
-  // Combine supported codecs from all internal factories
-  // Currently only FFmpeg
-  return ffmpeg_factory_->GetSupportedCodecs();
+  std::vector<CodecInfo> codecs;
+#ifdef AVE_FFMPEG_CODEC
+  if (ffmpeg_factory_) {
+    codecs = ffmpeg_factory_->GetSupportedCodecs();
+  }
+#endif
+  return codecs;
 }
 
 std::shared_ptr<Codec> SoftwareCodecFactory::CreateCodecByType(CodecId codec_id,
@@ -32,18 +38,33 @@ std::shared_ptr<Codec> SoftwareCodecFactory::CreateCodecByType(CodecId codec_id,
   }
   // TODO: Add logic to choose between FFmpeg and other software codecs (e.g.
   // FDK-AAC)
-  return ffmpeg_factory_->CreateCodecByType(codec_id, encoder);
+#ifdef AVE_FFMPEG_CODEC
+  if (ffmpeg_factory_) {
+    return ffmpeg_factory_->CreateCodecByType(codec_id, encoder);
+  }
+#endif
+  return nullptr;
 }
 
 std::shared_ptr<Codec> SoftwareCodecFactory::CreateCodecByName(
     const std::string& name) {
-  return ffmpeg_factory_->CreateCodecByName(name);
+#ifdef AVE_FFMPEG_CODEC
+  if (ffmpeg_factory_) {
+    return ffmpeg_factory_->CreateCodecByName(name);
+  }
+#endif
+  return nullptr;
 }
 
 std::shared_ptr<Codec> SoftwareCodecFactory::CreateCodecByMime(
     const std::string& mime,
     bool encoder) {
-  return ffmpeg_factory_->CreateCodecByMime(mime, encoder);
+#ifdef AVE_FFMPEG_CODEC
+  if (ffmpeg_factory_) {
+    return ffmpeg_factory_->CreateCodecByMime(mime, encoder);
+  }
+#endif
+  return nullptr;
 }
 
 }  // namespace media

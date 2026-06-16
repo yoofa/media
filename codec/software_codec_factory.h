@@ -9,7 +9,9 @@
 #define SOFTWARE_CODEC_FACTORY_H
 
 #include "codec_factory.h"
+#ifdef AVE_FFMPEG_CODEC
 #include "ffmpeg/ffmpeg_codec_factory.h"
+#endif
 
 namespace ave {
 namespace media {
@@ -30,7 +32,9 @@ class SoftwareCodecFactory : public CodecFactory {
   int16_t priority() const override { return 100; }
 
  private:
+#ifdef AVE_FFMPEG_CODEC
   std::shared_ptr<FFmpegCodecFactory> ffmpeg_factory_;
+#endif
 };
 
 }  // namespace media

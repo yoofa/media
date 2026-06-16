@@ -48,7 +48,7 @@ ave_executable("test_decode") {
     ":test_codec_support",
   ]
 
-  if (enable_ffmpeg_codec) {
+  if (ave_use_ffmpeg_codec) {
     deps += [ "//media/codec/ffmpeg:ffmpeg_codec" ]
   }
 }
