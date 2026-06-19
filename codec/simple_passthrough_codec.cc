@@ -72,7 +72,7 @@ void SimplePassthroughCodec::ProcessInput(size_t index) {
   AVE_LOG(LS_VERBOSE) << "SimplePassthroughCodec::ProcessInput(" << index
                       << ")";
 
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
 
   // Validate input buffer
   if (index >= input_buffers_.size() || !input_buffers_[index].in_use) {

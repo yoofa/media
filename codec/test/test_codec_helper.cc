@@ -108,7 +108,7 @@ status_t TestCodecRunner::Stop() {
 
   // Signal completion in case someone is waiting
   {
-    std::lock_guard<std::mutex> lock(completion_lock_);
+    std::scoped_lock lock(completion_lock_);
     completed_ = true;
     completion_cv_.notify_all();
   }
@@ -176,7 +176,7 @@ void TestCodecRunner::ProcessInput(size_t index) {
   }
 
   {
-    std::lock_guard<std::mutex> lock(completion_lock_);
+    std::scoped_lock lock(completion_lock_);
     has_pending_input_ = true;
   }
 
@@ -186,7 +186,7 @@ void TestCodecRunner::ProcessInput(size_t index) {
     codec_->QueueInputBuffer(static_cast<size_t>(buf_index));
     eos_sent_ = true;
 
-    std::lock_guard<std::mutex> lock(completion_lock_);
+    std::scoped_lock lock(completion_lock_);
     has_pending_input_ = false;
     CheckCompletion();
     return;
@@ -219,7 +219,7 @@ void TestCodecRunner::ProcessOutput(size_t index) {
   }
 
   {
-    std::lock_guard<std::mutex> lock(completion_lock_);
+    std::scoped_lock lock(completion_lock_);
     has_pending_output_ = true;
   }
 
@@ -236,7 +236,7 @@ void TestCodecRunner::ProcessOutput(size_t index) {
   }
 
   {
-    std::lock_guard<std::mutex> lock(completion_lock_);
+    std::scoped_lock lock(completion_lock_);
     has_pending_output_ = false;
     CheckCompletion();
   }

@@ -37,7 +37,7 @@ SimpleCodec::~SimpleCodec() {
   // Just clean up our own resources.
   task_runner_->PostTaskAndWait([this]() {
     AVE_DCHECK_RUN_ON(task_runner_.get());
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     input_buffers_.clear();
     output_buffers_.clear();
     while (!input_queue_.empty()) {
@@ -66,7 +66,7 @@ status_t SimpleCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
       return;
     }
 
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
 
     AVE_LOG(LS_INFO) << "SimpleCodec::Configure: allocating buffers";
     input_buffers_ = std::vector<BufferEntry>(kMaxInputBuffers);
@@ -122,7 +122,7 @@ status_t SimpleCodec::Start() {
       // Notify all initially free input buffers to kick off processing
       std::vector<size_t> free_indices;
       {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::scoped_lock lock(lock_);
         for (size_t i = 0; i < input_buffers_.size(); ++i) {
           if (!input_buffers_[i].in_use) {
             input_buffers_[i].in_use = true;  // mark as given to the caller
@@ -167,7 +167,7 @@ status_t SimpleCodec::Reset() {
   status_t ret = OK;
   task_runner_->PostTaskAndWait([this, &ret]() {
     AVE_DCHECK_RUN_ON(task_runner_.get());
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
 
     ret = OnReset();
     if (ret == OK) {
@@ -196,7 +196,7 @@ status_t SimpleCodec::Flush() {
   status_t ret = OK;
   task_runner_->PostTaskAndWait([this, &ret]() {
     AVE_DCHECK_RUN_ON(task_runner_.get());
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
 
     if (state_ != State::STARTED) {
       ret = INVALID_OPERATION;
@@ -225,7 +225,7 @@ status_t SimpleCodec::Release() {
     state_ = State::RELEASED;
     callback_ = nullptr;
 
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     input_buffers_.clear();
     output_buffers_.clear();
     while (!input_queue_.empty()) {
@@ -240,7 +240,7 @@ status_t SimpleCodec::Release() {
 
 status_t SimpleCodec::GetInputBuffer(size_t index,
                                      std::shared_ptr<CodecBuffer>& buffer) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (index >= input_buffers_.size()) {
     return INVALID_OPERATION;
   }
@@ -250,7 +250,7 @@ status_t SimpleCodec::GetInputBuffer(size_t index,
 
 status_t SimpleCodec::GetOutputBuffer(size_t index,
                                       std::shared_ptr<CodecBuffer>& buffer) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (index >= output_buffers_.size()) {
     return INVALID_OPERATION;
   }
@@ -261,7 +261,7 @@ status_t SimpleCodec::GetOutputBuffer(size_t index,
 ssize_t SimpleCodec::DequeueInputBuffer(int64_t timeout_ms)
     NO_THREAD_SAFETY_ANALYSIS {
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     for (size_t i = 0; i < input_buffers_.size(); ++i) {
       if (!input_buffers_[i].in_use) {
         input_buffers_[i].in_use = true;
@@ -309,7 +309,7 @@ ssize_t SimpleCodec::DequeueInputBuffer(int64_t timeout_ms)
 }
 
 status_t SimpleCodec::QueueInputBuffer(size_t index) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (index >= input_buffers_.size()) {
     return INVALID_OPERATION;
   }
@@ -329,7 +329,7 @@ status_t SimpleCodec::QueueInputBuffer(size_t index) {
 ssize_t SimpleCodec::DequeueOutputBuffer(int64_t timeout_ms)
     NO_THREAD_SAFETY_ANALYSIS {
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     if (!output_queue_.empty()) {
       size_t front_index = output_queue_.front();
       output_queue_.pop();
@@ -369,7 +369,7 @@ ssize_t SimpleCodec::DequeueOutputBuffer(int64_t timeout_ms)
 
 status_t SimpleCodec::ReleaseOutputBuffer(size_t index, bool render) {
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     if (index >= output_buffers_.size() || !output_buffers_[index].in_use) {
       return INVALID_OPERATION;
     }
@@ -401,7 +401,7 @@ void SimpleCodec::Process() {
 
   size_t input_index = kInvalidIndex;
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     AVE_LOG(LS_VERBOSE) << "Input queue size: " << input_queue_.size();
     // Only dequeue input when an output slot is available. This prevents
     // feeding the codec when all output buffers are in-use, which would cause
@@ -427,7 +427,7 @@ void SimpleCodec::Process() {
   while (state_ == State::STARTED) {
     size_t output_count_before{0};
     {
-      std::lock_guard<std::mutex> lock(lock_);
+      std::scoped_lock lock(lock_);
       output_count_before = output_queue_.size();
     }
 
@@ -435,7 +435,7 @@ void SimpleCodec::Process() {
 
     size_t output_count_after{0};
     {
-      std::lock_guard<std::mutex> lock(lock_);
+      std::scoped_lock lock(lock_);
       output_count_after = output_queue_.size();
     }
 

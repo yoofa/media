@@ -131,36 +131,36 @@ class StreamStatisticianLocked : public StreamStatisticianImplInterface {
   ~StreamStatisticianLocked() override = default;
 
   RtpReceiveStats GetStats() const override {
-    std::lock_guard<std::mutex> lock(stream_lock_);
+    std::scoped_lock<std::mutex> lock(stream_lock_);
     return impl_.GetStats();
   }
   std::optional<int32_t> GetFractionLostInPercent() const override {
-    std::lock_guard<std::mutex> lock(stream_lock_);
+    std::scoped_lock<std::mutex> lock(stream_lock_);
     return impl_.GetFractionLostInPercent();
   }
   StreamDataCounters GetReceiveStreamDataCounters() const override {
-    std::lock_guard<std::mutex> lock(stream_lock_);
+    std::scoped_lock<std::mutex> lock(stream_lock_);
     return impl_.GetReceiveStreamDataCounters();
   }
   uint32_t BitrateReceived() const override {
-    std::lock_guard<std::mutex> lock(stream_lock_);
+    std::scoped_lock<std::mutex> lock(stream_lock_);
     return impl_.BitrateReceived();
   }
   void MaybeAppendReportBlockAndReset(
       std::vector<rtcp::ReportBlock>& report_blocks) override {
-    std::lock_guard<std::mutex> lock(stream_lock_);
+    std::scoped_lock<std::mutex> lock(stream_lock_);
     impl_.MaybeAppendReportBlockAndReset(report_blocks);
   }
   void SetMaxReorderingThreshold(int32_t max_reordering_threshold) override {
-    std::lock_guard<std::mutex> lock(stream_lock_);
+    std::scoped_lock<std::mutex> lock(stream_lock_);
     return impl_.SetMaxReorderingThreshold(max_reordering_threshold);
   }
   void EnableRetransmitDetection(bool enable) override {
-    std::lock_guard<std::mutex> lock(stream_lock_);
+    std::scoped_lock<std::mutex> lock(stream_lock_);
     return impl_.EnableRetransmitDetection(enable);
   }
   void UpdateCounters(const RtpPacketReceived& packet) override {
-    std::lock_guard<std::mutex> lock(stream_lock_);
+    std::scoped_lock<std::mutex> lock(stream_lock_);
     return impl_.UpdateCounters(packet);
   }
 
@@ -217,24 +217,24 @@ class ReceiveStatisticsLocked : public ReceiveStatistics {
       : impl_(clock, std::move(stream_statitician_factory)) {}
   ~ReceiveStatisticsLocked() override = default;
   std::vector<rtcp::ReportBlock> RtcpReportBlocks(size_t max_blocks) override {
-    std::lock_guard<std::mutex> lock(receive_statistics_lock_);
+    std::scoped_lock<std::mutex> lock(receive_statistics_lock_);
     return impl_.RtcpReportBlocks(max_blocks);
   }
   void OnRtpPacket(const RtpPacketReceived& packet) override {
-    std::lock_guard<std::mutex> lock(receive_statistics_lock_);
+    std::scoped_lock<std::mutex> lock(receive_statistics_lock_);
     return impl_.OnRtpPacket(packet);
   }
   StreamStatistician* GetStatistician(uint32_t ssrc) const override {
-    std::lock_guard<std::mutex> lock(receive_statistics_lock_);
+    std::scoped_lock<std::mutex> lock(receive_statistics_lock_);
     return impl_.GetStatistician(ssrc);
   }
   void SetMaxReorderingThreshold(uint32_t ssrc,
                                  int32_t max_reordering_threshold) override {
-    std::lock_guard<std::mutex> lock(receive_statistics_lock_);
+    std::scoped_lock<std::mutex> lock(receive_statistics_lock_);
     return impl_.SetMaxReorderingThreshold(ssrc, max_reordering_threshold);
   }
   void EnableRetransmitDetection(uint32_t ssrc, bool enable) override {
-    std::lock_guard<std::mutex> lock(receive_statistics_lock_);
+    std::scoped_lock<std::mutex> lock(receive_statistics_lock_);
     return impl_.EnableRetransmitDetection(ssrc, enable);
   }
 

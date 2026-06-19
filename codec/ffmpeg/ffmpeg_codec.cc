@@ -109,7 +109,7 @@ status_t FFmpegCodec::OnRelease() {
 }
 
 void FFmpegCodec::ProcessInput(size_t index) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
 
   if (index >= input_buffers_.size() || !input_buffers_[index].in_use) {
     AVE_LOG(LS_WARNING) << "Invalid input buffer index or not in use";
@@ -242,7 +242,7 @@ void FFmpegCodec::ProcessOutput() {
   size_t pushed_index = kInvalidIndex;
 
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
 
     size_t index = GetAvailableOutputBufferIndex();
     if (index == static_cast<size_t>(-1)) {

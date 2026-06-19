@@ -61,7 +61,7 @@ status_t PacketSource::Stop() {
 }
 
 std::shared_ptr<MediaMeta> PacketSource::GetFormat() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (format_ != nullptr) {
     return format_;
   }
@@ -137,7 +137,7 @@ void PacketSource::QueueAccessUnit(std::shared_ptr<MediaFrame> frame) {
     return;
   }
 
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   queue_.push_back(QueueEntry{.frame_ = frame});
   condition_.notify_one();
 
@@ -160,7 +160,7 @@ void PacketSource::QueueAccessUnit(std::shared_ptr<MediaFrame> frame) {
 void PacketSource::QueueDiscontinuity(DiscontinuityType type,
                                       std::shared_ptr<Message> extra,
                                       bool discard) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
 
   if (discard) {
     // Clear all frames
@@ -199,13 +199,13 @@ void PacketSource::SignalEOS(status_t result) {
     return;
   }
 
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   eos_result_ = result;
   condition_.notify_one();
 }
 
 bool PacketSource::HasBufferAvailable(status_t* final_result) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   *final_result = OK;
   if (!enabled_) {
     return false;
@@ -219,7 +219,7 @@ bool PacketSource::HasBufferAvailable(status_t* final_result) {
 }
 
 bool PacketSource::HasDataBufferAvailable(status_t* final_result) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   *final_result = OK;
   if (!enabled_) {
     return false;
@@ -236,7 +236,7 @@ bool PacketSource::HasDataBufferAvailable(status_t* final_result) {
 }
 
 size_t PacketSource::GetAvailableBufferCount(status_t* final_result) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
 
   *final_result = OK;
   if (!enabled_) {
@@ -250,7 +250,7 @@ size_t PacketSource::GetAvailableBufferCount(status_t* final_result) {
 }
 
 int64_t PacketSource::GetBufferedDurationUs(status_t* final_result) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   *final_result = eos_result_;
 
   int64_t duration_us = 0;
@@ -264,7 +264,7 @@ int64_t PacketSource::GetBufferedDurationUs(status_t* final_result) {
 status_t PacketSource::NextBufferTime(int64_t* time_us) {
   *time_us = 0;
 
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
 
   if (queue_.empty()) {
     return eos_result_ != OK ? eos_result_ : ERROR_IO;
@@ -289,22 +289,22 @@ bool PacketSource::IsFinished(int64_t duration) const {
 }
 
 std::shared_ptr<MediaMeta> PacketSource::GetLatestEnqueuedMeta() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   return latest_enqueued_meta_;
 }
 
 std::shared_ptr<MediaMeta> PacketSource::GetLatestDequeuedMeta() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   return latest_dequeued_meta_;
 }
 
 void PacketSource::Enable(bool enable) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   enabled_ = enable;
 }
 
 void PacketSource::Clear() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   queue_.clear();
   format_ = nullptr;
   last_queued_time_us_ = 0;

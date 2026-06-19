@@ -35,7 +35,7 @@ DummyCodec::~DummyCodec() {
 }
 
 status_t DummyCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   config_ = config;
 
   input_buffers_ = std::vector<BufferEntry>(kMaxInputBuffers);
@@ -54,14 +54,14 @@ status_t DummyCodec::Configure(const std::shared_ptr<CodecConfig>& config) {
 }
 
 status_t DummyCodec::SetCallback(CodecCallback* callback) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   callback_ = callback;
   return OK;
 }
 
 status_t DummyCodec::GetInputBuffer(size_t index,
                                     std::shared_ptr<CodecBuffer>& buffer) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (index >= input_buffers_.size()) {
     return INVALID_OPERATION;
   }
@@ -71,7 +71,7 @@ status_t DummyCodec::GetInputBuffer(size_t index,
 
 status_t DummyCodec::GetOutputBuffer(size_t index,
                                      std::shared_ptr<CodecBuffer>& buffer) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (index >= output_buffers_.size()) {
     return INVALID_OPERATION;
   }
@@ -80,7 +80,7 @@ status_t DummyCodec::GetOutputBuffer(size_t index,
 }
 
 status_t DummyCodec::Start() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (started_) {
     return INVALID_OPERATION;
   }
@@ -89,13 +89,13 @@ status_t DummyCodec::Start() {
 }
 
 status_t DummyCodec::Stop() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   started_ = false;
   return OK;
 }
 
 status_t DummyCodec::Reset() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   while (!input_queue_.empty()) {
     input_queue_.pop();
   }
@@ -116,7 +116,7 @@ status_t DummyCodec::Flush() {
 }
 
 status_t DummyCodec::Release() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   input_buffers_.clear();
   output_buffers_.clear();
   while (!input_queue_.empty()) {
@@ -129,7 +129,7 @@ status_t DummyCodec::Release() {
 }
 
 ssize_t DummyCodec::DequeueInputBuffer(int64_t timeout_ms) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (!started_) {
     return -1;
   }
@@ -145,7 +145,7 @@ ssize_t DummyCodec::DequeueInputBuffer(int64_t timeout_ms) {
 
 status_t DummyCodec::QueueInputBuffer(size_t index) {
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     if (!started_ || index >= input_buffers_.size() ||
         !input_buffers_[index].in_use) {
       return INVALID_OPERATION;
@@ -159,7 +159,7 @@ status_t DummyCodec::QueueInputBuffer(size_t index) {
 }
 
 void DummyCodec::ProcessBuffer(size_t input_index) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (!started_ || input_index >= input_buffers_.size()) {
     return;
   }
@@ -213,7 +213,7 @@ void DummyCodec::ProcessBuffer(size_t input_index) {
 }
 
 ssize_t DummyCodec::DequeueOutputBuffer(int64_t timeout_ms) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (!started_ || output_queue_.empty()) {
     return -1;
   }
@@ -224,7 +224,7 @@ ssize_t DummyCodec::DequeueOutputBuffer(int64_t timeout_ms) {
 }
 
 status_t DummyCodec::ReleaseOutputBuffer(size_t index, bool render) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (!started_ || index >= output_buffers_.size() ||
       !output_buffers_[index].in_use) {
     return INVALID_OPERATION;

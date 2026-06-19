@@ -587,7 +587,7 @@ AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
 
 status_t AndroidNdkMediaCodec::Configure(
     const std::shared_ptr<CodecConfig>& config) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (!android_media_codec_) {
     AVE_LOG(LS_ERROR) << "Configure: codec not created";
@@ -743,7 +743,7 @@ status_t AndroidNdkMediaCodec::Configure(
 }
 
 status_t AndroidNdkMediaCodec::SetCallback(CodecCallback* callback) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (!android_media_codec_) {
     AVE_LOG(LS_ERROR) << "SetCallback: codec not created";
@@ -757,7 +757,7 @@ status_t AndroidNdkMediaCodec::SetCallback(CodecCallback* callback) {
 }
 
 status_t AndroidNdkMediaCodec::Start() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (!android_media_codec_) {
     AVE_LOG(LS_ERROR) << "Start: codec not created";
@@ -788,7 +788,7 @@ status_t AndroidNdkMediaCodec::Stop() {
   }
 
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     input_buffers_.clear();
     output_buffers_.clear();
     output_buffer_infos_.clear();
@@ -807,7 +807,7 @@ status_t AndroidNdkMediaCodec::Stop() {
 }
 
 status_t AndroidNdkMediaCodec::Flush() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (!android_media_codec_) {
     return NO_INIT;
@@ -845,7 +845,7 @@ status_t AndroidNdkMediaCodec::GetInputBuffer(
   // avoidance as QueueInputBuffer / ReleaseOutputBuffer.
   AMediaCodec* codec = nullptr;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (!android_media_codec_) {
       return NO_INIT;
     }
@@ -863,7 +863,7 @@ status_t AndroidNdkMediaCodec::GetInputBuffer(
                       << ", capacity=" << size;
 
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (input_buffers_.find(index) == input_buffers_.end()) {
       auto codec_buffer = std::make_shared<CodecBuffer>(addr, size);
       input_buffers_[index] = codec_buffer;
@@ -891,7 +891,7 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
   MediaType mtype = MediaType::UNKNOWN;
 
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (!android_media_codec_) {
       return NO_INIT;
     }
@@ -929,7 +929,7 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
     }
     codec_buffer->format() = meta;
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     output_buffers_[index] = codec_buffer;
     buffer = codec_buffer;
     return OK;
@@ -1011,7 +1011,8 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
     if (audio_pts_us >= 0) {
       meta->SetPts(base::Timestamp::Micros(audio_pts_us));
     }
-    if (has_buf_info && (buf_info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
+    if (has_buf_info &&
+        (buf_info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
       meta->SetEos(true);
     }
     codec_buffer->format() = meta;
@@ -1054,7 +1055,7 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
   }
 
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     output_buffers_[index] = codec_buffer;
   }
   buffer = codec_buffer;
@@ -1062,7 +1063,7 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
 }
 
 ssize_t AndroidNdkMediaCodec::DequeueInputBuffer(int64_t timeoutUs) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (!android_media_codec_) {
     return -1;
@@ -1078,7 +1079,7 @@ status_t AndroidNdkMediaCodec::QueueInputBuffer(size_t index) {
   // async callbacks that also try to lock mutex_.
   std::shared_ptr<CodecBuffer> input_buffer;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (!android_media_codec_) {
       return NO_INIT;
     }
@@ -1148,7 +1149,7 @@ status_t AndroidNdkMediaCodec::QueueInputBuffer(size_t index) {
 }
 
 ssize_t AndroidNdkMediaCodec::DequeueOutputBuffer(int64_t timeout_us) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (!android_media_codec_) {
     return -1;
@@ -1175,7 +1176,7 @@ status_t AndroidNdkMediaCodec::ReleaseOutputBuffer(size_t index, bool render) {
   // (same pattern as QueueInputBuffer).
   AMediaCodec* codec = nullptr;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (!android_media_codec_) {
       return NO_INIT;
     }
@@ -1206,7 +1207,7 @@ void AndroidNdkMediaCodec::NotifyInputBufferAvailable(size_t index) {
   // eventually call back into codec methods that acquire the lock.
   CodecCallback* cb = nullptr;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     cb = callback_;
   }
   if (cb) {
@@ -1221,12 +1222,12 @@ void AndroidNdkMediaCodec::NotifyOutputBufferAvailable(
     int64_t presentation_time_us,
     uint32_t flags) {
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     output_buffer_infos_[index] = {offset, size, presentation_time_us, flags};
   }
   CodecCallback* cb = nullptr;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     cb = callback_;
   }
   if (cb) {
@@ -1279,7 +1280,7 @@ void AndroidNdkMediaCodec::NotifyOutputFormatChanged(AMediaFormat* format) {
 
   CodecCallback* cb = nullptr;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     cb = callback_;
   }
   if (cb) {
@@ -1290,7 +1291,7 @@ void AndroidNdkMediaCodec::NotifyOutputFormatChanged(AMediaFormat* format) {
 void AndroidNdkMediaCodec::NotifyError(status_t error) {
   CodecCallback* cb = nullptr;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     cb = callback_;
   }
   if (cb) {
@@ -1302,7 +1303,7 @@ void AndroidNdkMediaCodec::NotifyFrameRendered(
     std::shared_ptr<Message> message) {
   CodecCallback* cb = nullptr;
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     cb = callback_;
   }
   if (cb) {

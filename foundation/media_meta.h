@@ -66,7 +66,7 @@ class MediaMeta {
   MediaMeta& SetDuration(base::TimeDelta duration);
   base::TimeDelta duration() const;
 
-  MediaMeta& SetPrivateData(uint32_t size, void* data);
+  MediaMeta& SetPrivateData(uint32_t size, const void* data);
   std::shared_ptr<base::Buffer> private_data();
   // dereference private data if not use any more
   MediaMeta& ClearPrivateData();

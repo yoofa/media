@@ -133,7 +133,7 @@ void OpusCodec::ProcessInput(size_t index) {
   status_t error_to_notify = OK;
 
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock<std::mutex> lock(lock_);
     if (index >= input_buffers_.size() || !input_buffers_[index].in_use) {
       AVE_LOG(LS_WARNING) << "Invalid input buffer index or not in use";
       return;

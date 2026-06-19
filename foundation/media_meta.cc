@@ -250,13 +250,13 @@ base::TimeDelta MediaMeta::duration() const {
   }
 }
 
-MediaMeta& MediaMeta::SetPrivateData(uint32_t size, void* data) {
+MediaMeta& MediaMeta::SetPrivateData(uint32_t size, const void* data) {
   if (data == nullptr) {
     AVE_LOG(LS_WARNING) << "SetPrivateData failed, data is null";
     return *this;
   }
   auto buffer =
-      std::make_shared<base::Buffer>(static_cast<uint8_t*>(data), size);
+      std::make_shared<base::Buffer>(static_cast<const uint8_t*>(data), size);
   if (format_type_ == FormatType::kTrack) {
     switch (stream_type_) {
       case MediaType::VIDEO:
