@@ -58,8 +58,13 @@ std::shared_ptr<Codec> FFmpegCodecFactory::CreateCodecByName(
 std::shared_ptr<Codec> FFmpegCodecFactory::CreateCodecByMime(
     const std::string& mime,
     bool encoder) {
-  // TODO: Implement this
-  return nullptr;
+  const CodecId codec_id = MimeToCodecId(mime.c_str());
+  if (codec_id == CodecId::AVE_CODEC_ID_NONE) {
+    AVE_LOG(LS_WARNING) << "FFmpegCodecFactory: unsupported mime=" << mime;
+    return nullptr;
+  }
+
+  return CreateCodecByType(codec_id, encoder);
 }
 
 std::vector<CodecInfo> FFmpegCodecFactory::GetSupportedCodecs() {

@@ -12,6 +12,7 @@
 #include "base/attributes.h"
 #include "base/logging.h"
 #include "base/sequence_checker.h"
+#include "media/audio/channel_layout.h"
 #include "media/foundation/pixel_format.h"
 #include "media/modules/ffmpeg/ffmpeg_utils.h"
 
@@ -331,11 +332,7 @@ void FFmpegCodec::ProcessOutput() {
                                            MediaMeta::FormatType::kSample);
           meta->SetSampleRate(frame->sample_rate);
           int channels = frame->ch_layout.nb_channels;
-          if (channels == 1) {
-            meta->SetChannelLayout(CHANNEL_LAYOUT_MONO);
-          } else {
-            meta->SetChannelLayout(CHANNEL_LAYOUT_STEREO);
-          }
+          meta->SetChannelLayout(GuessChannelLayout(channels));
           meta->SetSamplesPerChannel(frame->nb_samples);
           meta->SetBitsPerSample(static_cast<int16_t>(
               av_get_bytes_per_sample(
