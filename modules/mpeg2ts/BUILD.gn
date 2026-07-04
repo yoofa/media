@@ -28,6 +28,7 @@ source_set("mpeg2ts") {
     "../../foundation:media_frame",
     "../../foundation:media_meta",
     "../../foundation:media_source",
+    "//base:ave_config",
     "//base:logging",
   ]
 }

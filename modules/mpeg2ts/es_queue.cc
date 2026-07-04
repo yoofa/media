@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "audio/channel_layout.h"
+#include "base/ave_config.h"
 #include "base/logging.h"
 #include "foundation/aac/aac_utils.h"
 #include "foundation/bit_reader.h"
@@ -564,6 +565,7 @@ void ESQueue::Clear(bool clear_format) {
   }
 
   range_infos_.clear();
+  next_aac_timestamp_us_ = -1;
 
   if (clear_format) {
     format_ = nullptr;
@@ -625,6 +627,7 @@ status_t ESQueue::AppendData(const void* data,
   info.length_ = size;
   info.pes_offset_ = payload_offset;
   info.pes_scrambling_control_ = pes_scrambling_control;
+  info.starts_pes_ = true;
   range_infos_.push_back(info);
 
   return OK;
@@ -718,6 +721,7 @@ int64_t ESQueue::FetchTimestamp(size_t size,
 
     if (info.length_ > size) {
       info.length_ -= size;
+      info.starts_pes_ = false;
       size = 0;
     } else {
       size -= info.length_;
@@ -787,9 +791,9 @@ std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitH264(bool force_flush) {
       format_->SetSampleAspectRatio(
           {static_cast<int16_t>(sar_width), static_cast<int16_t>(sar_height)});
     }
-    AVE_LOG(LS_INFO) << "ESQueue H264 format ready: width=" << format_->width()
-                     << " height=" << format_->height()
-                     << " csd_size=" << csd->size();
+    AVE_LOG(LS_VERBOSE) << "ESQueue H264 format ready: width="
+                        << format_->width() << " height=" << format_->height()
+                        << " csd_size=" << csd->size();
   };
 
   auto build_access_unit =
@@ -831,6 +835,9 @@ std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitH264(bool force_flush) {
     if (time_us >= 0) {
       access_unit->SetPts(base::Timestamp::Micros(time_us));
     }
+    AVE_LOG_IF(LS_INFO, base::AveConfig::GetInstance().demuxer_logs_enabled())
+        << "ESQueue H264 AU: pts_us=" << time_us << " size=" << access_unit_size
+        << " nal_count=" << nal_units.size();
 
     memmove(buffer_->data(), buffer_->data() + consumed_size,
             buffer_size - consumed_size);
@@ -852,10 +859,11 @@ std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitH264(bool force_flush) {
       access_unit->SetPictureType(PictureType::I);
     }
 
-    AVE_LOG(LS_INFO) << "ESQueue H264 access unit: nal_count="
-                     << nal_units.size() << " size=" << access_unit_size
-                     << " has_idr=" << has_idr << " has_i_slice=" << has_i_slice
-                     << " format_ready=" << static_cast<bool>(format_);
+    AVE_LOG(LS_VERBOSE) << "ESQueue H264 access unit: nal_count="
+                        << nal_units.size() << " size=" << access_unit_size
+                        << " has_idr=" << has_idr
+                        << " has_i_slice=" << has_i_slice
+                        << " format_ready=" << static_cast<bool>(format_);
 
     return access_unit;
   };
@@ -892,10 +900,10 @@ std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitH264(bool force_flush) {
     nal_units.push_back(H264NalUnit{nal_start, nal_size, nal_type});
     if (nal_type == 7) {
       avc_sps_ = Buffer::CreateAsCopy(nal_start, nal_size);
-      AVE_LOG(LS_INFO) << "ESQueue H264 saw SPS size=" << nal_size;
+      AVE_LOG(LS_VERBOSE) << "ESQueue H264 saw SPS size=" << nal_size;
     } else if (nal_type == 8) {
       avc_pps_ = Buffer::CreateAsCopy(nal_start, nal_size);
-      AVE_LOG(LS_INFO) << "ESQueue H264 saw PPS size=" << nal_size;
+      AVE_LOG(LS_VERBOSE) << "ESQueue H264 saw PPS size=" << nal_size;
     }
 
     if (IsH264VclNal(nal_type)) {
@@ -915,7 +923,7 @@ std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitAAC() {
   }
 
   const uint8_t* data = buffer_->data();
-  size_t size = buffer_->size();
+  const size_t size = buffer_->size();
 
   size_t offset = 0;
   while (offset + 7 <= size) {
@@ -928,22 +936,48 @@ std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitAAC() {
         return nullptr;
       }
 
+      ADTSHeader header{};
+      if (ParseADTSHeader(data + offset, frame_length, &header) != OK) {
+        return nullptr;
+      }
+
+      const uint32_t sample_rate = GetSamplingRate(header.sampling_freq_index);
+      if (sample_rate == 0) {
+        return nullptr;
+      }
+      const int64_t frame_duration_us =
+          1024LL * 1000000LL / static_cast<int64_t>(sample_rate);
+
+      // FetchTimestamp consumes the corresponding RangeInfo. Inspect its
+      // start marker first: only the first ADTS frame of a PES inherits that
+      // PES PTS; later frames advance by their AAC sample duration.
+      const bool starts_pes =
+          !range_infos_.empty() && range_infos_.front().starts_pes_;
+      const int64_t pes_timestamp_us =
+          !range_infos_.empty() ? range_infos_.front().timestamp_us_ : -1;
+      const int64_t consumed_timestamp_us =
+          FetchTimestamp(frame_length + offset);
+
+      int64_t time_us = next_aac_timestamp_us_;
+      if (starts_pes && pes_timestamp_us >= 0) {
+        time_us = pes_timestamp_us;
+      } else if (time_us < 0) {
+        time_us = consumed_timestamp_us;
+      }
+      if (time_us >= 0) {
+        next_aac_timestamp_us_ = time_us + frame_duration_us;
+      }
+
       auto access_unit =
           CreateFrameCopy(data + offset, frame_length, MediaType::AUDIO);
-
-      int64_t time_us = FetchTimestamp(frame_length + offset);
       if (time_us >= 0) {
         access_unit->SetPts(base::Timestamp::Micros(time_us));
+        access_unit->SetDuration(base::TimeDelta::Micros(frame_duration_us));
       }
 
       memmove(buffer_->data(), buffer_->data() + offset + frame_length,
               size - offset - frame_length);
       buffer_->setRange(0, size - offset - frame_length);
-
-      ADTSHeader header{};
-      if (ParseADTSHeader(data + offset, frame_length, &header) != OK) {
-        return access_unit;
-      }
 
       if (!format_) {
         format_ = MediaMeta::CreatePtr(MediaType::AUDIO,
@@ -953,11 +987,8 @@ std::shared_ptr<MediaFrame> ESQueue::DequeueAccessUnitAAC() {
       format_->SetMime(MEDIA_MIMETYPE_AUDIO_AAC);
       access_unit->SetMime(MEDIA_MIMETYPE_AUDIO_AAC);
 
-      const uint32_t sample_rate = GetSamplingRate(header.sampling_freq_index);
-      if (sample_rate > 0) {
-        format_->SetSampleRate(sample_rate);
-        access_unit->SetSampleRate(sample_rate);
-      }
+      format_->SetSampleRate(sample_rate);
+      access_unit->SetSampleRate(sample_rate);
 
       const uint8_t channel_count = GetChannelCount(header.channel_config);
       if (channel_count > 0) {

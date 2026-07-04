@@ -82,6 +82,8 @@ class ESQueue {
     size_t length_;
     int32_t pes_offset_;
     uint32_t pes_scrambling_control_;
+    // True until the first access unit consumes bytes from this PES payload.
+    bool starts_pes_;
   };
 
   Mode mode_;
@@ -103,6 +105,11 @@ class ESQueue {
   uint32_t latm_frame_length_type_ = 0;
   bool latm_other_data_present_ = false;
   uint64_t latm_other_data_len_bits_ = 0;
+
+  // AAC PES payloads commonly contain multiple ADTS frames. Keep the
+  // timestamp of the next frame so every decoder input buffer has a unique
+  // presentation time instead of inheriting the PES timestamp.
+  int64_t next_aac_timestamp_us_ = -1;
 
   bool IsSampleEncrypted() const {
     return (flags_ & kFlag_SampleEncryptedData) != 0;

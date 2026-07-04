@@ -12,6 +12,7 @@
 
 #include <cstring>
 
+#include "base/ave_config.h"
 #include "base/logging.h"
 #include "es_queue.h"
 #include "foundation/bit_reader.h"
@@ -205,14 +206,26 @@ class TSParser::Stream {
         (unsigned)expected_continuity_counter_ != continuity_counter) {
       AVE_LOG(LS_WARNING) << "Discontinuity on stream PID " << elementary_pid_;
       payload_started_ = false;
+      if (pes_buffer_) {
+        pes_buffer_->setRange(0, 0);
+      }
       expected_continuity_counter_ = -1;
     }
 
     expected_continuity_counter_ = (continuity_counter + 1) & 0x0f;
 
     if (payload_unit_start_indicator) {
-      // PES boundaries do not guarantee access-unit boundaries. Flushing here
-      // truncates video frames that span multiple PES payloads.
+      // A PES normally spans several TS packets. Do not pass individual TS
+      // payloads to ESQueue: continuation payloads have neither a PES header
+      // nor a timestamp, so doing so corrupts elementary-stream AU boundaries
+      // (especially AAC). This mirrors ATSParser::Stream::parse in AOSP.
+      if (payload_started_) {
+        const status_t err = Flush(event);
+        if (err != OK) {
+          AVE_LOG(LS_WARNING) << "Discarding malformed PES on stream PID "
+                              << elementary_pid_ << ", err=" << err;
+        }
+      }
       payload_started_ = true;
     }
 
@@ -225,10 +238,18 @@ class TSParser::Stream {
       return OK;
     }
 
-    status_t err = ParsePES(br, event);
-    if (err != OK) {
-      return err;
+    if (!pes_buffer_) {
+      pes_buffer_ = std::make_shared<Buffer>(payload_size);
+      pes_buffer_->setRange(0, 0);
     }
+
+    const size_t buffered_size = pes_buffer_->size();
+    const size_t required_size = buffered_size + payload_size;
+    if (required_size > pes_buffer_->capacity()) {
+      pes_buffer_->ensureCapacity(required_size, true);
+    }
+    memcpy(pes_buffer_->data() + buffered_size, br->data(), payload_size);
+    pes_buffer_->setRange(0, required_size);
 
     return OK;
   }
@@ -237,6 +258,9 @@ class TSParser::Stream {
                            std::shared_ptr<Message> extra) {
     payload_started_ = false;
     expected_continuity_counter_ = -1;
+    if (pes_buffer_) {
+      pes_buffer_->setRange(0, 0);
+    }
 
     if (source_) {
       source_->QueueDiscontinuity(type, extra, false);
@@ -245,8 +269,9 @@ class TSParser::Stream {
 
   void SignalEOS(status_t final_result) {
     if (queue_) {
-      queue_->SignalEOS();
       Flush(nullptr);
+      queue_->SignalEOS();
+      DrainAccessUnits(true, nullptr);
     }
 
     if (source_) {
@@ -267,6 +292,7 @@ class TSParser::Stream {
   bool payload_started_;
   bool eos_reached_;
   std::unique_ptr<ESQueue> queue_;
+  std::shared_ptr<Buffer> pes_buffer_;
 
   status_t ParsePES(BitReader* br, TSParser::SyncEvent* event) {
     if (br->numBitsLeft() < 3 * 8) {
@@ -276,16 +302,7 @@ class TSParser::Stream {
     uint32_t packet_start_code_prefix = br->getBits(24);
     if (packet_start_code_prefix != 1) {
       AVE_LOG(LS_VERBOSE) << "Not a valid PES start code";
-      // Continuation TS payloads do not start with a PES header. Restore the
-      // probe bits so the full payload is forwarded to the ES queue.
-      br->putBits(packet_start_code_prefix, 24);
-      size_t payload_size = br->numBitsLeft() / 8;
-      const uint8_t* data_ptr = br->data();
-
-      if (queue_) {
-        queue_->AppendData(data_ptr, payload_size, -1);
-      }
-      return OK;
+      return ERROR_MALFORMED;
     }
 
     if (br->numBitsLeft() < (8 + 16 + 8 + 8) * 8) {
@@ -379,51 +396,56 @@ class TSParser::Stream {
             time_us = 0;
           }
         }
+        AVE_LOG_IF(LS_INFO,
+                   base::AveConfig::GetInstance().demuxer_logs_enabled())
+            << "TS PES: pid=" << elementary_pid_ << " raw_pts=" << pts
+            << " time_us=" << time_us << " flags=" << pts_dts_flags;
       }
 
       queue_->AppendData(data_ptr, payload_size, time_us);
 
-      auto access_unit = queue_->DequeueAccessUnit(false);
-      while (access_unit) {
-        auto format = queue_->GetFormat();
-        if (format) {
-          source_->SetFormat(format);
-        }
-        if (!IsVideo() || format) {
-          source_->QueueAccessUnit(access_unit);
-        }
-
-        // Check if this is a sync frame
-        if (event && !event->HasReturnedData() && (!IsVideo() || format)) {
-          int64_t au_time_us = access_unit->pts().us_or(-1);
-          if (au_time_us >= 0) {
-            event->Init(0, source_, au_time_us,
-                        IsVideo() ? SourceType::VIDEO : SourceType::AUDIO);
-          }
-        }
-
-        access_unit = queue_->DequeueAccessUnit(false);
-      }
+      DrainAccessUnits(false, event);
     }
 
     return OK;
   }
 
   status_t Flush(TSParser::SyncEvent* event) {
-    if (queue_) {
-      auto access_unit = queue_->DequeueAccessUnit(true);
-      while (access_unit) {
-        auto format = queue_->GetFormat();
-        if (format) {
-          source_->SetFormat(format);
-        }
-        if (!IsVideo() || format) {
-          source_->QueueAccessUnit(access_unit);
-        }
-        access_unit = queue_->DequeueAccessUnit(true);
-      }
+    if (!pes_buffer_ || pes_buffer_->size() == 0) {
+      return OK;
     }
-    return OK;
+
+    BitReader br(pes_buffer_->data(), pes_buffer_->size());
+    const status_t err = ParsePES(&br, event);
+    pes_buffer_->setRange(0, 0);
+    return err;
+  }
+
+  void DrainAccessUnits(bool flush, TSParser::SyncEvent* event) {
+    if (!queue_) {
+      return;
+    }
+
+    auto access_unit = queue_->DequeueAccessUnit(flush);
+    while (access_unit) {
+      auto format = queue_->GetFormat();
+      if (format) {
+        source_->SetFormat(format);
+      }
+      if (!IsVideo() || format) {
+        source_->QueueAccessUnit(access_unit);
+      }
+
+      if (event && !event->HasReturnedData() && (!IsVideo() || format)) {
+        const int64_t au_time_us = access_unit->pts().us_or(-1);
+        if (au_time_us >= 0) {
+          event->Init(0, source_, au_time_us,
+                      IsVideo() ? SourceType::VIDEO : SourceType::AUDIO);
+        }
+      }
+
+      access_unit = queue_->DequeueAccessUnit(flush);
+    }
   }
 };
 
