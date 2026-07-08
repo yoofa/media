@@ -923,6 +923,9 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
     meta->SetStride(out_stride > 0 ? out_stride : out_width);
     if (has_buf_info) {
       meta->SetPts(base::Timestamp::Micros(buf_info.presentation_time_us));
+      if ((buf_info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
+        meta->SetEos(true);
+      }
     }
     codec_buffer->format() = meta;
 
@@ -1008,6 +1011,9 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
     if (audio_pts_us >= 0) {
       meta->SetPts(base::Timestamp::Micros(audio_pts_us));
     }
+    if (has_buf_info && (buf_info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
+      meta->SetEos(true);
+    }
     codec_buffer->format() = meta;
   } else if (mtype == MediaType::VIDEO) {
     auto meta =
@@ -1029,6 +1035,9 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
     }
     if (has_buf_info) {
       meta->SetPts(base::Timestamp::Micros(buf_info.presentation_time_us));
+      if ((buf_info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
+        meta->SetEos(true);
+      }
     }
     codec_buffer->format() = meta;
   } else {
@@ -1037,6 +1046,9 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
       auto meta = MediaMeta::CreatePtr(MediaType::UNKNOWN,
                                        MediaMeta::FormatType::kSample);
       meta->SetPts(base::Timestamp::Micros(buf_info.presentation_time_us));
+      if ((buf_info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
+        meta->SetEos(true);
+      }
       codec_buffer->format() = meta;
     }
   }
