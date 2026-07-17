@@ -314,10 +314,10 @@ void OnAsyncOutputAvailable(AMediaCodec* /*codec*/,
                             void* userdata,
                             int32_t index,
                             AMediaCodecBufferInfo* info) {
-  AVE_LOG(LS_INFO) << "NDK cb: output available, index=" << index
-                   << ", size=" << (info ? info->size : -1)
-                   << ", pts=" << (info ? info->presentationTimeUs : -1)
-                   << ", flags=" << (info ? info->flags : -1);
+  AVE_LOG(LS_VERBOSE) << "NDK cb: output available, index=" << index
+                      << ", size=" << (info ? info->size : -1)
+                      << ", pts=" << (info ? info->presentationTimeUs : -1)
+                      << ", flags=" << (info ? info->flags : -1);
   reinterpret_cast<AndroidNdkMediaCodec*>(userdata)
       ->NotifyOutputBufferAvailable(
           static_cast<size_t>(index), info ? info->offset : 0,
@@ -954,11 +954,11 @@ status_t AndroidNdkMediaCodec::GetOutputBuffer(
                         << ", using raw capacity=" << total_size;
   }
 
-  AVE_LOG(LS_INFO) << "GetOutputBuffer: index=" << index
-                   << ", total_size=" << total_size
-                   << ", data_offset=" << data_offset
-                   << ", data_size=" << data_size
-                   << ", has_buf_info=" << has_buf_info;
+  AVE_LOG(LS_VERBOSE) << "GetOutputBuffer: index=" << index
+                      << ", total_size=" << total_size
+                      << ", data_offset=" << data_offset
+                      << ", data_size=" << data_size
+                      << ", has_buf_info=" << has_buf_info;
 
   auto codec_buffer =
       std::make_shared<CodecBuffer>(addr + data_offset, data_size);
@@ -1121,11 +1121,12 @@ status_t AndroidNdkMediaCodec::QueueInputBuffer(size_t index) {
       pos += 4 + nal_size;
     }
     // Log first few bytes after conversion to confirm Annex B start code
-    AVE_LOG(LS_INFO) << "QueueInputBuffer[VIDEO]: index=" << index
-                     << ", size=" << size << ", pts=" << pts << ", first4=["
-                     << static_cast<int>(p[0]) << " " << static_cast<int>(p[1])
-                     << " " << static_cast<int>(p[2]) << " "
-                     << static_cast<int>(p[3]) << "]";
+    AVE_LOG(LS_VERBOSE) << "QueueInputBuffer[VIDEO]: index=" << index
+                        << ", size=" << size << ", pts=" << pts << ", first4=["
+                        << static_cast<int>(p[0]) << " "
+                        << static_cast<int>(p[1]) << " "
+                        << static_cast<int>(p[2]) << " "
+                        << static_cast<int>(p[3]) << "]";
   }
 
   AVE_LOG(LS_VERBOSE) << "QueueInputBuffer: index=" << index
@@ -1190,8 +1191,8 @@ status_t AndroidNdkMediaCodec::ReleaseOutputBuffer(size_t index, bool render) {
     output_buffer_infos_.erase(index);
   }
 
-  AVE_LOG(LS_INFO) << "ReleaseOutputBuffer: index=" << index
-                   << ", render=" << render;
+  AVE_LOG(LS_VERBOSE) << "ReleaseOutputBuffer: index=" << index
+                      << ", render=" << render;
 
   media_status_t ret = AMediaCodec_releaseOutputBuffer(codec, index, render);
 
