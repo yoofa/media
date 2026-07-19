@@ -17,6 +17,7 @@
 #include <media/NdkMediaFormat.h>
 
 #include "base/attributes.h"
+#include "base/ave_config.h"
 #include "base/errors.h"
 #include "base/logging.h"
 #include "media/NdkMediaCodec.h"
@@ -30,6 +31,13 @@ namespace media {
 
 namespace {
 
+// The platform defaults to a 32 KiB input buffer when max-input-size is not
+// supplied. Lossless audio frames can legitimately exceed that size (for
+// example a 6-channel FLAC frame), so reserve a conservative per-buffer
+// capacity for all audio decoders.
+constexpr int32_t kDefaultAudioMaxInputSize = 256 * 1024;
+constexpr char kMaxInputSizeKey[] = "max-input-size";
+
 #if defined(__ANDROID__)
 constexpr char kDebugVideoDumpPath[] =
     "/data/user/0/io.github.yoofa.avpdemo/cache/avp_video_input.h264";
@@ -40,7 +48,8 @@ void DumpDebugVideoInput(MediaType media_type,
                          const void* data,
                          size_t size,
                          uint32_t flags) {
-  if (media_type != MediaType::VIDEO || mime != MEDIA_MIMETYPE_VIDEO_AVC ||
+  if (!base::AveConfig::GetInstance().codec_debug_enabled() ||
+      media_type != MediaType::VIDEO || mime != MEDIA_MIMETYPE_VIDEO_AVC ||
       !data || size == 0 ||
       (flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
     return;
@@ -514,6 +523,11 @@ AMediaFormat* AndroidNdkMediaCodec::MediaMetaToAMediaFormat(
       AMediaFormat_setInt32(ndk_format, AMEDIAFORMAT_KEY_BIT_RATE,
                             static_cast<int32_t>(bitrate));
     }
+
+    AMediaFormat_setInt32(ndk_format, kMaxInputSizeKey,
+                          kDefaultAudioMaxInputSize);
+    AVE_LOG(LS_VERBOSE) << "MediaMetaToAMediaFormat: max_input_size="
+                        << kDefaultAudioMaxInputSize;
   }
 
   // CSD (Codec Specific Data) - SPS/PPS for H.264, AudioSpecificConfig, etc.

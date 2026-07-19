@@ -20,6 +20,7 @@ ave_library("android_ndk_media_codec") {
     "../../foundation:media_buffer",
     "../../foundation:media_meta",
     "../../video:video_render",
+    "//base:ave_config",
     "//base:logging",
     "//base:utils",
   ]
