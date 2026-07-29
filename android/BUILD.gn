@@ -34,7 +34,6 @@ if (is_android) {
       "java/io/github/yoofa/media/VideoFrame.java",
     ]
     namespace = "ave::media::jni"
-    jni_generator_include = "//base/android/jni/jni_generator_helper.h"
   }
 
   ave_library("ave_media_jni") {

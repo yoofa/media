@@ -28,8 +28,8 @@ using media::jni::Java_AudioSink_getBufferDurationUs;
 using media::jni::Java_AudioSink_getBufferSize;
 using media::jni::Java_AudioSink_getChannelCount;
 using media::jni::Java_AudioSink_getLatency;
-using media::jni::Java_AudioSink_getTimestamp;
 using media::jni::Java_AudioSink_getSampleRate;
+using media::jni::Java_AudioSink_getTimestamp;
 using media::jni::Java_AudioSink_isReady;
 using media::jni::Java_AudioSink_open;
 using media::jni::Java_AudioSink_pause;
@@ -127,32 +127,26 @@ status_t JavaAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
   }
   JNIEnv* env = AttachCurrentThreadIfNeeded();
 
-  jlongArray j_frame_pos = env->NewLongArray(1);
-  jlongArray j_nano_time = env->NewLongArray(1);
-  if (!j_frame_pos || !j_nano_time) {
-    if (j_frame_pos)
-      env->DeleteLocalRef(j_frame_pos);
-    if (j_nano_time)
-      env->DeleteLocalRef(j_nano_time);
+  auto j_frame_pos = jni_zero::ScopedJavaLocalRef<jlongArray>::Adopt(
+      env, env->NewLongArray(1));
+  auto j_nano_time = jni_zero::ScopedJavaLocalRef<jlongArray>::Adopt(
+      env, env->NewLongArray(1));
+  if (!j_frame_pos.obj() || !j_nano_time.obj()) {
     return -ENOMEM;
   }
 
-  jboolean ok = Java_AudioSink_getTimestamp(
-      env, j_audio_sink_,
-      jni_zero::JavaParamRef<jlongArray>(env, j_frame_pos),
-      jni_zero::JavaParamRef<jlongArray>(env, j_nano_time));
+  jboolean ok =
+      Java_AudioSink_getTimestamp(env, j_audio_sink_, j_frame_pos, j_nano_time);
 
   if (ok) {
     jlong frame_pos = 0;
     jlong nano_time = 0;
-    env->GetLongArrayRegion(j_frame_pos, 0, 1, &frame_pos);
-    env->GetLongArrayRegion(j_nano_time, 0, 1, &nano_time);
+    env->GetLongArrayRegion(j_frame_pos.obj(), 0, 1, &frame_pos);
+    env->GetLongArrayRegion(j_nano_time.obj(), 0, 1, &nano_time);
     ts->position = static_cast<uint32_t>(frame_pos);
     ts->nanos = static_cast<int64_t>(nano_time);
   }
 
-  env->DeleteLocalRef(j_frame_pos);
-  env->DeleteLocalRef(j_nano_time);
   return ok ? OK : INVALID_OPERATION;
 }
 
@@ -209,9 +203,10 @@ ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
 
   JNIEnv* env = AttachCurrentThreadIfNeeded();
 
-  jobject j_buffer = env->NewDirectByteBuffer(const_cast<void*>(buffer),
-                                              static_cast<jlong>(size));
-  if (!j_buffer) {
+  auto j_buffer = jni_zero::ScopedJavaLocalRef<jobject>::Adopt(
+      env, env->NewDirectByteBuffer(const_cast<void*>(buffer),
+                                    static_cast<jlong>(size)));
+  if (!j_buffer.obj()) {
     AVE_LOG(LS_ERROR) << "JavaAudioTrack::Write: NewDirectByteBuffer failed";
     return -ENOMEM;
   }
@@ -226,16 +221,14 @@ ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
   const int64_t blocking_deadline_ms =
       blocking ? base::TimeMillis() + (compressed ? 20 : 200) : 0;
   while (total_written < size) {
-    jint written = Java_AudioSink_write(
-        env, j_audio_sink_, jni_zero::JavaParamRef<jobject>(env, j_buffer),
-        static_cast<int>(size - total_written),
-        static_cast<jboolean>(blocking));
+    jint written = Java_AudioSink_write(env, j_audio_sink_, j_buffer,
+                                        static_cast<int>(size - total_written),
+                                        static_cast<jboolean>(blocking));
     if (written == 0 && blocking && base::TimeMillis() < blocking_deadline_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(2));
       continue;
     }
     if (written <= 0) {
-      env->DeleteLocalRef(j_buffer);
       if (total_written > 0 && !blocking) {
         return static_cast<ssize_t>(total_written);
       }
@@ -251,12 +244,12 @@ ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
 
     total_written += static_cast<size_t>(written);
     if (total_written < size) {
-      env->DeleteLocalRef(j_buffer);
-      j_buffer = env->NewDirectByteBuffer(
-          const_cast<uint8_t*>(static_cast<const uint8_t*>(buffer) +
-                               total_written),
-          static_cast<jlong>(size - total_written));
-      if (!j_buffer) {
+      j_buffer = jni_zero::ScopedJavaLocalRef<jobject>::Adopt(
+          env, env->NewDirectByteBuffer(
+                   const_cast<uint8_t*>(static_cast<const uint8_t*>(buffer) +
+                                        total_written),
+                   static_cast<jlong>(size - total_written)));
+      if (!j_buffer.obj()) {
         AVE_LOG(LS_ERROR)
             << "JavaAudioTrack::Write: NewDirectByteBuffer retry failed";
         return static_cast<ssize_t>(total_written);
@@ -266,8 +259,6 @@ ssize_t JavaAudioTrack::Write(const void* buffer, size_t size, bool blocking) {
       break;
     }
   }
-
-  env->DeleteLocalRef(j_buffer);
 
   return static_cast<ssize_t>(total_written);
 }

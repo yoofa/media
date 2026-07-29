@@ -452,7 +452,7 @@ void ConfigureVideoCodec(MediaMeta* format, AVCodecContext* codec_context) {
   codec_context->codec_type = AVMEDIA_TYPE_VIDEO;
   codec_context->codec_id = ConvertToFFmpegCodecId(format->codec());
   // TODO: profile
-  codec_context->profile = FF_PROFILE_UNKNOWN;
+  codec_context->profile = AV_PROFILE_UNKNOWN;
 
   // Only set dimensions if valid (for decoders, FFmpeg detects from stream)
   if (format->width() > 0) {

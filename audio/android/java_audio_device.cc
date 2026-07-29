@@ -53,7 +53,7 @@ std::shared_ptr<AudioTrack> JavaAudioDevice::CreateAudioTrack() {
   }
 
   // Wrap the Java AudioSink in a C++ JavaAudioTrack.
-  jni_zero::ScopedJavaGlobalRef<jobject> global_sink(env, j_audio_sink.obj());
+  jni_zero::ScopedJavaGlobalRef<jobject> global_sink(env, j_audio_sink);
   return std::make_shared<JavaAudioTrack>(global_sink);
 }
 
