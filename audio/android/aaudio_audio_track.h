@@ -10,6 +10,11 @@
 
 #include <aaudio/AAudio.h>
 
+#include <atomic>
+#include <cstdint>
+#include <mutex>
+#include <thread>
+
 #include "media/audio/audio_track.h"
 
 namespace ave {
@@ -43,6 +48,11 @@ class AAudioAudioTrack : public AudioTrack {
   ssize_t Write(const void* buffer, size_t size, bool blocking) override;
 
  private:
+  status_t OpenLocked();
+  status_t StartLocked();
+  void ScheduleRestartAfterDisconnect();
+  void RestartAfterDisconnect(std::stop_token stop_token);
+
   static aaudio_data_callback_result_t DataCallback(AAudioStream* stream,
                                                     void* userData,
                                                     void* audioData,
@@ -55,8 +65,14 @@ class AAudioAudioTrack : public AudioTrack {
   AudioCallback callback_;
   void* cookie_ = nullptr;
 
+  std::mutex stream_mutex_;
+  std::mutex restart_mutex_;
+  std::jthread restart_thread_;
   AAudioStream* stream_ = nullptr;
-  bool started_ = false;
+  std::atomic_bool started_ = false;
+  std::atomic_bool shutting_down_ = false;
+  std::atomic_bool restart_pending_ = false;
+  std::atomic_uint32_t restart_attempt_count_ = 0;
 };
 
 }  // namespace android

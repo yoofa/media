@@ -1259,10 +1259,7 @@ ave_library("forward_error_correction") {
 }
 
 ave_library("ulpfec_header_reader_writer") {
-  sources = [
-    "src/fec/ulpfec_header_reader_writer.cc",
-    "src/fec/ulpfec_header_reader_writer.h",
-  ]
+  sources = [ "src/fec/ulpfec_header_reader_writer.h" ]
   deps = [ ":forward_error_correction" ]
 }
 

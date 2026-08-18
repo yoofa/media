@@ -15,7 +15,7 @@ namespace media {
 
 namespace {
 const size_t kInvalidIndex = static_cast<size_t>(-1);
-const int kOpusFrameDuration = 20;  // 20ms frame duration
+const int32_t kDefaultOpusFrameDurationMs = 20;
 }  // namespace
 
 OpusCodec::OpusCodec(bool is_encoder)
@@ -51,8 +51,10 @@ status_t OpusCodec::OnConfigure(const std::shared_ptr<CodecConfig>& config) {
     channels_ = 2;  // Default to stereo
   }
 
-  // Calculate frame size based on sample rate and frame duration
-  frame_size_ = sample_rate_ * kOpusFrameDuration / 1000;
+  const int64_t samples_per_channel = format->samples_per_channel();
+  frame_size_ = samples_per_channel > 0
+                    ? static_cast<int32_t>(samples_per_channel)
+                    : sample_rate_ * kDefaultOpusFrameDurationMs / 1000;
 
   AVE_LOG(LS_INFO) << "Configuring OpusCodec: sample_rate=" << sample_rate_
                    << ", channels=" << channels_

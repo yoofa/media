@@ -154,7 +154,6 @@ status_t AAudioAudioRecord::Open(audio_config_t config,
   AAudioStreamBuilder_setPerformanceMode(builder,
                                          AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
   AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_SHARED);
-
   if (callback_) {
     AAudioStreamBuilder_setDataCallback(builder, DataCallback, this);
     AAudioStreamBuilder_setErrorCallback(builder, ErrorCallback, this);
