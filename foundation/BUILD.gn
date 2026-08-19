@@ -40,11 +40,14 @@ ave_library("media_frame") {
 
 ave_library("media_source_sink") {
   sources = [
+    "async_media_frame_source.cc",
+    "async_media_frame_source.h",
     "media_sink_base.cc",
     "media_sink_base.h",
     "media_source_base.h",
     "media_source_sink_interface.h",
   ]
+  deps = [ "//base:task_util" ]
 }
 
 ave_library("handler") {
@@ -171,11 +174,15 @@ ave_library("media_clock") {
 #
 ave_library("unittest_sources") {
   testonly = true
+  sources = [ "async_media_frame_source_unittest.cc" ]
   deps = [
+    ":media_frame",
+    ":media_source_sink",
     #"test:media_clock_test",
     # "test:media_meta_test",
     #  "test:media_utils_test",
     "test:message_test",
+    "//test:test_support",
   ]
 }
 

@@ -4,7 +4,40 @@ ave_library("audio") {
   deps = [
     ":audio_base",
     ":audio_device",
+    ":audio_encoder_stream",
   ]
+}
+
+ave_library("audio_encoder_stream") {
+  sources = [
+    "audio_encoder_stream.cc",
+    "audio_encoder_stream.h",
+  ]
+  deps = [
+    "//base:clock",
+    "//base:logging",
+    "//base:task_util",
+    "//base/units:timestamp",
+    "//media/codec:codec_factory",
+    "//media/codec:codec_id",
+    "//media/codec/opus:opus_codec",
+    "//media/foundation:media_frame",
+    "//media/foundation:media_source_sink",
+  ]
+}
+
+if (!is_android) {
+  ave_source_set("audio_encoder_stream_unittest_sources") {
+    testonly = true
+    sources = [ "audio_encoder_stream_unittest.cc" ]
+    deps = [
+      ":audio_encoder_stream",
+      "//base:clock",
+      "//media/foundation:media_frame",
+      "//media/foundation:media_source_sink",
+      "//test:test_support",
+    ]
+  }
 }
 
 # audio base

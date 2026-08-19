@@ -1,5 +1,7 @@
 #include "media/modules/rtp_session/rtp_session.h"
 
+#include "media/modules/rtp_session/rtp_timestamp_mapper.h"
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -337,6 +339,27 @@ TEST(RtpSessionTest, ControlsLifecycleAndStreamRemoval) {
   EXPECT_EQ(bundle.session->Stop(), OK);
   EXPECT_FALSE(bundle.session->started());
   EXPECT_EQ(bundle.session->Stop(), OK);
+}
+
+TEST(RtpTimestampMapperTest, UsesOpusClockForTenAndTwentyMillisecondFrames) {
+  constexpr uint32_t kInitialTimestamp = 0xf1234567U;
+  RtpTimestampMapper mapper(48000, kInitialTimestamp);
+  const base::Timestamp first_pts = base::Timestamp::Seconds(10);
+
+  EXPECT_EQ(mapper.Map(first_pts), kInitialTimestamp);
+  EXPECT_EQ(mapper.Map(first_pts + base::TimeDelta::Millis(10)),
+            kInitialTimestamp + 480U);
+  EXPECT_EQ(mapper.Map(first_pts + base::TimeDelta::Millis(20)),
+            kInitialTimestamp + 960U);
+}
+
+TEST(RtpTimestampMapperTest, ResetEstablishesANewPtsOrigin) {
+  RtpTimestampMapper mapper(90000, 100U);
+  EXPECT_EQ(mapper.Map(base::Timestamp::Millis(1)), 100U);
+  EXPECT_EQ(mapper.Map(base::Timestamp::Millis(11)), 1000U);
+
+  mapper.Reset(500U);
+  EXPECT_EQ(mapper.Map(base::Timestamp::Seconds(50)), 500U);
 }
 
 }  // namespace

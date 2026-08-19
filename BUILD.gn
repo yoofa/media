@@ -21,4 +21,7 @@ ave_executable("media_unittests") {
     "//test:test_main",
     "//test:test_support",
   ]
+  if (!is_android) {
+    deps += [ "audio:audio_encoder_stream_unittest_sources" ]
+  }
 }

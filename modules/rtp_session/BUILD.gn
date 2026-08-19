@@ -33,8 +33,12 @@ ave_library("rtp_transport") {
 
 ave_library("rtp_session") {
   sources = [
+    "audio_rtp_send_stream.cc",
+    "audio_rtp_send_stream.h",
     "rtp_session.cc",
     "rtp_session.h",
+    "rtp_timestamp_mapper.cc",
+    "rtp_timestamp_mapper.h",
   ]
 
   deps = [
@@ -42,6 +46,8 @@ ave_library("rtp_session") {
     "//base:clock",
     "//base:utils",
     "//base/units:timestamp",
+    "//media/foundation:media_frame",
+    "//media/foundation:media_source_sink",
     "//media/modules/rtp_rtcp:receive_statistics_impl",
     "//media/modules/rtp_rtcp:rtp_header_extension_map",
     "//media/modules/rtp_rtcp:rtp_header_extensions",
@@ -49,6 +55,7 @@ ave_library("rtp_session") {
     "//media/modules/rtp_rtcp:rtp_packet_received",
     "//media/modules/rtp_rtcp:rtp_rtcp_format",
     "//media/modules/rtp_rtcp:rtp_rtcp_interface",
+    "//media/modules/rtp_rtcp:rtp_sender_audio",
   ]
 }
 
