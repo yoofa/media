@@ -1,0 +1,52 @@
+import("//base/build/ave.gni")
+
+ave_library("packet_transport") {
+  sources = [
+    "transport/packet_transport.cc",
+    "transport/packet_transport.h",
+    "transport/packet_transport_sink.h",
+    "transport/udp_packet_transport.cc",
+    "transport/udp_packet_transport.h",
+  ]
+
+  deps = [
+    "//base:timeutils",
+    "//base:utils",
+    "//base/units:timestamp",
+  ]
+}
+
+ave_library("rtp_transport") {
+  sources = [
+    "transport/rtp_transport.cc",
+    "transport/rtp_transport.h",
+  ]
+
+  deps = [
+    ":packet_transport",
+    "//base:timeutils",
+    "//base:utils",
+    "//media/modules/rtp_rtcp:transport",
+  ]
+}
+
+if (!is_android) {
+  ave_source_set("unittest_sources") {
+    testonly = true
+    sources = [ "transport/packet_transport_unittest.cc" ]
+    deps = [
+      ":packet_transport",
+      ":rtp_transport",
+      "//base:clock",
+      "//test:test_support",
+    ]
+  }
+
+  ave_executable("rtp_session_unittests") {
+    testonly = true
+    deps = [
+      ":unittest_sources",
+      "//test:test_main",
+    ]
+  }
+}
