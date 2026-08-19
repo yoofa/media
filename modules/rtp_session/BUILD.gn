@@ -45,6 +45,8 @@ ave_library("rtp_session") {
     "rtp_timestamp_mapper.h",
     "video_rtp_send_stream.cc",
     "video_rtp_send_stream.h",
+    "video_rtp_receive_stream.cc",
+    "video_rtp_receive_stream.h",
   ]
 
   deps = [
@@ -90,6 +92,7 @@ if (!is_android) {
       "security/srtp_session_unittest.cc",
       "transport/packet_transport_unittest.cc",
       "video_rtp_send_stream_unittest.cc",
+      "video_rtp_receive_stream_unittest.cc",
     ]
     deps = [
       ":packet_transport",
