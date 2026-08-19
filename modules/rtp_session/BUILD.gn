@@ -31,6 +31,27 @@ ave_library("rtp_transport") {
   ]
 }
 
+ave_library("rtp_session") {
+  sources = [
+    "rtp_session.cc",
+    "rtp_session.h",
+  ]
+
+  deps = [
+    ":rtp_transport",
+    "//base:clock",
+    "//base:utils",
+    "//base/units:timestamp",
+    "//media/modules/rtp_rtcp:receive_statistics_impl",
+    "//media/modules/rtp_rtcp:rtp_header_extension_map",
+    "//media/modules/rtp_rtcp:rtp_header_extensions",
+    "//media/modules/rtp_rtcp:rtp_packet",
+    "//media/modules/rtp_rtcp:rtp_packet_received",
+    "//media/modules/rtp_rtcp:rtp_rtcp_format",
+    "//media/modules/rtp_rtcp:rtp_rtcp_interface",
+  ]
+}
+
 ave_library("srtp_session") {
   sources = [
     "security/srtp_session.cc",
@@ -47,11 +68,13 @@ if (!is_android) {
   ave_source_set("unittest_sources") {
     testonly = true
     sources = [
+      "rtp_session_unittest.cc",
       "security/srtp_session_unittest.cc",
       "transport/packet_transport_unittest.cc",
     ]
     deps = [
       ":packet_transport",
+      ":rtp_session",
       ":rtp_transport",
       ":srtp_session",
       "//base:clock",
