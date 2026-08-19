@@ -19,6 +19,7 @@
 #include "base/task_util/task_runner_factory.h"
 #include "media/foundation/async_media_frame_source.h"
 #include "media/modules/rtp_rtcp/api/rtp_packet_sink_interface.h"
+#include "media/modules/rtp_session/rtp_timestamp_mapper.h"
 
 namespace ave::media::rtp_session {
 
@@ -53,9 +54,7 @@ class VideoRtpReceiveStream final : public AsyncMediaFrameSource,
 
  private:
   struct PacketFragment {
-    uint16_t sequence_number = 0;
     bool marker = false;
-    bool starts_frame = false;
     bool key_frame = false;
     std::vector<uint8_t> payload;
   };
@@ -71,14 +70,11 @@ class VideoRtpReceiveStream final : public AsyncMediaFrameSource,
   static std::optional<PacketFragment> ParsePacket(
       const rtp_rtcp::RtpPacketReceived& packet);
   std::shared_ptr<MediaFrame> TryAssembleFrame();
-  void ResetPendingFrame(uint32_t rtp_timestamp,
-                         base::Timestamp arrival_time);
-  base::Timestamp MapRtpTimestamp(uint32_t rtp_timestamp);
+  void ResetPendingFrame(uint32_t rtp_timestamp, base::Timestamp arrival_time);
 
   const Config config_;
   base::RtpSequenceNumberUnwrapper sequence_unwrapper_;
-  base::RtpTimestampUnwrapper timestamp_unwrapper_;
-  std::optional<int64_t> first_rtp_timestamp_;
+  RtpReceiveTimestampMapper timestamp_mapper_;
   std::optional<PendingFrame> pending_frame_;
   mutable std::mutex mutex_;
   std::atomic<bool> running_{false};

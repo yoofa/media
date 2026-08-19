@@ -18,7 +18,8 @@ namespace ave::media::rtp_session {
 AudioRtpReceiveStream::AudioRtpReceiveStream(const Config& config)
     : AsyncMediaFrameSource(config.task_runner_factory),
       config_(config),
-      packet_buffer_(config.packet_buffer) {
+      packet_buffer_(config.packet_buffer),
+      timestamp_mapper_({.clock_rate_hz = config.rtp_clock_rate_hz}) {
   AVE_CHECK_GT(config_.rtp_clock_rate_hz, 0U);
 }
 
@@ -34,8 +35,7 @@ void AudioRtpReceiveStream::Stop() {
   running_.store(false);
   std::scoped_lock lock(mutex_);
   packet_buffer_.Reset();
-  timestamp_unwrapper_.Reset();
-  first_rtp_timestamp_.reset();
+  timestamp_mapper_.Reset();
 }
 
 void AudioRtpReceiveStream::OnRtpPacket(
@@ -77,7 +77,7 @@ void AudioRtpReceiveStream::DeliverPacket(BufferedAudioPacket packet) {
       MediaFrame::CreateShared(packet.payload.size(), MediaType::AUDIO);
   std::memcpy(frame->data(), packet.payload.data(), packet.payload.size());
   frame->setRange(0, packet.payload.size());
-  const base::Timestamp pts = MapRtpTimestamp(packet.rtp_timestamp);
+  const base::Timestamp pts = timestamp_mapper_.Map(packet.rtp_timestamp);
   base::TimeDelta duration =
       base::TimeDelta::Millis(config_.default_frame_duration_ms);
   if (packet.duration_rtp_ticks.has_value() && *packet.duration_rtp_ticks > 0 &&
@@ -94,19 +94,6 @@ void AudioRtpReceiveStream::DeliverPacket(BufferedAudioPacket packet) {
       .SetDuration(duration);
   frame->set_arrival_time(packet.arrival_time);
   DeliverFrame(frame);
-}
-
-base::Timestamp AudioRtpReceiveStream::MapRtpTimestamp(uint32_t rtp_timestamp) {
-  const int64_t unwrapped_timestamp =
-      timestamp_unwrapper_.Unwrap(rtp_timestamp);
-  if (!first_rtp_timestamp_.has_value()) {
-    first_rtp_timestamp_ = unwrapped_timestamp;
-  }
-  const int64_t relative_ticks = unwrapped_timestamp - *first_rtp_timestamp_;
-  const auto clock_rate = static_cast<int64_t>(config_.rtp_clock_rate_hz);
-  return base::Timestamp::Micros(relative_ticks / clock_rate * 1'000'000 +
-                                 relative_ticks % clock_rate * 1'000'000 /
-                                     clock_rate);
 }
 
 }  // namespace ave::media::rtp_session

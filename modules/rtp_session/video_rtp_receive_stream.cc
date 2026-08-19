@@ -27,8 +27,6 @@ constexpr uint8_t kStapAType = 24;
 constexpr uint8_t kFuAType = 28;
 constexpr uint8_t kIdrType = 5;
 constexpr uint8_t kSpsType = 7;
-constexpr uint8_t kPpsType = 8;
-constexpr uint8_t kAudType = 9;
 constexpr std::array<uint8_t, 4> kAnnexBStartCode = {0, 0, 0, 1};
 
 void AppendStartCode(std::vector<uint8_t>* output) {
@@ -43,7 +41,9 @@ bool IsKeyNal(uint8_t nal_type) {
 }  // namespace
 
 VideoRtpReceiveStream::VideoRtpReceiveStream(const Config& config)
-    : AsyncMediaFrameSource(config.task_runner_factory), config_(config) {}
+    : AsyncMediaFrameSource(config.task_runner_factory),
+      config_(config),
+      timestamp_mapper_({.clock_rate_hz = config.rtp_clock_rate_hz}) {}
 
 VideoRtpReceiveStream::~VideoRtpReceiveStream() {
   Stop();
@@ -58,8 +58,7 @@ void VideoRtpReceiveStream::Stop() {
   std::scoped_lock lock(mutex_);
   pending_frame_.reset();
   sequence_unwrapper_.Reset();
-  timestamp_unwrapper_.Reset();
-  first_rtp_timestamp_.reset();
+  timestamp_mapper_.Reset();
 }
 
 void VideoRtpReceiveStream::OnRtpPacket(
@@ -97,9 +96,6 @@ void VideoRtpReceiveStream::OnRtpPacket(
       ResetPendingFrame(packet.Timestamp(), packet.arrival_time());
     }
 
-    if (fragment->starts_frame) {
-      pending_frame_->first_sequence = sequence;
-    }
     if (!pending_frame_->first_sequence.has_value()) {
       pending_frame_->first_sequence = sequence;
     } else {
@@ -127,18 +123,14 @@ VideoRtpReceiveStream::Stats VideoRtpReceiveStream::GetStats() const {
 }
 
 std::optional<VideoRtpReceiveStream::PacketFragment>
-VideoRtpReceiveStream::ParsePacket(
-    const rtp_rtcp::RtpPacketReceived& packet) {
+VideoRtpReceiveStream::ParsePacket(const rtp_rtcp::RtpPacketReceived& packet) {
   const std::span<const uint8_t> payload = packet.payload();
   if (payload.empty()) {
     return std::nullopt;
   }
   const uint8_t nal_type = payload[0] & kNalTypeMask;
   PacketFragment fragment{
-      .sequence_number = packet.SequenceNumber(),
       .marker = packet.Marker(),
-      .starts_frame = nal_type == kSpsType || nal_type == kPpsType ||
-                      nal_type == kAudType,
       .key_frame = IsKeyNal(nal_type),
       .payload = std::vector<uint8_t>(payload.begin(), payload.end()),
   };
@@ -147,7 +139,6 @@ VideoRtpReceiveStream::ParsePacket(
       return std::nullopt;
     }
     const uint8_t original_type = payload[1] & kNalTypeMask;
-    fragment.starts_frame = (payload[1] & kFuStartBit) != 0;
     fragment.key_frame = IsKeyNal(original_type);
     if (packet.Marker() && (payload[1] & kFuEndBit) == 0) {
       return std::nullopt;
@@ -156,7 +147,6 @@ VideoRtpReceiveStream::ParsePacket(
     if (payload.size() < 4) {
       return std::nullopt;
     }
-    fragment.starts_frame = true;
   } else if (nal_type == 0 || nal_type >= kStapAType) {
     return std::nullopt;
   }
@@ -186,6 +176,8 @@ std::shared_ptr<MediaFrame> VideoRtpReceiveStream::TryAssembleFrame() {
 
   std::vector<uint8_t> annex_b;
   bool key_frame = false;
+  bool fragmented_nal_open = false;
+  uint8_t fragmented_nal_type = 0;
   for (int64_t sequence = *pending_frame_->first_sequence;
        sequence <= *pending_frame_->marker_sequence; ++sequence) {
     const PacketFragment& fragment = pending_frame_->packets.at(sequence);
@@ -193,6 +185,10 @@ std::shared_ptr<MediaFrame> VideoRtpReceiveStream::TryAssembleFrame() {
     const uint8_t nal_type = payload[0] & kNalTypeMask;
     key_frame = key_frame || fragment.key_frame;
     if (nal_type == kStapAType) {
+      if (fragmented_nal_open) {
+        ++stats_.invalid_packets_dropped;
+        return nullptr;
+      }
       size_t offset = 1;
       while (offset + 2 <= payload.size()) {
         const size_t nal_size =
@@ -216,24 +212,46 @@ std::shared_ptr<MediaFrame> VideoRtpReceiveStream::TryAssembleFrame() {
     }
     if (nal_type == kFuAType) {
       const bool starts_nal = (payload[1] & kFuStartBit) != 0;
+      const bool ends_nal = (payload[1] & kFuEndBit) != 0;
+      const uint8_t original_type = payload[1] & kNalTypeMask;
       if (starts_nal) {
+        if (fragmented_nal_open) {
+          ++stats_.invalid_packets_dropped;
+          return nullptr;
+        }
+        fragmented_nal_open = true;
+        fragmented_nal_type = original_type;
         AppendStartCode(&annex_b);
-        annex_b.push_back((payload[0] & 0xe0) | (payload[1] & kNalTypeMask));
+        annex_b.push_back((payload[0] & 0xe0) | original_type);
+      } else if (!fragmented_nal_open || original_type != fragmented_nal_type) {
+        ++stats_.invalid_packets_dropped;
+        return nullptr;
       }
       annex_b.insert(annex_b.end(), payload.begin() + 2, payload.end());
+      if (ends_nal) {
+        fragmented_nal_open = false;
+      }
       continue;
+    }
+    if (fragmented_nal_open) {
+      ++stats_.invalid_packets_dropped;
+      return nullptr;
     }
     AppendStartCode(&annex_b);
     annex_b.insert(annex_b.end(), payload.begin(), payload.end());
   }
-  if (annex_b.empty()) {
+  if (annex_b.empty() || fragmented_nal_open) {
+    if (fragmented_nal_open) {
+      ++stats_.invalid_packets_dropped;
+    }
     return nullptr;
   }
 
   auto frame = MediaFrame::CreateShared(annex_b.size(), MediaType::VIDEO);
   std::memcpy(frame->data(), annex_b.data(), annex_b.size());
   frame->setRange(0, annex_b.size());
-  const base::Timestamp pts = MapRtpTimestamp(pending_frame_->rtp_timestamp);
+  const base::Timestamp pts =
+      timestamp_mapper_.Map(pending_frame_->rtp_timestamp);
   frame->SetCodec(CodecId::AVE_CODEC_ID_H264)
       .SetPictureType(key_frame ? PictureType::I : PictureType::P)
       .SetPts(pts)
@@ -242,26 +260,12 @@ std::shared_ptr<MediaFrame> VideoRtpReceiveStream::TryAssembleFrame() {
   return frame;
 }
 
-void VideoRtpReceiveStream::ResetPendingFrame(
-    uint32_t rtp_timestamp,
-    base::Timestamp arrival_time) {
+void VideoRtpReceiveStream::ResetPendingFrame(uint32_t rtp_timestamp,
+                                              base::Timestamp arrival_time) {
   pending_frame_ = PendingFrame{
       .rtp_timestamp = rtp_timestamp,
       .arrival_time = arrival_time,
   };
-}
-
-base::Timestamp VideoRtpReceiveStream::MapRtpTimestamp(
-    uint32_t rtp_timestamp) {
-  const int64_t unwrapped = timestamp_unwrapper_.Unwrap(rtp_timestamp);
-  if (!first_rtp_timestamp_.has_value()) {
-    first_rtp_timestamp_ = unwrapped;
-  }
-  const int64_t relative_ticks = unwrapped - *first_rtp_timestamp_;
-  const auto clock_rate = static_cast<int64_t>(config_.rtp_clock_rate_hz);
-  return base::Timestamp::Micros(relative_ticks / clock_rate * 1'000'000 +
-                                 relative_ticks % clock_rate * 1'000'000 /
-                                     clock_rate);
 }
 
 }  // namespace ave::media::rtp_session

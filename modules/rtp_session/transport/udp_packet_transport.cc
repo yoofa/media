@@ -36,6 +36,16 @@ status_t StatusFromErrno() {
   return errno == 0 ? UNKNOWN_ERROR : -errno;
 }
 
+status_t SetSocketBufferSize(int socket_fd, int option, int32_t size_bytes) {
+  if (size_bytes == 0) {
+    return OK;
+  }
+  const int value = size_bytes;
+  return setsockopt(socket_fd, SOL_SOCKET, option, &value, sizeof(value)) == 0
+             ? OK
+             : StatusFromErrno();
+}
+
 }  // namespace
 
 UdpPacketTransport::UdpPacketTransport(Config config)
@@ -49,7 +59,9 @@ status_t UdpPacketTransport::Start(PacketTransportSink* sink) {
   std::scoped_lock lifecycle_lock(lifecycle_mutex_);
   if (sink == nullptr || !config_.local_endpoint.IsValid() ||
       config_.clock == nullptr || config_.maximum_packet_size == 0 ||
-      config_.maximum_packet_size > PacketTransport::kMaximumUdpPayloadSize) {
+      config_.maximum_packet_size > PacketTransport::kMaximumUdpPayloadSize ||
+      config_.receive_buffer_size_bytes < 0 ||
+      config_.send_buffer_size_bytes < 0) {
     return BAD_VALUE;
   }
   if (running_.load(std::memory_order_acquire)) {
@@ -67,6 +79,17 @@ status_t UdpPacketTransport::Start(PacketTransportSink* sink) {
     const status_t status = StatusFromErrno();
     close(socket_fd);
     return status;
+  }
+
+  status_t buffer_status = SetSocketBufferSize(
+      socket_fd, SO_RCVBUF, config_.receive_buffer_size_bytes);
+  if (buffer_status == OK) {
+    buffer_status = SetSocketBufferSize(socket_fd, SO_SNDBUF,
+                                        config_.send_buffer_size_bytes);
+  }
+  if (buffer_status != OK) {
+    close(socket_fd);
+    return buffer_status;
   }
 
   const sockaddr_in local_address = ToSockaddr(config_.local_endpoint);

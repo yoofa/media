@@ -18,6 +18,10 @@ class UdpPacketTransport final : public PacketTransport {
     PacketEndpoint local_endpoint;
     base::Clock* clock = nullptr;
     size_t maximum_packet_size = PacketTransport::kMaximumUdpPayloadSize;
+    // Zero keeps the platform default. Larger buffers are useful for video
+    // access-unit bursts; the kernel may clamp the requested value.
+    int32_t receive_buffer_size_bytes = 4 * 1024 * 1024;
+    int32_t send_buffer_size_bytes = 1024 * 1024;
   };
 
   explicit UdpPacketTransport(Config config);

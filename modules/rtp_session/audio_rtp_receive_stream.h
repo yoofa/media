@@ -12,12 +12,12 @@
 #include <map>
 #include <mutex>
 
-#include "base/numerics/sequence_number_unwrapper.h"
 #include "base/task_util/task_runner_factory.h"
 #include "media/codec/codec_id.h"
 #include "media/foundation/async_media_frame_source.h"
 #include "media/modules/rtp_rtcp/api/rtp_packet_sink_interface.h"
 #include "media/modules/rtp_session/audio_packet_buffer.h"
+#include "media/modules/rtp_session/rtp_timestamp_mapper.h"
 
 namespace ave::media::rtp_session {
 
@@ -43,12 +43,10 @@ class AudioRtpReceiveStream final : public AsyncMediaFrameSource,
 
  private:
   void DeliverPacket(BufferedAudioPacket packet);
-  base::Timestamp MapRtpTimestamp(uint32_t rtp_timestamp);
 
   Config config_;
   AudioPacketBuffer packet_buffer_;
-  base::RtpTimestampUnwrapper timestamp_unwrapper_;
-  std::optional<int64_t> first_rtp_timestamp_;
+  RtpReceiveTimestampMapper timestamp_mapper_;
   mutable std::mutex mutex_;
   std::atomic<bool> running_{false};
 };

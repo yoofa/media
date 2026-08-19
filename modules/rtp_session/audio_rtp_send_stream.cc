@@ -13,10 +13,11 @@ namespace ave::media::rtp_session {
 AudioRtpSendStream::AudioRtpSendStream(const Config& config)
     : config_(config),
       timestamp_mapper_(
-          config.rtp_clock_rate_hz,
+          config.rtp_clock_rate_hz == 0 ? 1 : config.rtp_clock_rate_hz,
           config.rtp_rtcp == nullptr ? 0 : config.rtp_rtcp->StartTimestamp()) {
   if (config_.rtp_rtcp == nullptr || config_.clock == nullptr ||
-      config_.rtp_rtcp->RtpSender() == nullptr || config_.payload_type > 127) {
+      config_.rtp_rtcp->RtpSender() == nullptr || config_.payload_type > 127 ||
+      config_.rtp_clock_rate_hz == 0) {
     AVE_LOG(LS_ERROR) << "AudioRtpSendStream requires an RTP sender and clock";
     return;
   }

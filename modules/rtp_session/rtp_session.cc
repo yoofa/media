@@ -361,16 +361,24 @@ void RtpSession::HandleRtcpPacket(std::span<const uint8_t> packet,
     return;
   }
 
+  std::vector<rtp_rtcp::RtpRtcpInterface*> modules;
   {
     std::scoped_lock lock(mutex_);
     ++stats_.rtcp_packets_received;
+    modules.reserve(rtp_rtcp_modules_.size());
+    for (const auto& [local_ssrc, module] : rtp_rtcp_modules_) {
+      static_cast<void>(local_ssrc);
+      modules.push_back(module.get());
+    }
   }
   if (observer_ != nullptr) {
     observer_->OnRtcpPacketReceived(packet, source);
   }
-  std::scoped_lock lock(mutex_);
-  for (const auto& [local_ssrc, module] : rtp_rtcp_modules_) {
-    static_cast<void>(local_ssrc);
+  // Receive streams and their RTCP modules cannot be changed while the
+  // session is running, so the snapshot remains valid. Do not invoke RTP/RTCP
+  // code while holding the session mutex: feedback callbacks may re-enter the
+  // session.
+  for (rtp_rtcp::RtpRtcpInterface* module : modules) {
     module->IncomingRtcpPacket(packet);
   }
 }

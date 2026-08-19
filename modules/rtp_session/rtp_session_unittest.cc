@@ -362,5 +362,25 @@ TEST(RtpTimestampMapperTest, ResetEstablishesANewPtsOrigin) {
   EXPECT_EQ(mapper.Map(base::Timestamp::Seconds(50)), 500U);
 }
 
+TEST(RtpReceiveTimestampMapperTest, PreservesWrapAroundContinuity) {
+  RtpReceiveTimestampMapper mapper({.clock_rate_hz = 48000});
+
+  EXPECT_EQ(mapper.Map(0xfffffff0U), base::Timestamp::Zero());
+  EXPECT_EQ(mapper.Map(0x00000020U), base::Timestamp::Millis(1));
+}
+
+TEST(RtpReceiveTimestampMapperTest,
+     RestartsDiscontinuousTimelineMonotonically) {
+  RtpReceiveTimestampMapper mapper({.clock_rate_hz = 90000});
+
+  const base::Timestamp first = mapper.Map(3'000'000U);
+  const base::Timestamp second = mapper.Map(3'003'000U);
+  const base::Timestamp restarted = mapper.Map(1'000U);
+  EXPECT_EQ(first, base::Timestamp::Zero());
+  EXPECT_GT(second, first);
+  EXPECT_GT(restarted, second);
+  EXPECT_LT(restarted - second, base::TimeDelta::Millis(2));
+}
+
 }  // namespace
 }  // namespace ave::media::rtp_session

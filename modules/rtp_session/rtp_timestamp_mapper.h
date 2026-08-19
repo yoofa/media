@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <optional>
 
+#include "base/numerics/sequence_number_unwrapper.h"
 #include "base/units/timestamp.h"
 
 namespace ave::media::rtp_session {
@@ -29,6 +30,33 @@ class RtpTimestampMapper {
   uint32_t clock_rate_hz_;
   uint32_t initial_timestamp_;
   std::optional<base::Timestamp> first_pts_;
+};
+
+// Converts a remote RTP clock to a monotonic local media timeline. Sender
+// restarts and large timestamp jumps begin a new epoch just after the last
+// delivered timestamp instead of producing a negative or multi-hour PTS.
+class RtpReceiveTimestampMapper {
+ public:
+  struct Config {
+    uint32_t clock_rate_hz = 0;
+    uint32_t maximum_continuous_gap_ms = 5000;
+    uint32_t restart_gap_us = 1000;
+  };
+
+  explicit RtpReceiveTimestampMapper(Config config);
+
+  base::Timestamp Map(uint32_t rtp_timestamp);
+  void Reset();
+
+ private:
+  int64_t ToMicros(int64_t ticks) const;
+
+  const Config config_;
+  base::RtpTimestampUnwrapper timestamp_unwrapper_;
+  std::optional<int64_t> first_rtp_timestamp_;
+  std::optional<int64_t> last_rtp_timestamp_;
+  int64_t pts_epoch_us_ = 0;
+  int64_t last_pts_us_ = -1;
 };
 
 }  // namespace ave::media::rtp_session
