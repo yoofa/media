@@ -12,6 +12,7 @@
 
 #include "base/units/timestamp.h"
 #include "media/modules/rtp_rtcp/src/transport/transport.h"
+#include "media/modules/rtp_session/security/srtp_session.h"
 #include "media/modules/rtp_session/transport/packet_transport.h"
 #include "media/modules/rtp_session/transport/packet_transport_sink.h"
 
@@ -30,6 +31,9 @@ class RtpTransportObserver {
                             size_t bytes,
                             int64_t send_duration_us,
                             status_t status) = 0;
+
+  virtual void OnPacketDiscarded(RtpTransportPacketType /*packet_type*/,
+                                 status_t /*status*/) {}
 };
 
 class RtpTransport final : public rtp_rtcp::Transport,
@@ -43,6 +47,7 @@ class RtpTransport final : public rtp_rtcp::Transport,
   struct Config {
     std::unique_ptr<PacketTransport> packet_transport;
     std::optional<PacketEndpoint> remote_endpoint;
+    SrtpSessionConfig security;
     RtpTransportObserver* observer = nullptr;
   };
 
@@ -68,14 +73,22 @@ class RtpTransport final : public rtp_rtcp::Transport,
                         size_t bytes,
                         int64_t send_duration_us,
                         status_t status) const;
+  void NotifyPacketDiscarded(RtpTransportPacketType packet_type,
+                             status_t status) const;
   void AddRemoteRtcpEndpointLocked(const PacketEndpoint& endpoint);
 
   std::unique_ptr<PacketTransport> packet_transport_;
+  std::unique_ptr<SrtpSession> srtp_session_;
   RtpTransportObserver* const observer_;
 
   std::mutex lifecycle_mutex_;
   std::mutex callback_mutex_;
   PacketReceivedCallback receive_callback_;
+
+  std::mutex outbound_security_mutex_;
+  std::vector<uint8_t> outbound_security_buffer_;
+  std::mutex inbound_security_mutex_;
+  std::vector<uint8_t> inbound_security_buffer_;
 
   std::mutex endpoints_mutex_;
   std::optional<PacketEndpoint> remote_endpoint_;

@@ -24,19 +24,36 @@ ave_library("rtp_transport") {
 
   deps = [
     ":packet_transport",
+    ":srtp_session",
     "//base:timeutils",
     "//base:utils",
     "//media/modules/rtp_rtcp:transport",
   ]
 }
 
+ave_library("srtp_session") {
+  sources = [
+    "security/srtp_session.cc",
+    "security/srtp_session.h",
+  ]
+
+  deps = [
+    "//base:utils",
+    "//third_party/libsrtp",
+  ]
+}
+
 if (!is_android) {
   ave_source_set("unittest_sources") {
     testonly = true
-    sources = [ "transport/packet_transport_unittest.cc" ]
+    sources = [
+      "security/srtp_session_unittest.cc",
+      "transport/packet_transport_unittest.cc",
+    ]
     deps = [
       ":packet_transport",
       ":rtp_transport",
+      ":srtp_session",
       "//base:clock",
       "//test:test_support",
     ]

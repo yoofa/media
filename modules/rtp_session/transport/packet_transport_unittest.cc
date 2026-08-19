@@ -173,6 +173,10 @@ class FakePacketTransport final : public PacketTransport {
     return destinations_;
   }
 
+  const std::vector<uint8_t>& packet(size_t index) const {
+    return packets_.at(index);
+  }
+
  private:
   PacketTransportSink* sink_ = nullptr;
   std::vector<std::vector<uint8_t>> packets_;
@@ -196,15 +200,33 @@ class RecordingTransportObserver final : public RtpTransportObserver {
     }
   }
 
+  void OnPacketDiscarded(RtpTransportPacketType /*packet_type*/,
+                         status_t status) override {
+    ++discarded_packets_;
+    last_discard_status_ = status;
+  }
+
   uint64_t rtp_packets() const { return rtp_packets_; }
   uint64_t rtcp_packets() const { return rtcp_packets_; }
   uint64_t failures() const { return failures_; }
+  uint64_t discarded_packets() const { return discarded_packets_; }
+  status_t last_discard_status() const { return last_discard_status_; }
 
  private:
   uint64_t rtp_packets_ = 0;
   uint64_t rtcp_packets_ = 0;
   uint64_t failures_ = 0;
+  uint64_t discarded_packets_ = 0;
+  status_t last_discard_status_ = OK;
 };
+
+SrtpKey MakeTransportTestKey(uint8_t seed) {
+  SrtpKey key;
+  for (size_t index = 0; index < key.bytes.size(); ++index) {
+    key.bytes[index] = static_cast<uint8_t>(seed + index);
+  }
+  return key;
+}
 
 TEST(PacketEndpointTest, ParsesAndFormatsIpv4Address) {
   const auto endpoint = PacketEndpoint::CreateIpv4("192.168.1.20", 5000);
@@ -353,6 +375,7 @@ TEST(RtpTransportTest, UpdatesEndpointsAndForwardsArrivalTime) {
   EXPECT_TRUE(transport.SendRtp(rtp_packet, rtp_rtcp::PacketOptions{}));
   ASSERT_EQ(fake->destinations().size(), 1u);
   EXPECT_EQ(fake->destinations()[0], first_endpoint);
+  EXPECT_EQ(fake->packet(0), rtp_packet);
 
   ASSERT_EQ(transport.SetRemoteEndpoint(second_endpoint), OK);
   EXPECT_TRUE(transport.SendRtp(rtp_packet, rtp_rtcp::PacketOptions{}));
@@ -376,6 +399,87 @@ TEST(RtpTransportTest, UpdatesEndpointsAndForwardsArrivalTime) {
   EXPECT_EQ(observer.rtcp_packets(), 2u);
   EXPECT_EQ(observer.failures(), 0u);
   EXPECT_EQ(transport.Stop(), OK);
+}
+
+TEST(RtpTransportTest, ProtectsAndUnprotectsRtpAndRtcp) {
+  const PacketEndpoint sender_endpoint = LoopbackEndpoint(5010);
+  const PacketEndpoint receiver_endpoint = LoopbackEndpoint(5012);
+  const SrtpKey sender_key = MakeTransportTestKey(0x10);
+  const SrtpKey receiver_key = MakeTransportTestKey(0x70);
+
+  auto sender_packet_transport = std::make_unique<FakePacketTransport>();
+  FakePacketTransport* const sender_fake = sender_packet_transport.get();
+  RtpTransport::Config sender_config{
+      .packet_transport = std::move(sender_packet_transport),
+      .remote_endpoint = receiver_endpoint,
+      .security =
+          {
+              .mode = RtpSecurityMode::kSrtpPreSharedKey,
+              .outbound_key = sender_key,
+              .inbound_key = receiver_key,
+          },
+  };
+  RtpTransport sender(std::move(sender_config));
+
+  auto receiver_packet_transport = std::make_unique<FakePacketTransport>();
+  FakePacketTransport* const receiver_fake = receiver_packet_transport.get();
+  RecordingTransportObserver receiver_observer;
+  RtpTransport::Config receiver_config{
+      .packet_transport = std::move(receiver_packet_transport),
+      .remote_endpoint = sender_endpoint,
+      .security =
+          {
+              .mode = RtpSecurityMode::kSrtpPreSharedKey,
+              .outbound_key = receiver_key,
+              .inbound_key = sender_key,
+          },
+      .observer = &receiver_observer,
+  };
+  RtpTransport receiver(std::move(receiver_config));
+
+  std::vector<std::vector<uint8_t>> received_packets;
+  ASSERT_EQ(sender.Start([](std::span<const uint8_t> /*packet*/,
+                            const PacketEndpoint& /*source*/,
+                            base::Timestamp /*arrival_time*/) {}),
+            OK);
+  ASSERT_EQ(receiver.Start([&](std::span<const uint8_t> packet,
+                               const PacketEndpoint& /*source*/,
+                               base::Timestamp /*arrival_time*/) {
+    received_packets.emplace_back(packet.begin(), packet.end());
+  }),
+            OK);
+
+  const std::vector<uint8_t> rtp_packet{
+      0x80, 0x60, 0x00, 0x01, 0x00, 0x00, 0x01, 0xe0,
+      0x11, 0x22, 0x33, 0x44, 0x4f, 0x70, 0x75, 0x73,
+  };
+  ASSERT_TRUE(sender.SendRtp(rtp_packet, rtp_rtcp::PacketOptions{}));
+  ASSERT_EQ(sender_fake->destinations().size(), 1u);
+  ASSERT_GT(sender_fake->packet(0).size(), rtp_packet.size());
+  EXPECT_NE(sender_fake->packet(0), rtp_packet);
+  receiver_fake->InjectPacket(sender_fake->packet(0), sender_endpoint,
+                              base::Timestamp::Millis(10));
+  ASSERT_EQ(received_packets.size(), 1u);
+  EXPECT_EQ(received_packets[0], rtp_packet);
+
+  const std::vector<uint8_t> rtcp_packet{
+      0x80, 0xc8, 0x00, 0x01, 0x11, 0x22, 0x33, 0x44,
+  };
+  ASSERT_TRUE(sender.SendRtcp(rtcp_packet));
+  ASSERT_EQ(sender_fake->destinations().size(), 2u);
+  ASSERT_GT(sender_fake->packet(1).size(), rtcp_packet.size());
+  receiver_fake->InjectPacket(sender_fake->packet(1), sender_endpoint,
+                              base::Timestamp::Millis(20));
+  ASSERT_EQ(received_packets.size(), 2u);
+  EXPECT_EQ(received_packets[1], rtcp_packet);
+
+  receiver_fake->InjectPacket(sender_fake->packet(0), sender_endpoint,
+                              base::Timestamp::Millis(30));
+  EXPECT_EQ(received_packets.size(), 2u);
+  EXPECT_EQ(receiver_observer.discarded_packets(), 1u);
+  EXPECT_EQ(receiver_observer.last_discard_status(), ALREADY_EXISTS);
+  EXPECT_EQ(sender.Stop(), OK);
+  EXPECT_EQ(receiver.Stop(), OK);
 }
 
 }  // namespace
