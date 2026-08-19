@@ -34,6 +34,7 @@ MediaFrame::MediaFrame(size_t size, MediaType media_type)
       native_handle_(nullptr) {}
 
 MediaFrame::MediaFrame(const MediaFrame& other) : MediaMeta(other) {
+  arrival_time_ = other.arrival_time_;
   if (other.buffer_type_ == FrameBufferType::kTypeNormal) {
     data_ = other.data_;
     native_handle_ = nullptr;

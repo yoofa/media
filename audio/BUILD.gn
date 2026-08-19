@@ -4,8 +4,36 @@ ave_library("audio") {
   deps = [
     ":audio_base",
     ":audio_device",
+    ":audio_decoder_stream",
     ":audio_encoder_stream",
+    ":pcm_ring_buffer",
   ]
+}
+
+ave_library("audio_decoder_stream") {
+  sources = [
+    "audio_decoder_stream.cc",
+    "audio_decoder_stream.h",
+  ]
+  deps = [
+    ":pcm_ring_buffer",
+    "//base:clock",
+    "//base:logging",
+    "//base:task_util",
+    "//media/codec:codec_factory",
+    "//media/codec:codec_id",
+    "//media/codec/opus:opus_codec",
+    "//media/foundation:media_frame",
+    "//media/foundation:media_source_sink",
+  ]
+}
+
+ave_library("pcm_ring_buffer") {
+  sources = [
+    "pcm_ring_buffer.cc",
+    "pcm_ring_buffer.h",
+  ]
+  deps = [ "//base:checks" ]
 }
 
 ave_library("audio_encoder_stream") {
@@ -29,9 +57,14 @@ ave_library("audio_encoder_stream") {
 if (!is_android) {
   ave_source_set("audio_encoder_stream_unittest_sources") {
     testonly = true
-    sources = [ "audio_encoder_stream_unittest.cc" ]
+    sources = [
+      "audio_encoder_stream_unittest.cc",
+      "pcm_ring_buffer_unittest.cc",
+    ]
     deps = [
+      ":audio_decoder_stream",
       ":audio_encoder_stream",
+      ":pcm_ring_buffer",
       "//base:clock",
       "//media/foundation:media_frame",
       "//media/foundation:media_source_sink",

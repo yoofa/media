@@ -62,10 +62,18 @@ class MediaFrame : public MediaMeta {
   FrameBufferType buffer_type() const { return buffer_type_; }
   void* native_handle() const { return native_handle_; }
 
+  // Local receive/capture timestamp. This is transport-side timing metadata
+  // and is intentionally separate from media PTS/DTS.
+  void set_arrival_time(base::Timestamp arrival_time) {
+    arrival_time_ = arrival_time;
+  }
+  base::Timestamp arrival_time() const { return arrival_time_; }
+
  private:
   std::shared_ptr<media::Buffer> data_;
   FrameBufferType buffer_type_;
   void* native_handle_;
+  base::Timestamp arrival_time_ = base::Timestamp::MinusInfinity();
 };
 
 }  // namespace media

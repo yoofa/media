@@ -33,6 +33,10 @@ ave_library("rtp_transport") {
 
 ave_library("rtp_session") {
   sources = [
+    "audio_packet_buffer.cc",
+    "audio_packet_buffer.h",
+    "audio_rtp_receive_stream.cc",
+    "audio_rtp_receive_stream.h",
     "audio_rtp_send_stream.cc",
     "audio_rtp_send_stream.h",
     "rtp_session.cc",
@@ -44,6 +48,7 @@ ave_library("rtp_session") {
   deps = [
     ":rtp_transport",
     "//base:clock",
+    "//base/numerics:sequence_number_unwrapper",
     "//base:utils",
     "//base/units:timestamp",
     "//media/foundation:media_frame",
@@ -75,6 +80,7 @@ if (!is_android) {
   ave_source_set("unittest_sources") {
     testonly = true
     sources = [
+      "audio_rtp_receive_stream_unittest.cc",
       "rtp_session_unittest.cc",
       "security/srtp_session_unittest.cc",
       "transport/packet_transport_unittest.cc",
