@@ -43,6 +43,8 @@ ave_library("rtp_session") {
     "rtp_session.h",
     "rtp_timestamp_mapper.cc",
     "rtp_timestamp_mapper.h",
+    "video_rtp_send_stream.cc",
+    "video_rtp_send_stream.h",
   ]
 
   deps = [
@@ -53,6 +55,8 @@ ave_library("rtp_session") {
     "//base/units:timestamp",
     "//media/foundation:media_frame",
     "//media/foundation:media_source_sink",
+    "//media/foundation:avc_util",
+    "//media/foundation/h264",
     "//media/modules/rtp_rtcp:receive_statistics_impl",
     "//media/modules/rtp_rtcp:rtp_header_extension_map",
     "//media/modules/rtp_rtcp:rtp_header_extensions",
@@ -61,6 +65,7 @@ ave_library("rtp_session") {
     "//media/modules/rtp_rtcp:rtp_rtcp_format",
     "//media/modules/rtp_rtcp:rtp_rtcp_interface",
     "//media/modules/rtp_rtcp:rtp_sender_audio",
+    "//media/modules/rtp_rtcp:rtp_sender_video",
   ]
 }
 
@@ -84,6 +89,7 @@ if (!is_android) {
       "rtp_session_unittest.cc",
       "security/srtp_session_unittest.cc",
       "transport/packet_transport_unittest.cc",
+      "video_rtp_send_stream_unittest.cc",
     ]
     deps = [
       ":packet_transport",
@@ -91,6 +97,10 @@ if (!is_android) {
       ":rtp_transport",
       ":srtp_session",
       "//base:clock",
+      "//base:task_util",
+      "//media/modules/rtp_rtcp:rtp_packet_received",
+      "//media/modules/rtp_rtcp:rtp_rtcp_impl2",
+      "//media/modules/rtp_rtcp:transport",
       "//test:test_support",
     ]
   }
